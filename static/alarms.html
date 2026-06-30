@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Allarmi</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:16px 24px; }
+
+    /* Tab */
+    .tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:20px; }
+    .tab-btn {
+      padding:10px 18px; font-size:13px; font-weight:500;
+      background:none; border:none; border-bottom:2px solid transparent;
+      color:var(--text-secondary); cursor:pointer; transition:all 0.15s;
+      margin-bottom:-1px;
+    }
+    .tab-btn.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
+    .tab-btn:hover:not(.active) { color:var(--text-primary); }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    /* Allarmi */
+    .alarm-row {
+      display:flex; align-items:center; gap:12px;
+      padding:12px 16px; border-radius:8px; margin-bottom:8px;
+      border:1px solid var(--border-color);
+      background:var(--bg-secondary);
+      transition:border-color 0.15s;
+    }
+    .alarm-row.alarm   { border-left:3px solid var(--accent-red); }
+    .alarm-row.warning { border-left:3px solid var(--accent-yellow); }
+    .alarm-row.acked   { opacity:0.5; }
+    .alarm-icon { font-size:18px; flex-shrink:0; }
+    .alarm-icon.alarm   { color:var(--accent-red); }
+    .alarm-icon.warning { color:var(--accent-yellow); }
+    .alarm-info { flex:1; min-width:0; }
+    .alarm-asset { font-size:13px; font-weight:600; }
+    .alarm-campo { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .alarm-meta  { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .alarm-valore { font-size:16px; font-weight:700; text-align:right; }
+    .alarm-valore.alarm   { color:var(--accent-red); }
+    .alarm-valore.warning { color:var(--accent-yellow); }
+
+    /* Soglie */
+    .threshold-group { margin-bottom:24px; }
+    .threshold-group-title {
+      font-size:12px; font-weight:700; letter-spacing:0.06em;
+      color:var(--text-muted); text-transform:uppercase;
+      margin-bottom:10px; padding-bottom:6px;
+      border-bottom:1px solid var(--border-color);
+    }
+    .threshold-row {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 0; border-bottom:1px solid var(--border-color);
+    }
+    .threshold-row:last-child { border-bottom:none; }
+    .threshold-label { flex:1; font-size:13px; }
+    .threshold-unit  { font-size:11px; color:var(--text-muted); width:50px; }
+    .threshold-input {
+      width:80px; padding:5px 8px;
+      background:var(--input-bg); border:1px solid var(--input-border);
+      border-radius:6px; color:var(--text-primary); font-size:13px; text-align:center;
+    }
+    .threshold-input:focus { outline:none; border-color:var(--accent-blue); }
+    .threshold-sep { font-size:11px; color:var(--text-muted); }
+
+    /* Storico */
+    .storico-empty { text-align:center; padding:40px; color:var(--text-muted); }
+
+    /* Contatore allarmi */
+    .alarm-counter {
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:12px; color:var(--text-secondary);
+    }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title" data-i18n="all.titolo">Gestione allarmi</h1>
+      <div class="alarm-counter">
+        <span id="counter-alarm" class="badge badge-alarm" style="display:none"></span>
+        <span id="counter-warning" class="badge badge-warning" style="display:none"></span>
+      </div>
+    </div>
+    <div class="page-body">
+      <!-- Tab -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="attivi" data-i18n="all.attivi">Allarmi attivi</button>
+        <button class="tab-btn" data-tab="soglie" data-i18n="all.soglie">Soglie</button>
+        <button class="tab-btn" data-tab="storico" data-i18n="all.storico">Storico</button>
+      </div>
+
+      <!-- Tab: Allarmi attivi -->
+      <div class="tab-content active" id="tab-attivi">
+        <div id="allarmi-list">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+      </div>
+
+      <!-- Tab: Soglie -->
+      <div class="tab-content" id="tab-soglie">
+        <div id="soglie-content">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+        <div id="soglie-actions" style="display:none;margin-top:16px">
+          <button class="btn btn-primary" id="btn-salva-soglie">
+            <i class="fa fa-save"></i> <span data-i18n="all.salva_soglie">Salva soglie</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: Storico -->
+      <div class="tab-content" id="tab-storico">
+        <div id="storico-list">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script>
+  /**
+   * alarms.html - Gestione allarmi GIS Asset Manager v2.0
+   * Autore: Felix / KeyBiz
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('allarmi', { filtri: false });
+  renderSidebar('allarmi');
+  i18n.apply();
+
+  const isAdmin = API.isAdmin();
+  let tuttiAllarmi = [];
+  let tutteSoglie  = [];
+
+  // ── Gestione tab ─────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Caricamento allarmi ───────────────────────────────────────
+  async function caricaAllarmi() {
+    try {
+      tuttiAllarmi = await API.getAlarms();
+      renderAllarmi();
+      renderStorico();
+      aggiornaContatori();
+    } catch (e) {
+      showToast(i18n.t('gen.errore') + ': ' + e.message, 'error');
+    }
+  }
+
+  function renderAllarmi() {
+    const attivi = tuttiAllarmi.filter(a => !a.ack_at);
+    const el = document.getElementById('allarmi-list');
+    if (attivi.length === 0) {
+      el.innerHTML = `
+        <div style="text-align:center;padding:48px;color:var(--text-muted)">
+          <i class="fa fa-check-circle" style="font-size:40px;color:var(--accent-green);display:block;margin-bottom:12px"></i>
+          <p data-i18n="all.nessuno">${i18n.t('all.nessuno')}</p>
+        </div>`;
+      return;
+    }
+    // Ordina: alarm prima, poi warning
+    const ordinati = [...attivi].sort((a,b) => {
+      if (a.livello === b.livello) return new Date(b.created_at) - new Date(a.created_at);
+      return a.livello === 'alarm' ? -1 : 1;
+    });
+    el.innerHTML = ordinati.map(a => `
+      <div class="alarm-row ${a.livello}" id="alarm-${a.id}">
+        <i class="fa fa-exclamation-triangle alarm-icon ${a.livello}"></i>
+        <div class="alarm-info">
+          <div class="alarm-asset">${a.asset_nome}</div>
+          <div class="alarm-campo">${a.campo.replace(/_/g,' ')} · ${a.asset_tipo} · ${a.citta||''}</div>
+          <div class="alarm-meta">${formatData(a.created_at)}</div>
+        </div>
+        <div class="alarm-valore ${a.livello}">${a.valore}</div>
+        ${isAdmin ? `
+          <button class="btn btn-secondary btn-sm" onclick="ackAlarm(${a.id})" title="${i18n.t('all.conferma')}">
+            <i class="fa fa-check"></i>
+          </button>` : ''}
+      </div>`).join('');
+  }
+
+  function renderStorico() {
+    const acked = tuttiAllarmi.filter(a => a.ack_at);
+    const el = document.getElementById('storico-list');
+    if (acked.length === 0) {
+      el.innerHTML = `<div class="storico-empty"><i class="fa fa-history" style="font-size:32px;margin-bottom:8px;display:block"></i><p>${i18n.t('all.nessuno_storico')}</p></div>`;
+      return;
+    }
+    el.innerHTML = acked.map(a => `
+      <div class="alarm-row acked">
+        <i class="fa fa-check-circle" style="color:var(--accent-green);font-size:18px;flex-shrink:0"></i>
+        <div class="alarm-info">
+          <div class="alarm-asset">${a.asset_nome}</div>
+          <div class="alarm-campo">${a.campo.replace(/_/g,' ')} · ${a.asset_tipo}</div>
+          <div class="alarm-meta">${i18n.t('all.rilevato')}: ${formatData(a.created_at)} · ${i18n.t('all.confermato')}: ${formatData(a.ack_at)}</div>
+        </div>
+        <div class="alarm-valore" style="color:var(--text-muted)">${a.valore}</div>
+      </div>`).join('');
+  }
+
+  function aggiornaContatori() {
+    const attivi = tuttiAllarmi.filter(a => !a.ack_at);
+    const nAlarm   = attivi.filter(a => a.livello === 'alarm').length;
+    const nWarning = attivi.filter(a => a.livello === 'warning').length;
+    const cA = document.getElementById('counter-alarm');
+    const cW = document.getElementById('counter-warning');
+    if (nAlarm > 0)   { cA.textContent = nAlarm + ' ' + i18n.t('all.alarm');   cA.style.display = 'inline-flex'; }
+    else cA.style.display = 'none';
+    if (nWarning > 0) { cW.textContent = nWarning + ' ' + i18n.t('all.warning'); cW.style.display = 'inline-flex'; }
+    else cW.style.display = 'none';
+  }
+
+  // ── Acknowledge allarme ───────────────────────────────────────
+  async function ackAlarm(id) {
+    try {
+      await API.ackAlarm(id);
+      showToast(i18n.t('all.ack_ok'), 'success');
+      await caricaAllarmi();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  // ── Caricamento soglie ────────────────────────────────────────
+  async function caricaSoglie() {
+    try {
+      tutteSoglie = await API.getThresholds();
+      renderSoglie();
+    } catch (e) {
+      showToast(i18n.t('gen.errore') + ': ' + e.message, 'error');
+    }
+  }
+
+  function renderSoglie() {
+    const el = document.getElementById('soglie-content');
+    if (!tutteSoglie.length) {
+      el.innerHTML = `<p style="color:var(--text-muted)">${i18n.t('all.nessuna_soglia')}</p>`;
+      return;
+    }
+
+    // Raggruppa per tipo asset
+    const gruppi = {};
+    tutteSoglie.forEach(s => {
+      if (!gruppi[s.asset_tipo]) gruppi[s.asset_tipo] = [];
+      gruppi[s.asset_tipo].push(s);
+    });
+
+    const tipoLabel = {
+      stabilimento: i18n.t('tipo.stabilimento'),
+      ufficio:      i18n.t('tipo.ufficio'),
+      magazzino:    i18n.t('tipo.magazzino'),
+      deposito:     i18n.t('tipo.deposito')
+    };
+    const readonly  = !isAdmin ? 'readonly disabled' : '';
+
+    el.innerHTML = Object.entries(gruppi).map(([tipo, soglie]) => `
+      <div class="threshold-group">
+        <div class="threshold-group-title">
+          <i class="fa ${iconaTipo(tipo)}"></i> ${tipoLabel[tipo]||tipo}
+        </div>
+        ${soglie.map(s => `
+          <div class="threshold-row">
+            <span class="threshold-label">${s.label || s.campo.replace(/_/g,' ')}</span>
+            <span class="threshold-unit">${s.unita||''}</span>
+            <span class="threshold-sep" data-i18n="all.soglia_warning">Warning</span>
+            <input class="threshold-input" type="number" step="0.1"
+                   id="thr-warn-${s.id}" value="${s.warning_value}" ${readonly}>
+            <span class="threshold-sep" data-i18n="all.soglia_alarm">Alarm</span>
+            <input class="threshold-input" type="number" step="0.1"
+                   id="thr-alarm-${s.id}" value="${s.alarm_value}" ${readonly}>
+          </div>`).join('')}
+      </div>`).join('');
+
+    if (isAdmin) {
+      document.getElementById('soglie-actions').style.display = 'block';
+    }
+  }
+
+  // ── Salvataggio soglie ────────────────────────────────────────
+  document.getElementById('btn-salva-soglie')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-salva-soglie');
+    btn.disabled = true;
+    let errori = 0;
+    for (const s of tutteSoglie) {
+      const wEl = document.getElementById('thr-warn-' + s.id);
+      const aEl = document.getElementById('thr-alarm-' + s.id);
+      if (!wEl || !aEl) continue;
+      const wVal = parseFloat(wEl.value);
+      const aVal = parseFloat(aEl.value);
+      if (isNaN(wVal) || isNaN(aVal)) continue;
+      try {
+        await API.updateThreshold(s.id, { warning_value: wVal, alarm_value: aVal });
+      } catch (e) {
+        errori++;
+        showToast(i18n.t('all.errore_soglia') + ' ' + s.label + ': ' + e.message, 'error');
+      }
+    }
+    btn.disabled = false;
+    if (errori === 0) showToast(i18n.t('all.soglie_salvate'), 'success');
+    await caricaSoglie();
+  });
+
+  // ── Utility ───────────────────────────────────────────────────
+  function formatData(iso) {
+    if (!iso) return '–';
+    try {
+      const loc = i18n.getLang() === 'en' ? 'en-GB' : 'it-IT';
+      return new Date(iso).toLocaleString(loc, { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch (_) { return iso; }
+  }
+
+  // ── Avvio ─────────────────────────────────────────────────────
+  caricaAllarmi();
+  caricaSoglie();
+  </script>
+</body>
+</html>
