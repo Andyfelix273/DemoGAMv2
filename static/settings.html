@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Impostazioni</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:24px; max-width:720px; }
+
+    /* Sezioni impostazioni */
+    .settings-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .settings-section-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+    }
+    .settings-section-icon {
+      width: 32px; height: 32px; border-radius: 6px;
+      background: rgba(88,166,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--accent-blue);
+    }
+    .settings-section-title { font-size: 14px; font-weight: 600; }
+    .settings-section-body { padding: 16px 18px; }
+
+    /* Riga impostazione */
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border-color);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 13px; color: var(--text-primary); }
+    .setting-desc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .setting-control { display: flex; align-items: center; gap: 8px; }
+
+    /* Radio group */
+    .radio-group { display: flex; gap: 8px; }
+    .radio-btn {
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border-color); cursor: pointer;
+      background: var(--bg-tertiary); color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .radio-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+    /* Profilo utente */
+    .profile-avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(88,166,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: var(--accent-blue);
+      margin-bottom: 12px;
+    }
+    .profile-nome  { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .profile-ruolo { font-size: 12px; color: var(--text-secondary); }
+
+    /* Info versione */
+    .version-info { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
+    /* Nota sola lettura */
+    .readonly-note {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text-muted);
+      background: var(--bg-tertiary); border-radius: 4px; padding: 3px 8px;
+    }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title" data-i18n="imp.titolo">Impostazioni</h1>
+      <div id="admin-save" style="display:none">
+        <button class="btn btn-primary" id="btn-salva">
+          <i class="fa fa-save"></i> <span data-i18n="imp.salva">Salva impostazioni</span>
+        </button>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- Sezione: Profilo utente -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-user"></i></div>
+          <span class="settings-section-title" data-i18n="imp.profilo">Profilo utente</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="profile-avatar"><i class="fa fa-user"></i></div>
+          <div class="profile-nome" id="profile-nome">–</div>
+          <div class="profile-ruolo" id="profile-ruolo">–</div>
+          <div class="setting-row" style="margin-top:12px">
+            <div>
+              <div class="setting-label">Username</div>
+            </div>
+            <span id="profile-username" style="font-size:13px;color:var(--text-secondary)">–</span>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Email</div>
+            </div>
+            <span id="profile-email" style="font-size:13px;color:var(--text-secondary)">–</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Tema interfaccia -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-adjust"></i></div>
+          <span class="settings-section-title" data-i18n="imp.tema">Tema interfaccia</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label" data-i18n="imp.tema">Tema</div>
+              <div class="setting-desc">Scegli tra tema scuro e tema chiaro</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="tema-group">
+                <span class="radio-btn" data-val="dark" data-i18n="imp.tema_dark">Scuro</span>
+                <span class="radio-btn" data-val="light" data-i18n="imp.tema_light">Chiaro</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Lingua -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-language"></i></div>
+          <span class="settings-section-title" data-i18n="imp.lingua">Lingua</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label" data-i18n="imp.lingua">Lingua interfaccia</div>
+              <div class="setting-desc">Italiano / English</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="lingua-group">
+                <span class="radio-btn" data-val="it">Italiano</span>
+                <span class="radio-btn" data-val="en">English</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Rotte marittime (solo admin) -->
+      <div class="settings-section" id="section-rotte">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-ship"></i></div>
+          <span class="settings-section-title" data-i18n="imp.rotte">Rotte marittime</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label" data-i18n="imp.rotte">Visualizzazione rotte</div>
+              <div class="setting-desc">Mostra le rotte marittime del Mediterraneo sulla mappa</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="rotte-group">
+                <span class="radio-btn" data-val="true" data-i18n="imp.rotte_on">Visibili</span>
+                <span class="radio-btn" data-val="false" data-i18n="imp.rotte_off">Nascoste</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Informazioni applicazione -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-info-circle"></i></div>
+          <span class="settings-section-title">Informazioni</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div class="setting-label">GIS Asset Manager</div>
+            <span style="font-size:12px;color:var(--text-muted)">v2.0</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Sviluppato da</div>
+            <span style="font-size:12px;color:var(--text-secondary)">KeyBiz / Metamorphosis</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Mappa</div>
+            <span style="font-size:12px;color:var(--text-secondary)">Jawg Maps + Leaflet.js</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script>
+  /**
+   * settings.html - Impostazioni GIS Asset Manager v2.0
+   * Autore: Felix / KeyBiz
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('impostazioni', { filtri: false });
+  renderSidebar('impostazioni');
+  i18n.apply();
+
+  const isAdmin = API.isAdmin();
+
+  // Stato corrente impostazioni
+  let cfg = {
+    tema:            Tema.get(),
+    lingua:          i18n.getLang(),
+    rotte_marittime: 'false'
+  };
+
+  // ── Caricamento profilo e configurazione ─────────────────────
+  async function caricaDati() {
+    // Profilo utente
+    try {
+      const me = await API.me();
+      document.getElementById('profile-nome').textContent    = me.nome_completo || me.username;
+      document.getElementById('profile-username').textContent = me.username;
+      document.getElementById('profile-email').textContent   = me.email || '–';
+      const ruoloLabel = me.role === 'admin' ? i18n.t('imp.ruolo_admin') : i18n.t('imp.ruolo_user');
+      document.getElementById('profile-ruolo').innerHTML =
+        `<span class="badge badge-ok" style="font-size:11px">${me.role}</span> ${ruoloLabel}`;
+    } catch (_) {}
+
+    // Configurazione dal backend
+    try {
+      const serverCfg = await API.getConfig();
+      if (serverCfg.tema)            cfg.tema            = serverCfg.tema;
+      if (serverCfg.lingua)          cfg.lingua          = serverCfg.lingua;
+      if (serverCfg.rotte_marittime) cfg.rotte_marittime = serverCfg.rotte_marittime;
+    } catch (_) {}
+
+    // Applica valori ai controlli
+    setRadioGroup('tema-group',   cfg.tema);
+    setRadioGroup('lingua-group', cfg.lingua);
+    setRadioGroup('rotte-group',  cfg.rotte_marittime);
+
+    // Mostra pulsante salva solo per admin
+    if (isAdmin) {
+      document.getElementById('admin-save').style.display = 'block';
+    }
+  }
+
+  // ── Gestione radio group ──────────────────────────────────────
+  function setRadioGroup(groupId, valore) {
+    document.querySelectorAll(`#${groupId} .radio-btn`).forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === valore);
+    });
+  }
+
+  function getRadioValue(groupId) {
+    const active = document.querySelector(`#${groupId} .radio-btn.active`);
+    return active ? active.dataset.val : null;
+  }
+
+  // Click sui radio button
+  document.querySelectorAll('.radio-group').forEach(group => {
+    group.addEventListener('click', e => {
+      const btn = e.target.closest('.radio-btn');
+      if (!btn) return;
+      // Per tema e lingua: applica subito in locale (non richiede admin)
+      const groupId = group.id;
+      group.querySelectorAll('.radio-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (groupId === 'tema-group') {
+        Tema.set(btn.dataset.val);
+        cfg.tema = btn.dataset.val;
+      } else if (groupId === 'lingua-group') {
+        i18n.setLang(btn.dataset.val);
+        cfg.lingua = btn.dataset.val;
+        // Riapplica traduzioni
+        i18n.apply();
+      } else if (groupId === 'rotte-group') {
+        cfg.rotte_marittime = btn.dataset.val;
+      }
+    });
+  });
+
+  // ── Salvataggio configurazione (solo admin) ───────────────────
+  document.getElementById('btn-salva')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-salva');
+    btn.disabled = true;
+    try {
+      await API.updateConfig({
+        tema:            getRadioValue('tema-group')   || cfg.tema,
+        lingua:          getRadioValue('lingua-group') || cfg.lingua,
+        rotte_marittime: getRadioValue('rotte-group')  || cfg.rotte_marittime
+      });
+      showToast(i18n.t('imp.salvato'), 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Avvio ─────────────────────────────────────────────────────
+  caricaDati();
+  </script>
+</body>
+</html>

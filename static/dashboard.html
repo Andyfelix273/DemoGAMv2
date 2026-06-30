@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metamorphosis Online Demo</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Header centrato senza navigazione ─────────────────── */
+    .demo-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px 32px;
+      border-bottom: 1px solid var(--border-color);
+      gap: 14px;
+    }
+    .demo-logo { height: 120px; object-fit: contain; }
+    .demo-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text-primary);
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .demo-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* ── Corpo pagina ──────────────────────────────────────── */
+    .dashboard-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px 64px;
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      max-width: 880px;
+      width: 100%;
+    }
+    .module-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 28px 24px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+    a.module-card:hover {
+      border-color: var(--accent-blue);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 24px rgba(31,111,235,0.18);
+    }
+    .module-card.disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .module-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      background: rgba(31,111,235,0.12);
+      color: var(--accent-blue);
+    }
+    .module-card.disabled .module-icon {
+      background: rgba(139,148,158,0.1);
+      color: var(--text-muted);
+    }
+    .module-body { flex: 1; }
+    .module-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 6px;
+    }
+    .module-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      margin: 0;
+    }
+    .module-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 3px 9px;
+      border-radius: 20px;
+      align-self: flex-start;
+      background: rgba(139,148,158,0.12);
+      color: var(--text-muted);
+    }
+    .module-badge.live {
+      background: rgba(31,111,235,0.15);
+      color: var(--accent-blue);
+    }
+
+    /* ── Footer logout ─────────────────────────────────────── */
+    .demo-footer {
+      text-align: center;
+      padding: 20px 24px;
+      border-top: 1px solid var(--border-color);
+    }
+    .demo-footer button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .demo-footer button:hover { color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+
+  <!-- Header: logo + titolo demo, nessuna navigazione -->
+  <header class="demo-header">
+    <img id="demo-logo" class="demo-logo" src="/static/img/metamorphosis_logo.png" alt="Metamorphosis">
+    <h1 class="demo-title">Metamorphosis Online Demo</h1>
+    <p class="demo-subtitle">Seleziona il modulo da avviare</p>
+  </header>
+
+  <main class="dashboard-main">
+    <div class="modules-grid">
+
+      <!-- Modulo 1: GIS Asset Manager — disponibile -->
+      <a class="module-card" href="/static/map.html">
+        <div class="module-icon"><i class="fa fa-map-marker"></i></div>
+        <div class="module-body">
+          <p class="module-title">GIS Asset Manager</p>
+          <p class="module-desc">Visualizza e gestisci gli asset aziendali georeferenziati su mappa interattiva con monitoraggio operativo in tempo reale e gestione allarmi.</p>
+        </div>
+        <span class="module-badge live">Disponibile</span>
+      </a>
+
+      <!-- Modulo 2: Occupancy — prossimamente -->
+      <div class="module-card disabled">
+        <div class="module-icon"><i class="fa fa-users"></i></div>
+        <div class="module-body">
+          <p class="module-title">Occupancy &amp; Efficientamento</p>
+          <p class="module-desc">Analisi dell'occupazione degli edifici per ottimizzare l'utilizzo degli spazi e ridurre i consumi energetici attraverso dati IoT real-time.</p>
+        </div>
+        <span class="module-badge">Prossimamente</span>
+      </div>
+
+      <!-- Modulo 3: Infrastrutture — prossimamente -->
+      <div class="module-card disabled">
+        <div class="module-icon"><i class="fa fa-road"></i></div>
+        <div class="module-body">
+          <p class="module-title">Monitoraggio Infrastrutture</p>
+          <p class="module-desc">Supervisione dello stato strutturale di ponti, viadotti e infrastrutture critiche con integrazione sensori IoT e analisi predittiva.</p>
+        </div>
+        <span class="module-badge">Prossimamente</span>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer con solo il pulsante logout -->
+  <footer class="demo-footer">
+    <button onclick="API.logout()">
+      <i class="fa fa-sign-out"></i> Esci
+    </button>
+  </footer>
+
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script>
+    // Protezione pagina
+    if (!requireAuth()) throw new Error('not authenticated');
+
+    // Applica tema
+    Tema.apply();
+
+    // Il logo KeyBiz è unico (non cambia con il tema)
+
+    // Nessun messaggio di benvenuto
+  </script>
+</body>
+</html>

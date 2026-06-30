@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIS Asset Manager — KeyBiz</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Font Awesome per le icone -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* =============================================
+           RESET E VARIABILI
+        ============================================= */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* Tema dark (default) */
+        :root {
+            --bg-dark:       #0D1B2A;
+            --bg-panel:      #132338;
+            --bg-card:       #1A2E45;
+            --accent:        #00A3E0;
+            --accent-dim:    rgba(0, 163, 224, 0.15);
+            --text-primary:  #F0F4F8;
+            --text-secondary:#8FA8C0;
+            --border:        rgba(255,255,255,0.08);
+            --stato-attivo:  #27AE60;
+            --stato-man:     #F39C12;
+            --stato-inattivo:#E74C3C;
+            --tipo-stab:     #E74C3C;
+            --tipo-uff:      #3498DB;
+            --tipo-mag:      #F39C12;
+            --tipo-dep:      #27AE60;
+            --panel-width:   420px;
+            --loader-bg:     rgba(13, 27, 42, 0.8);
+        }
+
+        /* Tema light */
+        :root.light {
+            --bg-dark:       #EEF2F7;
+            --bg-panel:      #FFFFFF;
+            --bg-card:       #F5F7FA;
+            --accent:        #0077B6;
+            --accent-dim:    rgba(0, 119, 182, 0.10);
+            --text-primary:  #1A2E45;
+            --text-secondary:#5A7A96;
+            --border:        rgba(0,0,0,0.10);
+            --stato-attivo:  #1A7A4A;
+            --stato-man:     #B07800;
+            --stato-inattivo:#C0392B;
+            --tipo-stab:     #E74C3C;
+            --tipo-uff:      #2980B9;
+            --tipo-mag:      #E67E22;
+            --tipo-dep:      #27AE60;
+            --panel-width:   420px;
+            --loader-bg:     rgba(238, 242, 247, 0.85);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* =============================================
+           TOPBAR
+        ============================================= */
+        .topbar {
+            height: 56px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 16px;
+            flex-shrink: 0;
+            z-index: 1000;
+        }
+
+        .topbar-logo {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 1px;
+        }
+
+        .topbar-separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+        }
+
+        .topbar-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* Toggle tema dark/light */
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .theme-toggle-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            user-select: none;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: background 0.25s;
+        }
+
+        .toggle-switch input:checked + .toggle-track {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            transition: transform 0.25s, background 0.25s;
+        }
+
+        .toggle-switch input:checked ~ .toggle-thumb {
+            transform: translateX(20px);
+            background: #fff;
+        }
+
+        .toggle-icon {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Campo di ricerca */
+        .search-container {
+            margin-left: 16px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .search-input {
+            width: 240px;
+            height: 32px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0 12px 0 30px;
+            font-size: 13px;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input::placeholder { color: var(--text-secondary); }
+        .search-input:focus { border-color: var(--accent); }
+
+        .search-results {
+            position: absolute;
+            top: 38px;
+            left: 0;
+            width: 100%;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            max-height: 260px;
+            overflow-y: auto;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+
+        .search-results.visible { display: block; }
+
+        .search-result-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item:hover { background: var(--accent-dim); }
+
+        .search-result-dot {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
+
+        .search-result-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .search-result-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .search-no-results {
+            padding: 14px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .topbar-filters {
+            margin-left: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .filter-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+        .filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+        .filter-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+        }
+
+        /* =============================================
+           LAYOUT PRINCIPALE
+        ============================================= */
+        .main-layout {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* =============================================
+           MAPPA
+        ============================================= */
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
+
+        /* Filtro blu notte applicato solo ai tile, non ai marker */
+        .leaflet-tile-pane {
+            filter: hue-rotate(195deg) saturate(1.3) brightness(0.85);
+        }
+
+        /* =============================================
+           PANNELLO LATERALE
+        ============================================= */
+        .side-panel {
+            width: var(--panel-width);
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .panel-placeholder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 40px;
+            gap: 16px;
+        }
+
+        .panel-placeholder i { font-size: 48px; opacity: 0.3; }
+        .panel-placeholder p { font-size: 14px; line-height: 1.6; }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: none;
+        }
+
+        .panel-content.visible { display: block; }
+
+        /* Dashboard di sintesi (vista iniziale) */
+        .overview-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .overview-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+        }
+
+        .overview-kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .overview-kpi-card:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover, rgba(100,180,255,0.05));
+        }
+
+        .overview-kpi-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .overview-kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .overview-kpi-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .overview-kpi-sub {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 3px solid #E74C3C;
+            cursor: pointer;
+        }
+
+        .alert-item:hover { opacity: 0.85; }
+
+        .alert-item.livello-bassa { border-left-color: #F39C12; }
+
+        .alert-icon { color: #E74C3C; font-size: 13px; margin-top: 1px; }
+        .alert-icon.bassa { color: #F39C12; }
+
+        .alert-nome { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+        .alert-msg  { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+        .back-to-overview {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+            cursor: pointer;
+            margin-bottom: 16px;
+            opacity: 0.85;
+        }
+        .back-to-overview:hover { opacity: 1; }
+
+        .overview-ts {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        /* Scrollbar personalizzata */
+        .panel-content::-webkit-scrollbar { width: 4px; }
+        .panel-content::-webkit-scrollbar-track { background: transparent; }
+        .panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* =============================================
+           DETTAGLIO ASSET
+        ============================================= */
+        .asset-header {
+            margin-bottom: 20px;
+        }
+
+        .asset-tipo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .asset-nome {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .asset-codice {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .stato-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .stato-attivo  { background: rgba(39,174,96,0.15);  color: var(--stato-attivo); }
+        .stato-manutenzione { background: rgba(243,156,18,0.15); color: var(--stato-man); }
+        .stato-inattivo { background: rgba(231,76,60,0.15);  color: var(--stato-inattivo); }
+
+        /* Sezioni del pannello */
+        .section-title {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section { margin-bottom: 24px; }
+
+        /* Griglia info anagrafica */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .info-item { display: flex; flex-direction: column; gap: 3px; }
+        .info-item.full { grid-column: 1 / -1; }
+
+        .info-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        /* KPI di monitoraggio */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-top: 2px solid var(--accent);
+            padding: 12px;
+        }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.3;
+        }
+
+        /* Barra di progresso */
+        .progress-bar-container {
+            margin-top: 6px;
+        }
+
+        .progress-bar-bg {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-bar-fill.warn { background: var(--stato-man); }
+        .progress-bar-fill.danger { background: var(--stato-inattivo); }
+
+        /* Timestamp aggiornamento */
+        .update-time {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        .update-time i { margin-right: 4px; }
+
+        /* Nota simulazione */
+        .sim-note {
+            background: rgba(0, 163, 224, 0.08);
+            border: 1px solid rgba(0, 163, 224, 0.2);
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-top: 16px;
+        }
+
+        .sim-note i { color: var(--accent); margin-right: 6px; }
+
+        /* =============================================
+           MARKER PERSONALIZZATI LEAFLET
+        ============================================= */
+        .custom-marker {
+            width: 26px !important;
+            height: 26px !important;
+            border-radius: 50%;
+            border: 1.5px solid currentColor;
+            background: transparent !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+
+        .custom-marker.selected {
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.6);
+        }
+
+        .custom-marker i {
+            font-size: 11px;
+        }
+
+        /* =============================================
+           LEGENDA MAPPA
+        ============================================= */
+        .map-legend {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+
+        .legend-title {
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            min-width: 180px;
+        }
+
+        .legend-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* =============================================
+           LOADER
+        ============================================= */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--loader-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .loading-overlay.hidden { display: none; }
+
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* =============================================
+           ECG ANIMATO (monitoraggio operativo)
+        ============================================= */
+        .ecg-container {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .ecg-svg {
+            width: 48px;
+            height: 16px;
+            overflow: visible;
+        }
+
+        .ecg-line {
+            fill: none;
+            stroke: var(--stato-attivo);
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Maschera scorrevole che rivela la linea da sinistra a destra */
+        .ecg-mask-rect {
+            animation: ecg-scroll 1.8s linear infinite;
+        }
+
+        @keyframes ecg-scroll {
+            0%   { transform: translateX(-48px); }
+            100% { transform: translateX(48px); }
+        }
+
+        /* Punto pulsante alla fine della linea */
+        .ecg-dot {
+            fill: var(--stato-attivo);
+            animation: ecg-pulse 1.8s ease-in-out infinite;
+        }
+
+        @keyframes ecg-pulse {
+            0%, 100% { opacity: 1; r: 2.5; }
+            50%       { opacity: 0.3; r: 1.5; }
+        }
+
+        /* Toggle OpenSeaMap */
+        .sea-toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+            white-space: nowrap;
+        }
+
+        .sea-toggle-btn:hover {
+            border-color: #2980B9;
+            color: #2980B9;
+        }
+
+        .sea-toggle-btn.active {
+            background: rgba(41, 128, 185, 0.15);
+            border-color: #2980B9;
+            color: #2980B9;
+        }
+
+        .sea-toggle-btn i { font-size: 13px; }
+
+        /* Nome cliente nella topbar */
+        .topbar-client {
+            font-size: 15px;
+            font-weight: 700;
+            color: #F39C12;
+            background: transparent;
+            border: none;
+            padding: 0 4px;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+    <!-- Pulsante ritorno alla dashboard -->
+    <button onclick="tornaDashboard()" style="background:transparent;border:1px solid rgba(100,160,255,0.2);border-radius:6px;color:rgba(255,255,255,0.5);font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;margin-right:12px;transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(100,160,255,0.5)';this.style.color='rgba(255,255,255,0.8)'" onmouseout="this.style.borderColor='rgba(100,160,255,0.2)';this.style.color='rgba(255,255,255,0.5)'">
+        <i class="fas fa-th-large" style="font-size:12px"></i> Dashboard
+    </button>
+    <img id="meta-logo" src="/static/logodark.png" alt="Metamorphosis" style="height:32px; width:auto; object-fit:contain;">
+    <div class="topbar-separator"></div>
+    <span class="topbar-title">GIS Asset Manager</span>
+
+    <!-- TOGGLE DARK/LIGHT + ROTTE MARITTIME (raggruppati a destra) -->
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+        <!-- Toggle dark/light -->
+        <div class="theme-toggle">
+            <i class="fas fa-sun toggle-icon" id="iconLight"></i>
+            <label class="toggle-switch">
+                <input type="checkbox" id="themeToggle">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+            </label>
+            <i class="fas fa-moon toggle-icon" id="iconDark"></i>
+        </div>
+        <div class="topbar-separator"></div>
+        <!-- Toggle rotte marittime: icona nave SVG -->
+        <div style="display:flex;align-items:center;gap:6px;" title="Mostra/nascondi rotte marittime">
+            <svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:0.7;">
+                <path d="M2 11 L4 15 L18 15 L20 11 Z" stroke="var(--text-secondary)" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+                <line x1="11" y1="2" x2="11" y2="11" stroke="var(--text-secondary)" stroke-width="1.4"/>
+                <path d="M11 3 L17 10 L11 10 Z" stroke="var(--text-secondary)" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+                <path d="M1 17 Q4 15.5 7 17 Q10 18.5 13 17 Q16 15.5 19 17" stroke="var(--text-secondary)" stroke-width="1" fill="none"/>
+            </svg>
+            <label class="toggle-switch">
+                <input type="checkbox" id="seaToggle">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+            </label>
+        </div>
+    </div>
+
+    <!-- CAMPO DI RICERCA -->
+    <div class="search-container">
+        <i class="fas fa-search search-icon"></i>
+        <input type="text" id="searchInput" class="search-input" placeholder="Cerca asset per nome...">
+        <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <div class="topbar-filters">
+        <button class="filter-btn active" data-tipo="tutti">
+            <i class="fas fa-layer-group" style="font-size:11px;"></i> Tutti
+        </button>
+        <button class="filter-btn" data-tipo="stabilimento">
+            <i class="fas fa-industry" style="font-size:11px;"></i> Stabilimenti
+        </button>
+        <button class="filter-btn" data-tipo="ufficio">
+            <i class="fas fa-building" style="font-size:11px;"></i> Uffici
+        </button>
+        <button class="filter-btn" data-tipo="magazzino">
+            <i class="fas fa-warehouse" style="font-size:11px;"></i> Magazzini
+        </button>
+        <button class="filter-btn" data-tipo="deposito_mezzi">
+            <i class="fas fa-truck" style="font-size:11px;"></i> Depositi
+        </button>
+    </div>
+</div>
+
+<!-- LAYOUT PRINCIPALE -->
+<div class="main-layout">
+
+    <!-- MAPPA -->
+    <div id="map"></div>
+
+    <!-- PANNELLO LATERALE -->
+    <div class="side-panel" id="sidePanel">
+        <div class="panel-header">
+            <div style="font-size:13px; font-weight:600; color:var(--text-secondary);">
+                <i class="fas fa-info-circle" style="color:var(--accent); margin-right:8px;"></i>
+                Scheda Asset
+            </div>
+        </div>
+
+        <!-- Vista iniziale: dashboard di sintesi -->
+        <div class="overview-panel" id="overviewPanel"></div>
+
+        <!-- Contenuto dettaglio asset -->
+        <div class="panel-content" id="panelContent"></div>
+    </div>
+</div>
+
+<!-- LOADER -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <span style="font-size:13px; color:var(--text-secondary);">Caricamento asset in corso...</span>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// =============================================
+// CONFIGURAZIONE MAPPA
+// =============================================
+const map = L.map('map', {
+    center: [42.5, 12.5],  // Centro Italia
+    zoom: 6,
+    zoomControl: true,
+    attributionControl: true
+});
+
+// Logo DSS posizionato sopra la legenda (bottomleft, ordine superiore)
+// Logo Metamorphosis: overlay fisso in basso a sinistra, sopra la legenda
+// Cambia automaticamente tra logodark.png e logolight.png al cambio tema
+
+// Legenda (aggiornata dinamicamente dopo il caricamento degli asset)
+const legend = L.control({ position: 'bottomleft' });
+legend.onAdd = function() {
+    const div = L.DomUtil.create('div', 'map-legend');
+    div.id = 'map-legend-content';
+    div.innerHTML = `<div class="legend-title">Tipologia asset</div><div style="color:var(--text-secondary);font-size:11px">Caricamento...</div>`;
+    return div;
+};
+legend.addTo(map);
+
+function aggiornaLegenda(features) {
+    const conteggi = {};
+    features.forEach(f => {
+        const t = f.properties.tipo;
+        conteggi[t] = (conteggi[t] || 0) + 1;
+    });
+    const voci = [
+        { tipo: 'stabilimento',   label: 'Stabilimento',  icona: 'fa-industry'  },
+        { tipo: 'ufficio',        label: 'Ufficio',        icona: 'fa-building'  },
+        { tipo: 'magazzino',      label: 'Magazzino',      icona: 'fa-warehouse' },
+        { tipo: 'deposito_mezzi', label: 'Deposito Mezzi', icona: 'fa-truck'     },
+    ];
+    const div = document.getElementById('map-legend-content');
+    if (!div) return;
+    div.innerHTML = `<div class="legend-title">Tipologia asset</div>` +
+        voci.map(v => {
+            const n = conteggi[v.tipo] || 0;
+            return `<div class="legend-item">
+                <i class="fas ${v.icona}" style="width:16px;text-align:center;color:${COLORE_MARKER};font-size:12px;"></i>
+                <span style="flex:1;margin-left:6px;">${v.label}</span>
+                <span style="font-size:11px;font-weight:600;color:var(--accent);margin-left:8px">${n}</span>
+            </div>`;
+        }).join('');
+}
+
+// =============================================
+// STATO APPLICAZIONE
+// =============================================
+let allMarkers = [];       // array di { marker, feature }
+let selectedMarker = null;
+let filtroAttivo = 'tutti';
+
+// =============================================
+// ICONE FONT AWESOME PER TIPO
+// =============================================
+const ICONE = {
+    'stabilimento':   'fa-industry',
+    'ufficio':        'fa-building',
+    'magazzino':      'fa-warehouse',
+    'deposito_mezzi': 'fa-truck',
+};
+
+// Colore unico per tutti i marker (azzurro desaturato, tenue)
+const COLORE_MARKER   = '#7BAFC4';
+const COLORE_SELECTED = '#F39C12';  // arancione per marker selezionato
+
+// =============================================
+// CREAZIONE MARKER PERSONALIZZATO
+// =============================================
+function creaIcona(colore, tipoIcona, selected = false) {
+    // Il parametro colore viene ignorato: si usa sempre il colore uniforme
+    const faClass  = ICONE[tipoIcona] || 'fa-map-pin';
+    const c        = selected ? COLORE_SELECTED : COLORE_MARKER;
+    const selClass = selected ? ' selected' : '';
+    return L.divIcon({
+        className: '',
+        html: `<div class="custom-marker${selClass}" style="color:${c}; border-color:${c};">
+                   <i class="fas ${faClass}" style="color:${c};"></i>
+               </div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -15]
+    });
+}
+
+// =============================================
+// CARICAMENTO ASSET DAL BACKEND
+// =============================================
+async function caricaAssets() {
+    try {
+        const res = await fetch('/api/assets');
+        const geojson = await res.json();
+
+        aggiornaLegenda(geojson.features);
+
+        geojson.features.forEach(feature => {
+            const { lat, lon } = { lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0] };
+            const props = feature.properties;
+
+            const marker = L.marker([lat, lon], {
+                icon: creaIcona(props.colore, props.tipo)
+            }).addTo(map);
+
+            marker.on('click', () => selezionaAsset(feature, marker));
+
+            allMarkers.push({ marker, feature });
+        });
+
+        document.getElementById('loadingOverlay').classList.add('hidden');
+    } catch (err) {
+        console.error('Errore caricamento asset:', err);
+        document.getElementById('loadingOverlay').innerHTML =
+            '<i class="fas fa-exclamation-triangle" style="color:#E74C3C;font-size:32px"></i>' +
+            '<span style="color:#E74C3C;font-size:13px">Errore nel caricamento degli asset</span>';
+    }
+}
+
+// =============================================
+// SELEZIONE ASSET E CARICAMENTO DETTAGLIO
+// =============================================
+async function selezionaAsset(feature, marker) {
+    // Ripristina marker precedente
+    if (selectedMarker) {
+        const prev = allMarkers.find(m => m.marker === selectedMarker);
+        if (prev) {
+            prev.marker.setIcon(creaIcona(prev.feature.properties.colore, prev.feature.properties.tipo, false));
+        }
+    }
+
+    // Evidenzia marker selezionato
+    marker.setIcon(creaIcona(feature.properties.colore, feature.properties.tipo, true));
+    selectedMarker = marker;
+
+    // Centra mappa sull'asset
+    map.flyTo([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], Math.max(map.getZoom(), 10), {
+        duration: 0.8
+    });
+
+    // Mostra loader nel pannello, nasconde la overview
+    document.getElementById('overviewPanel').style.display = 'none';
+    const panelContent = document.getElementById('panelContent');
+    panelContent.classList.add('visible');
+    panelContent.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    // Carica dettaglio dal backend
+    try {
+        const res = await fetch(`/api/assets/${feature.properties.id}`);
+        const data = await res.json();
+        renderDettaglio(data, panelContent, feature.properties.colore);
+    } catch (err) {
+        panelContent.innerHTML = '<div style="color:#E74C3C;padding:20px">Errore nel caricamento del dettaglio.</div>';
+    }
+}
+
+// =============================================
+// RENDERING DETTAGLIO ASSET NEL PANNELLO
+// =============================================
+function renderDettaglio(data, container, colore) {
+    const a = data.anagrafica;
+    const m = data.monitoraggio;
+
+    // Badge stato
+    const statoClass = { 'attivo': 'stato-attivo', 'manutenzione': 'stato-manutenzione', 'inattivo': 'stato-inattivo' }[a.stato] || '';
+    const statoLabel = { 'attivo': 'Attivo', 'manutenzione': 'In manutenzione', 'inattivo': 'Inattivo' }[a.stato] || a.stato;
+
+    // Link di ritorno alla panoramica
+    let html = `
+        <div class="back-to-overview" id="btnPanoramica">
+            <i class="fas fa-arrow-left" style="font-size:10px;"></i> Panoramica
+        </div>
+        <div class="asset-header">
+            <div>
+                <span class="asset-tipo-badge" style="background:${colore}22; color:${colore}; border:1px solid ${colore}44">
+                    <i class="fas ${ICONE[a.tipo] || 'fa-map-pin'}"></i>
+                    ${a.tipo_label}
+                </span>
+                <span class="stato-badge ${statoClass}">
+                    <i class="fas fa-circle" style="font-size:6px"></i>
+                    ${statoLabel}
+                </span>
+            </div>
+            <div class="asset-nome">${a.nome}</div>
+            <div class="asset-codice">${a.codice}</div>
+        </div>
+
+        <!-- ANAGRAFICA -->
+        <div class="section">
+            <div class="section-title">Anagrafica</div>
+            <div class="info-grid">
+                <div class="info-item full">
+                    <span class="info-label">Indirizzo</span>
+                    <span class="info-value">${a.indirizzo}, ${a.citta} (${a.provincia}) ${a.cap}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Anno costruzione</span>
+                    <span class="info-value">${a.anno_costruzione || '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Superficie</span>
+                    <span class="info-value">${a.superficie_mq ? a.superficie_mq.toLocaleString('it-IT') + ' m²' : '—'}</span>
+                </div>
+                <div class="info-item full">
+                    <span class="info-label">Referente</span>
+                    <span class="info-value">${a.referente || '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Telefono</span>
+                    <span class="info-value">${a.telefono || '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email</span>
+                    <span class="info-value" style="font-size:11px">${a.email || '—'}</span>
+                </div>
+                ${a.note ? `<div class="info-item full">
+                    <span class="info-label">Note</span>
+                    <span class="info-value" style="font-size:12px;color:var(--text-secondary)">${a.note}</span>
+                </div>` : ''}
+            </div>
+        </div>
+
+        <!-- COORDINATE -->
+        <div class="section">
+            <div class="section-title">Georeferenziazione</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Latitudine</span>
+                    <span class="info-value" style="font-family:monospace">${a.lat.toFixed(5)}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Longitudine</span>
+                    <span class="info-value" style="font-family:monospace">${a.lon.toFixed(5)}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // MONITORAGGIO (dipende dal tipo)
+        if (m) {
+        html += `<div class="section">
+            <div class="section-title" style="display:flex;align-items:center;">
+                Monitoraggio operativo
+                <span class="ecg-container">
+                    <svg class="ecg-svg" viewBox="0 0 48 16" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <clipPath id="ecg-clip">
+                                <rect class="ecg-mask-rect" x="0" y="-4" width="48" height="24"/>
+                            </clipPath>
+                        </defs>
+                        <!-- Tracciato ECG stilizzato -->
+                        <polyline class="ecg-line"
+                            clip-path="url(#ecg-clip)"
+                            points="0,8 6,8 9,8 11,2 13,14 15,8 18,8 24,8 27,8 29,2 31,14 33,8 36,8 42,8 45,8 47,2 48,14"
+                        />
+                        <!-- Punto pulsante finale -->
+                        <circle class="ecg-dot" cx="46" cy="8" r="2.5"/>
+                    </svg>
+                </span>
+            </div>`;
+
+        if (a.tipo === 'ufficio') {
+            const pct = Math.round((m.dipendenti_presenti / m.capienza_massima) * 100);
+            const barClass = pct > 90 ? 'danger' : pct > 70 ? 'warn' : '';
+            html += `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.dipendenti_presenti}</div>
+                        <div class="kpi-label">Dipendenti presenti</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill ${barClass}" style="width:${pct}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.capienza_massima}</div>
+                        <div class="kpi-label">Capienza massima</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.sale_riunioni_occupate} / ${m.sale_riunioni_totali}</div>
+                        <div class="kpi-label">Sale riunioni occupate</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${pct}%</div>
+                        <div class="kpi-label">Occupancy</div>
+                    </div>
+                </div>`;
+        }
+
+        else if (a.tipo === 'stabilimento') {
+            const pctLinee = Math.round((m.linee_produzione_attive / m.linee_produzione_totali) * 100);
+            html += `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.personale_attivo}</div>
+                        <div class="kpi-label">Personale attivo</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.linee_produzione_attive} / ${m.linee_produzione_totali}</div>
+                        <div class="kpi-label">Linee produzione attive</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" style="width:${pctLinee}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="kpi-card" style="grid-column:1/-1">
+                        <div class="kpi-value">${m.media_produzione_giornaliera_pz ? m.media_produzione_giornaliera_pz.toLocaleString('it-IT') : 0}</div>
+                        <div class="kpi-label">Media produzione giornaliera (pz)</div>
+                    </div>
+                </div>`;
+        }
+
+        else if (a.tipo === 'magazzino') {
+            const pctSat = m.saturazione_stoccaggio_pct || 0;
+            const satClass = pctSat > 90 ? 'danger' : pctSat > 75 ? 'warn' : '';
+            html += `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.operatori_presenti}</div>
+                        <div class="kpi-label">Operatori presenti</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.mezzi_magazzino_presenti} / ${m.mezzi_magazzino_totali}</div>
+                        <div class="kpi-label">Mezzi in magazzino</div>
+                    </div>
+                    <div class="kpi-card" style="grid-column:1/-1">
+                        <div class="kpi-value">${pctSat}%</div>
+                        <div class="kpi-label">Saturazione stoccaggio</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill ${satClass}" style="width:${pctSat}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        else if (a.tipo === 'deposito_mezzi') {
+            const pctMezzi = Math.round((m.mezzi_presenti / m.mezzi_totali) * 100);
+            html += `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.mezzi_presenti} / ${m.mezzi_totali}</div>
+                        <div class="kpi-label">Mezzi presenti in deposito</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" style="width:${pctMezzi}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.mezzi_in_missione}</div>
+                        <div class="kpi-label">Mezzi in missione</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.mezzi_in_manutenzione}</div>
+                        <div class="kpi-label">Mezzi in manutenzione</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value">${m.mezzi_totali - m.mezzi_presenti - m.mezzi_in_missione}</div>
+                        <div class="kpi-label">Mezzi non disponibili</div>
+                    </div>
+                </div>`;
+        }
+
+        html += `
+            <div class="update-time"><i class="fas fa-clock"></i>Simulato — in produzione: dati da API sensori</div>
+            </div>`;
+
+        // Nota simulazione
+        html += `
+            <div class="sim-note">
+                <i class="fas fa-info-circle"></i>
+                I dati di monitoraggio provengono dal database locale. In una implementazione reale, questi valori verrebbero aggiornati in tempo reale tramite chiamate API verso sensori o sistemi di campo.
+            </div>`;
+    }
+
+    container.innerHTML = html;
+
+    // Evento click sul link Panoramica
+    const btnPanoramica = document.getElementById('btnPanoramica');
+    if (btnPanoramica) {
+        btnPanoramica.addEventListener('click', () => {
+            // Deseleziona marker corrente
+            if (selectedMarker) {
+                const prev = allMarkers.find(m => m.marker === selectedMarker);
+                if (prev) prev.marker.setIcon(creaIcona(prev.feature.properties.colore, prev.feature.properties.tipo, false));
+                selectedMarker = null;
+            }
+            // Mostra overview, nasconde dettaglio
+            document.getElementById('panelContent').classList.remove('visible');
+            document.getElementById('overviewPanel').style.display = '';
+        });
+    }
+}
+
+// =============================================
+// FILTRI PER TIPO
+// =============================================
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filtroAttivo = btn.dataset.tipo;
+
+        allMarkers.forEach(({ marker, feature }) => {
+            const tipo = feature.properties.tipo;
+            if (filtroAttivo === 'tutti' || tipo === filtroAttivo) {
+                if (!map.hasLayer(marker)) map.addLayer(marker);
+            } else {
+                if (map.hasLayer(marker)) map.removeLayer(marker);
+            }
+        });
+    });
+});
+
+// =============================================
+// TOGGLE TEMA DARK / LIGHT
+// =============================================
+const JAWG_TOKEN = 'QHoHKE9mfIrm3sUkmrrM1v95NtcsqYNtMOdLeC91Hb1n1mLrqMzLWKzTkHLON1bD';
+let tileLayer = null;
+
+function applicaTema(isLight) {
+    const root = document.documentElement;
+
+    if (isLight) {
+        root.classList.add('light');
+    } else {
+        root.classList.remove('light');
+    }
+
+    // Rimuovi il tile layer corrente e sostituiscilo
+    if (tileLayer) map.removeLayer(tileLayer);
+
+    const stile = isLight ? 'jawg-light' : 'jawg-dark';
+    tileLayer = L.tileLayer(
+        `https://tile.jawg.io/${stile}/{z}/{x}/{y}{r}.png?access-token=${JAWG_TOKEN}`,
+        {
+            attribution: '<a href="https://jawg.io" target="_blank">&copy; Jawg Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 22
+        }
+    );
+    // Inserisce il tile layer sotto tutti gli altri layer
+    tileLayer.addTo(map);
+    tileLayer.bringToBack();
+
+    // Switch logo Metamorphosis dark/light
+    const logoEl = document.getElementById('meta-logo');
+    if (logoEl) {
+        logoEl.src = isLight ? '/static/logolight.png' : '/static/logodark.png';
+    }
+
+    // Salva preferenza
+    localStorage.setItem('gis-tema', isLight ? 'light' : 'dark');
+}
+
+// Inizializzazione tile layer con tema dark (default)
+tileLayer = L.tileLayer(
+    `https://tile.jawg.io/jawg-dark/{z}/{x}/{y}{r}.png?access-token=${JAWG_TOKEN}`,
+    {
+        attribution: '<a href="https://jawg.io" target="_blank">&copy; Jawg Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 22
+    }
+).addTo(map);
+
+// Ripristina preferenza salvata
+const temaPrec = localStorage.getItem('gis-tema');
+if (temaPrec === 'light') {
+    document.getElementById('themeToggle').checked = true;
+    applicaTema(true);
+}
+
+document.getElementById('themeToggle').addEventListener('change', function() {
+    applicaTema(this.checked);
+});
+
+// =============================================
+// LAYER ROTTE MARITTIME (GeoJSON shipping lanes)
+// =============================================
+
+// Stile per tipo di rotta
+function stileRotta(feature) {
+    const tipo = feature.properties.Type;
+    if (tipo === 'Major') {
+        return { color: '#00BFFF', weight: 2, opacity: 0.85, dashArray: null };
+    } else if (tipo === 'Middle') {
+        return { color: '#4FC3F7', weight: 1.2, opacity: 0.65, dashArray: '6,4' };
+    } else {
+        return { color: '#81D4FA', weight: 0.8, opacity: 0.45, dashArray: '3,5' };
+    }
+}
+
+let shippingLayer = null;  // caricato al primo click
+let seaLayerAttivo = false;
+
+const seaToggle = document.getElementById('seaToggle');
+
+seaToggle.addEventListener('change', () => {
+    seaLayerAttivo = seaToggle.checked;
+
+    if (seaLayerAttivo) {
+        if (shippingLayer) {
+            // Layer già caricato: lo riaggiunge
+            shippingLayer.addTo(map);
+        } else {
+            // Prima attivazione: carica entrambi i dataset in parallelo
+            Promise.all([
+                fetch('/static/shipping_lanes.geojson').then(r => r.json()),
+                fetch('/static/med_routes.geojson').then(r => r.json())
+            ]).then(([globalData, medData]) => {
+                // Unisce le features dei due dataset
+                const combined = {
+                    type: 'FeatureCollection',
+                    features: [...globalData.features, ...medData.features]
+                };
+                shippingLayer = L.geoJSON(combined, {
+                    style: stileRotta,
+                    onEachFeature: function(feature, layer) {
+                        const tipo = feature.properties.Type;
+                        const nome = feature.properties.nome || `Rotta ${tipo}`;
+                        layer.bindTooltip(
+                            nome,
+                            { sticky: true, className: 'leaflet-tooltip', direction: 'top' }
+                        );
+                    }
+                }).addTo(map);
+                shippingLayer.bringToBack();
+            }).catch(err => {
+                console.error('Errore caricamento rotte:', err);
+                seaToggle.checked = false;
+                seaLayerAttivo = false;
+            });
+        }
+    } else {
+        if (shippingLayer) map.removeLayer(shippingLayer);
+    }
+});
+
+// =============================================
+// RICERCA ASSET
+// =============================================
+const searchInput  = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+
+searchInput.addEventListener('input', () => {
+    const query = searchInput.value.trim().toLowerCase();
+
+    if (query.length < 2) {
+        searchResults.classList.remove('visible');
+        searchResults.innerHTML = '';
+        return;
+    }
+
+    // Filtra tra tutti gli asset caricati
+    const matches = allMarkers.filter(({ feature }) =>
+        feature.properties.nome.toLowerCase().includes(query) ||
+        feature.properties.codice.toLowerCase().includes(query) ||
+        (feature.properties.citta && feature.properties.citta.toLowerCase().includes(query))
+    );
+
+    if (matches.length === 0) {
+        searchResults.innerHTML = '<div class="search-no-results">Nessun asset trovato</div>';
+    } else {
+        searchResults.innerHTML = matches.map(({ feature }) => `
+            <div class="search-result-item" data-id="${feature.properties.id}">
+                <span class="search-result-dot" style="background:${feature.properties.colore}"></span>
+                <span class="search-result-name">${feature.properties.nome}</span>
+                <span class="search-result-meta">${feature.properties.citta || ''}</span>
+            </div>
+        `).join('');
+
+        // Clic su un risultato: seleziona l'asset sulla mappa
+        searchResults.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = parseInt(item.dataset.id);
+                const found = allMarkers.find(m => m.feature.properties.id === id);
+                if (found) {
+                    selezionaAsset(found.feature, found.marker);
+                    searchInput.value = found.feature.properties.nome;
+                    searchResults.classList.remove('visible');
+                }
+            });
+        });
+    }
+
+    searchResults.classList.add('visible');
+});
+
+// Chiudi i risultati cliccando fuori
+document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.classList.remove('visible');
+    }
+});
+
+// =============================================
+// DASHBOARD DI SINTESI (vista iniziale pannello)
+// =============================================
+async function caricaStats() {
+    const panel = document.getElementById('overviewPanel');
+    panel.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-secondary)"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    try {
+        const res  = await fetch('/api/stats');
+        const data = await res.json();
+        const ora  = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+        let html = `
+            <div class="overview-title">Panoramica operativa</div>
+            <div class="overview-ts"><i class="fas fa-clock" style="margin-right:4px;"></i>Aggiornato alle ${ora} &mdash; ${data.totale_asset} asset totali</div>
+        `;
+
+        // KPI per categoria
+        data.kpi.forEach(k => {
+            const barClass = k.percentuale >= 85 ? 'danger' : k.percentuale >= 70 ? 'warn' : '';
+            html += `
+                <div class="overview-kpi-card" data-tipo="${k.tipo}">
+                    <div class="overview-kpi-header">
+                        <span class="overview-kpi-label">
+                            <i class="fas ${k.icona}" style="color:${COLORE_MARKER};"></i>
+                            ${k.label} <span style="font-weight:400;opacity:0.6">(${k.count})</span>
+                        </span>
+                        <span class="overview-kpi-value">${k.valore_principale}</span>
+                    </div>
+                    <div class="overview-kpi-sub">${k.sottotitolo}</div>
+                    <div class="progress-bar-container" style="margin-top:8px;">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill ${barClass}" style="width:${k.percentuale}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Alert
+        if (data.alert.length > 0) {
+            html += `<div class="overview-title" style="margin-top:20px;">Situazioni da monitorare</div>`;
+            data.alert.forEach(a => {
+                html += `
+                    <div class="alert-item livello-${a.livello}" data-id="${a.id}">
+                        <i class="fas ${a.icona} alert-icon ${a.livello === 'bassa' ? 'bassa' : ''}"></i>
+                        <div>
+                            <div class="alert-nome">${a.nome}</div>
+                            <div class="alert-msg">${a.citta} &mdash; ${a.messaggio}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += `
+                <div style="margin-top:20px;padding:12px;background:var(--bg-card);border:1px solid var(--border);font-size:12px;color:var(--text-secondary);">
+                    <i class="fas fa-check-circle" style="color:#27AE60;margin-right:6px;"></i>
+                    Nessuna situazione critica rilevata.
+                </div>
+            `;
+        }
+
+        panel.innerHTML = html;
+
+        // Click su KPI card: filtra la mappa per tipo
+        panel.querySelectorAll('.overview-kpi-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const tipo = card.dataset.tipo;
+                // Attiva il filtro corrispondente
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.tipo === tipo);
+                });
+                filtroAttivo = tipo;
+                allMarkers.forEach(({ marker, feature }) => {
+                    if (feature.properties.tipo === tipo) {
+                        if (!map.hasLayer(marker)) map.addLayer(marker);
+                    } else {
+                        if (map.hasLayer(marker)) map.removeLayer(marker);
+                    }
+                });
+            });
+        });
+
+        // Click su alert: apre il dettaglio dell'asset
+        panel.querySelectorAll('.alert-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = parseInt(item.dataset.id);
+                const found = allMarkers.find(m => m.feature.properties.id === id);
+                if (found) selezionaAsset(found.feature, found.marker);
+            });
+        });
+
+    } catch (err) {
+        panel.innerHTML = '<div style="color:#E74C3C;padding:20px;font-size:12px;">Errore nel caricamento della panoramica.</div>';
+    }
+}
+
+// =============================================
+// AVVIO
+// =============================================
+// Controllo autenticazione
+if (sessionStorage.getItem('gam_auth') !== '1') {
+    
+}
+
+// Funzione ritorno alla dashboard
+function tornaDashboard() {
+    window.location.href = '/static/dashboard.html';
+}
+
+caricaAssets();
+caricaStats();
+</script>
+</body>
+</html>

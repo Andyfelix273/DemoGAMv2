@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Anagrafica</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-actions { display:flex; gap:8px; align-items:center; }
+    .page-body { padding:16px 24px; }
+
+    /* Barra ricerca + contatore */
+    .table-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; gap: 12px;
+    }
+    .table-header-left { display:flex; gap:8px; align-items:center; flex:1; }
+    .search-wrap { position:relative; flex:1; max-width:320px; }
+    .search-wrap .fa { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted); }
+    .search-wrap input { padding-left:30px; }
+    .record-count { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+
+    /* Tabella */
+    .table-wrap { overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; }
+    .stato-badge {
+      display:inline-block; padding:2px 8px; border-radius:20px;
+      font-size:11px; font-weight:600;
+    }
+    .stato-attivo      { background:rgba(63,185,80,0.15);  color:var(--accent-green); }
+    .stato-manutenzione{ background:rgba(243,156,18,0.15); color:var(--accent-orange); }
+    .stato-inattivo    { background:rgba(110,118,129,0.15);color:var(--text-muted); }
+
+    /* Paginazione */
+    .pagination {
+      display:flex; align-items:center; justify-content:flex-end;
+      gap:4px; margin-top:12px;
+    }
+    .page-btn {
+      min-width:32px; height:32px; padding:0 8px;
+      border:1px solid var(--border-color); border-radius:6px;
+      background:var(--bg-secondary); color:var(--text-secondary);
+      font-size:13px; cursor:pointer; transition:all 0.15s;
+    }
+    .page-btn:hover:not(:disabled) { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .page-btn.active { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
+    .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* Modal form asset */
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+    .form-grid .full { grid-column:1/-1; }
+
+    /* Import Excel */
+    .import-zone {
+      border:2px dashed var(--border-color); border-radius:8px;
+      padding:24px; text-align:center; cursor:pointer;
+      transition:border-color 0.15s;
+    }
+    .import-zone:hover { border-color:var(--accent-blue); }
+    .import-zone.drag-over { border-color:var(--accent-blue); background:rgba(88,166,255,0.05); }
+    .import-result { margin-top:12px; font-size:13px; }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title" data-i18n="ana.titolo">Anagrafica asset</h1>
+      <div class="page-actions" id="admin-actions" style="display:none">
+        <button class="btn btn-secondary btn-sm" id="btn-import" title="Importa da Excel">
+          <i class="fa fa-upload"></i> <span data-i18n="ana.importa">Importa Excel</span>
+        </button>
+        <button class="btn btn-primary btn-sm" id="btn-nuovo">
+          <i class="fa fa-plus"></i> <span data-i18n="ana.nuovo">Nuovo asset</span>
+        </button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="table-header">
+        <div class="table-header-left">
+          <div class="search-wrap">
+            <i class="fa fa-search"></i>
+            <input class="form-control" type="text" id="search-input"
+                   placeholder="Cerca..." data-i18n-placeholder="ana.cerca">
+          </div>
+          <select class="form-control" id="filter-tipo" style="width:auto">
+            <option value="" data-i18n="tipo.tutti">Tutti i tipi</option>
+            <option value="stabilimento" data-i18n="tipo.stabilimento">Stabilimento</option>
+            <option value="ufficio" data-i18n="tipo.ufficio">Ufficio</option>
+            <option value="magazzino" data-i18n="tipo.magazzino">Magazzino</option>
+            <option value="deposito" data-i18n="tipo.deposito">Deposito</option>
+          </select>
+          <select class="form-control" id="filter-stato" style="width:auto">
+            <option value="" data-i18n="tipo.tutti">Tutti gli stati</option>
+            <option value="attivo" data-i18n="stato.attivo">Attivo</option>
+            <option value="manutenzione" data-i18n="stato.manutenzione">Manutenzione</option>
+            <option value="inattivo" data-i18n="stato.inattivo">Inattivo</option>
+          </select>
+        </div>
+        <span class="record-count" id="record-count"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="assets-table">
+          <thead>
+            <tr>
+              <th data-i18n="ana.codice">Codice</th>
+              <th data-i18n="ana.nome">Nome</th>
+              <th data-i18n="ana.tipo">Tipo</th>
+              <th data-i18n="ana.citta">Città</th>
+              <th data-i18n="ana.stato">Stato</th>
+              <th data-i18n="ana.azioni">Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="assets-tbody">
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">
+              <div class="spinner" style="margin:0 auto"></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <!-- Modal: Nuovo / Modifica asset -->
+  <div class="modal-overlay" id="modal-asset" style="display:none">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title">Nuovo asset</span>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <form id="asset-form">
+        <input type="hidden" id="asset-id">
+        <div class="form-grid">
+          <div class="form-group">
+            <label data-i18n="campo.codice">Codice</label>
+            <input class="form-control" type="text" id="f-codice" required>
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.tipo">Tipo</label>
+            <select class="form-control" id="f-tipo" required>
+              <option value="stabilimento" data-i18n="tipo.stabilimento">Stabilimento</option>
+              <option value="ufficio" data-i18n="tipo.ufficio">Ufficio</option>
+              <option value="magazzino" data-i18n="tipo.magazzino">Magazzino</option>
+              <option value="deposito" data-i18n="tipo.deposito">Deposito</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label data-i18n="campo.nome">Nome</label>
+            <input class="form-control" type="text" id="f-nome" required>
+          </div>
+          <div class="form-group full">
+            <label data-i18n="campo.indirizzo">Indirizzo</label>
+            <input class="form-control" type="text" id="f-indirizzo">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.citta">Città</label>
+            <input class="form-control" type="text" id="f-citta">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.provincia">Provincia</label>
+            <input class="form-control" type="text" id="f-provincia" maxlength="2">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.cap">CAP</label>
+            <input class="form-control" type="text" id="f-cap" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.stato">Stato</label>
+            <select class="form-control" id="f-stato">
+              <option value="attivo" data-i18n="stato.attivo">Attivo</option>
+              <option value="manutenzione" data-i18n="stato.manutenzione">In manutenzione</option>
+              <option value="inattivo" data-i18n="stato.inattivo">Inattivo</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.lat">Latitudine</label>
+            <input class="form-control" type="number" step="0.0001" id="f-lat" required>
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.lon">Longitudine</label>
+            <input class="form-control" type="number" step="0.0001" id="f-lon" required>
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.referente">Referente</label>
+            <input class="form-control" type="text" id="f-referente">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.telefono">Telefono</label>
+            <input class="form-control" type="text" id="f-telefono">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.email">Email</label>
+            <input class="form-control" type="email" id="f-email">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.superficie">Superficie (mq)</label>
+            <input class="form-control" type="number" id="f-superficie">
+          </div>
+          <div class="form-group">
+            <label data-i18n="campo.anno">Anno costruzione</label>
+            <input class="form-control" type="number" id="f-anno" min="1900" max="2030">
+          </div>
+          <div class="form-group full">
+            <label data-i18n="campo.note">Note</label>
+            <textarea class="form-control" id="f-note" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-annulla" data-i18n="gen.annulla">Annulla</button>
+          <button type="submit" class="btn btn-primary" id="btn-salva" data-i18n="gen.salva">Salva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Import Excel -->
+  <div class="modal-overlay" id="modal-import" style="display:none">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <span class="modal-title" data-i18n="ana.importa">Importa da Excel</span>
+        <button class="modal-close" id="import-close">&times;</button>
+      </div>
+      <div class="import-zone" id="import-zone">
+        <i class="fa fa-file-excel-o" style="font-size:32px;color:var(--accent-green);margin-bottom:8px"></i>
+        <p style="font-size:14px;margin-bottom:4px">Trascina il file .xlsx qui</p>
+        <p style="font-size:12px;color:var(--text-muted)">oppure clicca per selezionare</p>
+        <input type="file" id="import-file" accept=".xlsx" style="display:none">
+      </div>
+      <div class="import-result" id="import-result"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="import-cancel" data-i18n="gen.annulla">Annulla</button>
+        <button class="btn btn-primary" id="btn-scarica-template">
+          <i class="fa fa-download"></i> Template Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script>
+  /**
+   * assets.html - Anagrafica asset GIS Asset Manager v2.0
+   * Autore: Felix / KeyBiz
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('anagrafica', { filtri: false });
+  renderSidebar('anagrafica');
+  i18n.apply();
+
+  // Mostra azioni admin
+  if (API.isAdmin()) {
+    document.getElementById('admin-actions').style.display = 'flex';
+  }
+
+  // Stato
+  let allAssets = [];
+  let filtered  = [];
+  let pagina    = 1;
+  const PER_PAG = 15;
+
+  // Caricamento asset
+  async function caricaAssets() {
+    try {
+      const geojson = await API.getAssets();
+      allAssets = (geojson.features || []).map(f => ({
+        ...f.properties,
+        lat: f.geometry?.coordinates[1],
+        lon: f.geometry?.coordinates[0]
+      }));
+      applicaFiltri();
+    } catch (e) {
+      showToast(i18n.t('gen.errore') + ': ' + e.message, 'error');
+    }
+  }
+
+  // Filtri e ricerca
+  function applicaFiltri() {
+    const testo = document.getElementById('search-input').value.toLowerCase();
+    const tipo  = document.getElementById('filter-tipo').value;
+    const stato = document.getElementById('filter-stato').value;
+    filtered = allAssets.filter(a => {
+      if (tipo  && a.tipo  !== tipo)  return false;
+      if (stato && a.stato !== stato) return false;
+      if (testo && !a.nome.toLowerCase().includes(testo) &&
+          !a.codice.toLowerCase().includes(testo) &&
+          !(a.citta||'').toLowerCase().includes(testo)) return false;
+      return true;
+    });
+    pagina = 1;
+    renderTabella();
+  }
+
+  // Rendering tabella
+  function renderTabella() {
+    const totale = filtered.length;
+    const inizio = (pagina - 1) * PER_PAG;
+    const pagina_items = filtered.slice(inizio, inizio + PER_PAG);
+
+    document.getElementById('record-count').textContent = totale + ' asset';
+
+    const tbody = document.getElementById('assets-tbody');
+    if (pagina_items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px" data-i18n="ana.nessun_asset">Nessun asset trovato</td></tr>`;
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+
+    const isAdmin = API.isAdmin();
+    const tipoLabel = {
+      stabilimento: i18n.t('tipo.stabilimento'),
+      ufficio:      i18n.t('tipo.ufficio'),
+      magazzino:    i18n.t('tipo.magazzino'),
+      deposito:     i18n.t('tipo.deposito')
+    };
+    tbody.innerHTML = pagina_items.map(a => `
+      <tr>
+        <td><code style="font-size:12px;color:var(--text-secondary)">${a.codice}</code></td>
+        <td>${a.nome}</td>
+        <td><i class="fa ${iconaTipo(a.tipo)} tipo-icon"></i> ${tipoLabel[a.tipo]||a.tipo}</td>
+        <td>${a.citta||'–'} ${a.provincia?'('+a.provincia+')':''}</td>
+        <td><span class="stato-badge stato-${a.stato}">${i18n.t('stato.'+a.stato)||a.stato}</span></td>
+        <td>
+          ${isAdmin ? `
+            <button class="btn btn-ghost btn-sm" onclick="apriModifica(${a.id})" title="${i18n.t('ana.modifica')}">
+              <i class="fa fa-pencil"></i>
+            </button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--accent-red)" onclick="eliminaAsset(${a.id},'${a.nome.replace(/'/g,"\\'")}')">
+              <i class="fa fa-trash"></i>
+            </button>
+          ` : '<span style="color:var(--text-muted);font-size:12px">–</span>'}
+        </td>
+      </tr>`).join('');
+
+    // Paginazione
+    const totPag = Math.ceil(totale / PER_PAG);
+    const pag = document.getElementById('pagination');
+    if (totPag <= 1) { pag.innerHTML = ''; return; }
+
+    let html = `<button class="page-btn" ${pagina===1?'disabled':''} onclick="cambiaPagina(${pagina-1})">
+                  <i class="fa fa-chevron-left"></i></button>`;
+    for (let i = 1; i <= totPag; i++) {
+      if (totPag > 7 && Math.abs(i - pagina) > 2 && i !== 1 && i !== totPag) {
+        if (i === 2 || i === totPag - 1) html += '<span style="padding:0 4px;color:var(--text-muted)">…</span>';
+        continue;
+      }
+      html += `<button class="page-btn ${i===pagina?'active':''}" onclick="cambiaPagina(${i})">${i}</button>`;
+    }
+    html += `<button class="page-btn" ${pagina===totPag?'disabled':''} onclick="cambiaPagina(${pagina+1})">
+               <i class="fa fa-chevron-right"></i></button>`;
+    pag.innerHTML = html;
+  }
+
+  function cambiaPagina(n) { pagina = n; renderTabella(); }
+
+  // ── Modal: Nuovo asset ───────────────────────────────────────
+  function apriNuovo() {
+    document.getElementById('modal-title').textContent = i18n.t('ana.nuovo_titolo');
+    document.getElementById('asset-form').reset();
+    document.getElementById('asset-id').value = '';
+    document.getElementById('modal-asset').style.display = 'flex';
+  }
+
+  // ── Modal: Modifica asset ────────────────────────────────────
+  async function apriModifica(id) {
+    document.getElementById('modal-title').textContent = i18n.t('ana.modifica_titolo');
+    document.getElementById('asset-id').value = id;
+    const a = allAssets.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('f-codice').value    = a.codice || '';
+    document.getElementById('f-nome').value      = a.nome || '';
+    document.getElementById('f-tipo').value      = a.tipo || 'ufficio';
+    document.getElementById('f-indirizzo').value = a.indirizzo || '';
+    document.getElementById('f-citta').value     = a.citta || '';
+    document.getElementById('f-provincia').value = a.provincia || '';
+    document.getElementById('f-cap').value       = a.cap || '';
+    document.getElementById('f-stato').value     = a.stato || 'attivo';
+    document.getElementById('f-lat').value       = a.lat || '';
+    document.getElementById('f-lon').value       = a.lon || '';
+    document.getElementById('f-referente').value = a.referente || '';
+    document.getElementById('f-telefono').value  = a.telefono || '';
+    document.getElementById('f-email').value     = a.email || '';
+    document.getElementById('f-superficie').value= a.superficie_mq || '';
+    document.getElementById('f-anno').value      = a.anno_costruzione || '';
+    document.getElementById('f-note').value      = a.note || '';
+    document.getElementById('modal-asset').style.display = 'flex';
+  }
+
+  // ── Salvataggio form ─────────────────────────────────────────
+  document.getElementById('asset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('asset-id').value;
+    const payload = {
+      codice:           document.getElementById('f-codice').value.trim(),
+      nome:             document.getElementById('f-nome').value.trim(),
+      tipo:             document.getElementById('f-tipo').value,
+      indirizzo:        document.getElementById('f-indirizzo').value.trim() || null,
+      citta:            document.getElementById('f-citta').value.trim() || null,
+      provincia:        document.getElementById('f-provincia').value.trim() || null,
+      cap:              document.getElementById('f-cap').value.trim() || null,
+      stato:            document.getElementById('f-stato').value,
+      lat:              parseFloat(document.getElementById('f-lat').value),
+      lon:              parseFloat(document.getElementById('f-lon').value),
+      referente:        document.getElementById('f-referente').value.trim() || null,
+      telefono:         document.getElementById('f-telefono').value.trim() || null,
+      email:            document.getElementById('f-email').value.trim() || null,
+      superficie_mq:    parseInt(document.getElementById('f-superficie').value) || null,
+      anno_costruzione: parseInt(document.getElementById('f-anno').value) || null,
+      note:             document.getElementById('f-note').value.trim() || null,
+    };
+    const btn = document.getElementById('btn-salva');
+    btn.disabled = true;
+    try {
+      if (id) {
+        await API.updateAsset(parseInt(id), payload);
+        showToast('Asset aggiornato', 'success');
+      } else {
+        await API.createAsset(payload);
+        showToast('Asset creato', 'success');
+      }
+      chiudiModal();
+      await caricaAssets();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Eliminazione asset ───────────────────────────────────────
+  function eliminaAsset(id, nome) {
+    showConfirm(i18n.t('ana.conferma_elimina') + ' "' + nome + '"?', async () => {
+      try {
+        await API.deleteAsset(id);
+        showToast('Asset eliminato', 'success');
+        await caricaAssets();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  // ── Chiudi modal ─────────────────────────────────────────────
+  function chiudiModal() {
+    document.getElementById('modal-asset').style.display = 'none';
+    document.getElementById('modal-import').style.display = 'none';
+  }
+
+  // ── Import Excel ─────────────────────────────────────────────
+  async function importaFile(file) {
+    const resultEl = document.getElementById('import-result');
+    resultEl.innerHTML = '<div class="spinner" style="margin:8px auto"></div>';
+    try {
+      const res = await API.importExcel(file);
+      let html = `<p style="color:var(--accent-green)"><i class="fa fa-check"></i> ${i18n.t('ana.import_ok')}</p>`;
+      html += `<p style="font-size:12px;color:var(--text-secondary)">Inseriti: ${res.inseriti} · Aggiornati: ${res.aggiornati}</p>`;
+      if (res.errori?.length) {
+        html += `<p style="font-size:12px;color:var(--accent-red)">Errori: ${res.errori.join(', ')}</p>`;
+      }
+      resultEl.innerHTML = html;
+      await caricaAssets();
+    } catch (err) {
+      resultEl.innerHTML = `<p style="color:var(--accent-red)"><i class="fa fa-times"></i> ${err.message}</p>`;
+    }
+  }
+
+  // Template Excel: genera CSV scaricabile come placeholder
+  function scaricaTemplate() {
+    const intestazioni = 'codice,nome,tipo,indirizzo,citta,provincia,cap,lat,lon,referente,telefono,email,superficie_mq,anno_costruzione,stato,note';
+    const esempio = 'ASS-0021,Nuovo Asset,ufficio,Via Esempio 1,Milano,MI,20100,45.4642,9.1900,Mario Rossi,02-1234567,m.rossi@example.it,1000,2020,attivo,Note di esempio';
+    const blob = new Blob([intestazioni + '\n' + esempio], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'template_asset.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Event listeners ──────────────────────────────────────────
+  document.getElementById('btn-nuovo')?.addEventListener('click', apriNuovo);
+  document.getElementById('modal-close').addEventListener('click', chiudiModal);
+  document.getElementById('btn-annulla').addEventListener('click', chiudiModal);
+  document.getElementById('btn-import')?.addEventListener('click', () => {
+    document.getElementById('import-result').innerHTML = '';
+    document.getElementById('modal-import').style.display = 'flex';
+  });
+  document.getElementById('import-close').addEventListener('click', chiudiModal);
+  document.getElementById('import-cancel').addEventListener('click', chiudiModal);
+  document.getElementById('btn-scarica-template').addEventListener('click', scaricaTemplate);
+
+  // Drag & drop import
+  const importZone = document.getElementById('import-zone');
+  importZone.addEventListener('click', () => document.getElementById('import-file').click());
+  importZone.addEventListener('dragover', e => { e.preventDefault(); importZone.classList.add('drag-over'); });
+  importZone.addEventListener('dragleave', () => importZone.classList.remove('drag-over'));
+  importZone.addEventListener('drop', e => {
+    e.preventDefault(); importZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) importaFile(file);
+  });
+  document.getElementById('import-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) importaFile(file);
+  });
+
+  // Filtri
+  document.getElementById('search-input').addEventListener('input', applicaFiltri);
+  document.getElementById('filter-tipo').addEventListener('change', applicaFiltri);
+  document.getElementById('filter-stato').addEventListener('change', applicaFiltri);
+
+  // Avvio
+  caricaAssets();
+  </script>
+</body>
+</html>

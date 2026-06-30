@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Accesso</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: #0d1117;
+      overflow: hidden;
+    }
+    .bg {
+      position: fixed; inset: 0;
+      background: url('/static/img/bg_control_room.jpg') center/cover no-repeat;
+      filter: brightness(0.35) saturate(0.7);
+      z-index: 0;
+    }
+    .login-box {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 400px;
+      background: rgba(22, 27, 34, 0.92);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      border-radius: 14px;
+      padding: 40px 36px 32px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      backdrop-filter: blur(12px);
+      animation: fadeUp 0.5s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .logo-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      margin-bottom: 28px;
+    }
+    .logo-main  { height: 72px; object-fit: contain; }
+    .logo-small { height: 28px; object-fit: contain; opacity: 0.7; }
+    .login-title {
+      text-align: center;
+      font-size: 15px; font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+    .error-msg {
+      display: none;
+      background: rgba(248, 81, 73, 0.15);
+      border: 1px solid var(--accent-red);
+      color: var(--accent-red);
+      border-radius: 6px; padding: 8px 12px;
+      font-size: 13px; margin-bottom: 14px;
+      text-align: center;
+    }
+    .btn-login {
+      width: 100%; padding: 11px;
+      background: var(--accent-blue);
+      color: #fff; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      margin-top: 8px;
+    }
+    .btn-login:hover:not(:disabled) { background: #388bfd; }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-hint {
+      text-align: center; margin-top: 16px;
+      font-size: 12px; color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="login-box">
+    <div class="logo-wrap">
+      <img class="logo-main" src="/static/img/logodark.png" alt="Metamorphosis">
+      <img class="logo-small" src="/static/img/keybiz_logo.png" alt="KeyBiz">
+    </div>
+    <p class="login-title" data-i18n="login.titolo">Accedi alla piattaforma</p>
+    <div class="error-msg" id="error-msg"></div>
+    <form id="login-form" autocomplete="off">
+      <div class="form-group">
+        <label data-i18n="login.utente">Utente</label>
+        <input class="form-control" type="text" id="username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label data-i18n="login.password">Password</label>
+        <input class="form-control" type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn-login" type="submit" id="btn-login" data-i18n="login.accedi">Accedi</button>
+    </form>
+    <p class="login-hint" data-i18n="login.hint">Demo: admin / demo2026</p>
+  </div>
+
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (API.isAuthenticated()) window.location.href = '/static/dashboard.html';
+    i18n.apply();
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn   = document.getElementById('btn-login');
+      const errEl = document.getElementById('error-msg');
+      btn.disabled = true;
+      btn.textContent = i18n.t('login.caricamento');
+      errEl.style.display = 'none';
+      try {
+        await API.login(
+          document.getElementById('username').value.trim(),
+          document.getElementById('password').value
+        );
+        window.location.href = '/static/dashboard.html';
+      } catch (_) {
+        errEl.textContent = i18n.t('login.errore');
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = i18n.t('login.accedi');
+      }
+    });
+  </script>
+</body>
+</html>
