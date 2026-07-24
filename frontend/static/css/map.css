@@ -387,6 +387,7 @@
     .kpi-group-header {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
       font-size: 10px;
       font-weight: 700;

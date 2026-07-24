@@ -467,7 +467,7 @@ async function caricaStats() {
     let html = `
       <div id="op-kpi-groups">
         <div class="kpi-group group-wo">
-          <div class="kpi-group-header"><i class="fas fa-wrench"></i> Work Order</div>
+          <div class="kpi-group-header"><i class="fas fa-wrench"></i> Manutenzione</div>
           <div class="op-kpi-grid" id="op-kpi-wo">
             <div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:11px;grid-column:span 3;"><i class="fas fa-spinner fa-spin"></i></div>
           </div>
