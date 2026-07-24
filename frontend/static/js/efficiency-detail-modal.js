@@ -2,7 +2,7 @@
  * efficiency-detail-modal.js — Modale dettaglio asset condivisa
  *
  * Componente autonomo: inietta il markup HTML della modale nel <body>,
- * gestisce tutti i 7 tab (Anagrafica, Consumi, Occupancy, Allarmi, ESG,
+ * gestisce tutti i 7 tab (Anagrafica, Consumi, Occupancy, Allarmi, Efficienza energetica,
  * Impianti, Zone) e si apre con apriDettaglioAsset(id).
  *
  * Utilizzato da:
@@ -49,7 +49,7 @@
       <button class="edm-tab" data-tab="consumi"><i class="fa fa-bolt"></i> Consumi</button>
       <button class="edm-tab" data-tab="occupancy"><i class="fa fa-users"></i> Occupancy</button>
       <button class="edm-tab" data-tab="allarmi"><i class="fa fa-bell"></i> Allarmi <span id="edm-alarm-badge"></span></button>
-      <button class="edm-tab" data-tab="esg"><i class="fa fa-leaf"></i> ESG Energia</button>
+      <button class="edm-tab" data-tab="esg"><i class="fa fa-leaf"></i> Efficienza energetica</button>
       <button class="edm-tab" data-tab="impianti"><i class="fa fa-cogs"></i> Impianti</button>
       <button class="edm-tab" data-tab="zone"><i class="fa fa-th-large"></i> Zone</button>
     </div>
@@ -466,7 +466,7 @@ async function _edmCaricaEsg(assetId) {
     const items = await res.json();
     const item  = items.find(i => i.asset_id === assetId);
     if (!item) {
-      el.innerHTML = `<p style="color:var(--text-secondary,#7BAFC4);font-size:13px;padding:20px;text-align:center;">Dati ESG energetici non disponibili.</p>`;
+      el.innerHTML = `<p style="color:var(--text-secondary,#7BAFC4);font-size:13px;padding:20px;text-align:center;">Dati di efficienza energetica non disponibili.</p>`;
       return;
     }
     const ratingColor = { A:'#27AE60', B:'#4CAF50', C:'#F39C12', D:'#E74C3C', E:'#c0392b' };
@@ -493,7 +493,7 @@ async function _edmCaricaEsg(assetId) {
         : `<div style="margin-top:12px;padding:8px 12px;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:6px;font-size:12px;color:#27AE60;">
              <i class="fa fa-check-circle" style="margin-right:5px;"></i>Consumi nella norma — nessuna anomalia rilevata</div>`}`;
   } catch(e) {
-    if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Dati ESG non disponibili</p>`;
+    if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Dati di efficienza energetica non disponibili</p>`;
   }
 }
 

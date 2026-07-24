@@ -11,7 +11,7 @@
  *   consumi         Grafici kWh per vettore energetico (/api/energy/readings/{id})
  *   occupancy       Dati di occupancy (/api/occupancy/summary)
  *   allarmi_energy  Anomalie di consumo (/api/energy/anomalies)
- *   esg_energy      CO2 e costi energetici (/api/energy/summary)
+ *   efficienza_energetica  CO2 e costi energetici (/api/energy/summary)
  */
 /* global API, map, allMarkers, ICONE_TIPO, COLORI_EFFICIENZA, i18n */
 
@@ -105,7 +105,7 @@ async function apriModaleAsset(id) {
     document.getElementById('mm-panel-allarmi_energy').innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i></div>`;
     caricaAllarmiEnergy(id, a.nome);
 
-    // ── Tab ESG Energia ────────────────────────────────────────────
+    // ── Tab Efficienza energetica ────────────────────────────────────────────
     document.getElementById('mm-panel-esg_energy').innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i></div>`;
     caricaEsgEnergy(id);
 
@@ -312,7 +312,7 @@ async function caricaAllarmiEnergy(assetId, nomeAsset) {
   }
 }
 
-// ── Carica ESG energia ───────────────────────────────────────────────
+// ── Carica dati efficienza energetica ───────────────────────────────────────────────
 async function caricaEsgEnergy(assetId) {
   const panel = document.getElementById('mm-panel-esg_energy');
   if (!panel) return;
@@ -325,7 +325,7 @@ async function caricaEsgEnergy(assetId) {
 
     const item = items.find(i => i.asset_id === assetId);
     if (!item) {
-      panel.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;padding:20px;text-align:center;">Dati ESG energetici non disponibili per questo asset.</p>`;
+      panel.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;padding:20px;text-align:center;">Dati di efficienza energetica non disponibili per questo asset.</p>`;
       return;
     }
 
@@ -372,7 +372,7 @@ async function caricaEsgEnergy(assetId) {
       </div>`;
   } catch(e) {
     console.warn('[caricaEsgEnergy]', e.message);
-    if (panel) panel.innerHTML = `<p style="color:var(--stato-inattivo);font-size:13px;padding:20px;text-align:center;"><i class="fas fa-exclamation-circle" style="margin-right:5px;"></i>Dati ESG non disponibili</p>`;
+    if (panel) panel.innerHTML = `<p style="color:var(--stato-inattivo);font-size:13px;padding:20px;text-align:center;"><i class="fas fa-exclamation-circle" style="margin-right:5px;"></i>Dati di efficienza energetica non disponibili</p>`;
   }
 }
 

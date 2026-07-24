@@ -266,7 +266,7 @@
       <div class="map-modal-tabs">
         <button class="map-modal-tab active" data-mmpanel="anagrafica"><i class="fa fa-info-circle"></i> Anagrafica</button>
         <button class="map-modal-tab" data-mmpanel="monitoraggio"><i class="fa fa-bar-chart"></i> Monitoraggio</button>
-        <button class="map-modal-tab" data-mmpanel="esg"><i class="fa fa-leaf"></i> ESG</button>
+        <button class="map-modal-tab" data-mmpanel="esg"><i class="fa fa-leaf"></i> Efficienza energetica</button>
         <button class="map-modal-tab" data-mmpanel="allarmi"><i class="fa fa-bell"></i> Allarmi <span id="mm-alarm-badge"></span></button>
         <button class="map-modal-tab" data-mmpanel="workorders"><i class="fa fa-wrench"></i> Work Order <span id="mm-wo-badge"></span></button>
         <button class="map-modal-tab" data-mmpanel="documenti"><i class="fa fa-file"></i> Documenti <span id="mm-doc-badge"></span></button>
@@ -608,7 +608,7 @@
       monHtml += `<p style="font-size:11px;color:var(--text-muted);margin-top:8px">Aggiornato il: ${m.aggiornato_il || '\u2013'}</p>`;
       document.getElementById('det-monitoraggio-content').innerHTML = monHtml;
 
-      // Tab ESG
+      // Tab Efficienza energetica
       let esgHtml = '';
       if (esg && esg.co2_totale_kg_giorno) {
         const ratingColor = { A:'var(--accent-green)', B:'#4CAF50', C:'var(--accent-orange)', D:'var(--accent-red)', E:'#c0392b' };
@@ -616,7 +616,7 @@
         esgHtml = `
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
             <div style="width:56px;height:56px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff">${esg.rating_esg || '\u2013'}</div>
-            <div><div style="font-size:13px;color:var(--text-muted)">Rating ESG</div><div style="font-size:22px;font-weight:700">${esg.co2_totale_kg_giorno.toFixed(0)} kg CO\u2082/giorno</div></div>
+            <div><div style="font-size:13px;color:var(--text-muted)">Rating energetico</div><div style="font-size:22px;font-weight:700">${esg.co2_totale_kg_giorno.toFixed(0)} kg CO\u2082/giorno</div></div>
           </div>
           <div class="esg-bar-wrap">
             <div class="esg-bar-label"><span>Energia elettrica</span><span>${esg.consumo_kwh_giorno?.toFixed(0) ?? '\u2013'} kWh/g (benchmark ${esg.benchmark_kwh ?? '\u2013'})</span></div>
@@ -631,7 +631,7 @@
             <div class="kpi-card"><div class="kpi-val" style="font-size:16px">${esg.co2_scope2_kg_giorno?.toFixed(0) ?? '\u2013'} kg</div><div class="kpi-lbl">CO\u2082 Scope 2 (elettricit\u00e0)</div></div>
           </div>`;
       } else {
-        esgHtml = '<p style="color:var(--text-muted);font-size:13px">Nessun dato ESG disponibile per questo asset.</p>';
+        esgHtml = '<p style="color:var(--text-muted);font-size:13px">Nessun dato di efficienza energetica disponibile per questo asset.</p>';
       }
       document.getElementById('det-esg-content').innerHTML = esgHtml;
 

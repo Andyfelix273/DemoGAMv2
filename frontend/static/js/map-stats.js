@@ -270,7 +270,7 @@ function renderDettaglio(data, container) {
     html += `</div>`;
   }
 
-  // ── Sezione ESG ────────────────────────────────────────────
+  // ── Sezione Efficienza energetica ────────────────────────────────────────────
   const e = data.esg || {};
   if (e.consumo_kwh_giorno !== undefined) {
     // Calcolo percentuale vs benchmark per mini-barre
@@ -441,7 +441,7 @@ function renderDettaglio(data, container) {
  * Carica la panoramica operativa dal backend e aggiorna il pannello laterale.
  *
  * Chiama API.getStats() e renderizza: tachimetri per tipo asset (occupancy,
- * linee produzione, saturazione, mezzi), dati ESG aggregati, situazioni da
+ * linee produzione, saturazione, mezzi), dati efficienza energetica aggregati, situazioni da
  * monitorare e il footer con conteggio allarmi.
  *
  * @async
@@ -540,7 +540,7 @@ async function caricaStats() {
     });
     html += '</div>';
 
-    // ── KPI ESG flotta (prima delle situazioni da monitorare) ─────
+    // ── KPI Efficienza energetica flotta (prima delle situazioni da monitorare) ─────
     let esgHtml = '';
     try {
       const esgData = await API.getStatsEsg();
@@ -569,8 +569,8 @@ async function caricaStats() {
           </div>
         </div>`;
     } catch(esgErr) {
-      console.warn('[caricaStats] Impossibile caricare i dati ESG:', esgErr.message);
-      // ESG non critico: la panoramica viene comunque mostrata senza il blocco ESG
+      console.warn('[caricaStats] Impossibile caricare i dati efficienza energetica:', esgErr.message);
+      // Efficienza energetica non critica: la panoramica viene comunque mostrata senza il blocco
     }
     html += esgHtml;
 

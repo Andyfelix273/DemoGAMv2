@@ -103,7 +103,7 @@ function renderDettaglio(data, container) {
         </div>
         <div class="op-kpi-card">
           <div class="op-kpi-val" style="color:${rc};">${item.rating_esg || '–'}</div>
-          <div class="op-kpi-label">Rating ESG</div>
+          <div class="op-kpi-label">Rating energetico</div>
         </div>
         <div class="op-kpi-card">
           <div class="op-kpi-val">${(item.co2_kg_giorno||0).toFixed(1)}</div>

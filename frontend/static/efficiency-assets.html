@@ -305,7 +305,7 @@
   /**
    * efficiency-assets.html — Anagrafica asset del dimostratore Asset Efficiency
    * Basato su assets.html del GIS Asset Manager
-   * Tab dettaglio: Anagrafica, Consumi, Occupancy, Allarmi Energetici, ESG Energia
+   * Tab dettaglio: Anagrafica, Consumi, Occupancy, Allarmi Energetici, Efficienza energetica
    */
 
   if (!requireAuth()) throw new Error('not authenticated');
@@ -648,7 +648,7 @@
       document.getElementById('det-allarmi-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
       caricaAllarmiEnergyDettaglio(id, a.nome);
 
-      // ── Tab ESG Energia ─────────────────────────────────────
+      // ── Tab Efficienza energetica ─────────────────────────────────────
       document.getElementById('det-esg-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
       caricaEsgEnergyDettaglio(id);
 
@@ -857,7 +857,7 @@
     }
   }
 
-  // ── Carica ESG energia ───────────────────────────────────────
+  // ── Carica dati efficienza energetica ───────────────────────────────────────
   async function caricaEsgEnergyDettaglio(assetId) {
     const el = document.getElementById('det-esg-content');
     if (!el) return;
@@ -867,7 +867,7 @@
       const items = await res.json();
       const item = items.find(i => i.asset_id === assetId);
       if (!item) {
-        el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Dati ESG energetici non disponibili.</p>';
+        el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Dati di efficienza energetica non disponibili.</p>';
         return;
       }
       const ratingColor = { A:'#27AE60', B:'#4CAF50', C:'#F39C12', D:'#E74C3C', E:'#c0392b' };
@@ -876,7 +876,7 @@
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
           <div style="width:56px;height:56px;border-radius:50%;background:${rc};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;">${item.rating_esg||'–'}</div>
           <div>
-            <div style="font-size:13px;color:var(--text-muted)">Rating ESG energetico</div>
+            <div style="font-size:13px;color:var(--text-muted)">Rating energetico</div>
             <div style="font-size:22px;font-weight:700">${(item.kwh_giorno||0).toFixed(0)} kWh/giorno</div>
             <div style="font-size:11px;color:var(--text-muted)">${(item.kwh_mq||0).toFixed(2)} kWh/m²</div>
           </div>
@@ -894,7 +894,7 @@
           <i class="fa fa-check-circle" style="margin-right:5px;"></i>Consumi nella norma
         </div>`}`;
     } catch(e) {
-      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Dati ESG non disponibili</p>`;
+      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Dati di efficienza energetica non disponibili</p>`;
     }
   }
 

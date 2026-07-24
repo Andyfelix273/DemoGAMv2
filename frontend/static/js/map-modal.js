@@ -173,7 +173,7 @@ async function apriModaleAsset(id) {
     monHtml += `<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Aggiornato il: ${m.aggiornato_il || '–'}</p>`;
     document.getElementById('mm-panel-monitoraggio').innerHTML = monHtml;
 
-    // Tab ESG
+    // Tab Efficienza energetica
     let esgHtml = '';
     if (esg && esg.co2_totale_kg_giorno) {
       const ratingColor = { A:'#27AE60', B:'#4CAF50', C:'#F39C12', D:'#E74C3C', E:'#c0392b' };
@@ -183,7 +183,7 @@ async function apriModaleAsset(id) {
       esgHtml = `
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
           <div style="width:56px;height:56px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff">${esg.rating_esg || '–'}</div>
-          <div><div style="font-size:13px;color:var(--text-secondary)">Rating ESG</div><div style="font-size:22px;font-weight:700">${esg.co2_totale_kg_giorno.toFixed(0)} kg CO₂/giorno</div></div>
+          <div><div style="font-size:13px;color:var(--text-secondary)">Rating energetico</div><div style="font-size:22px;font-weight:700">${esg.co2_totale_kg_giorno.toFixed(0)} kg CO₂/giorno</div></div>
         </div>
         <div class="mm-esg-bar-wrap">
           <div class="mm-esg-bar-label"><span>Energia elettrica</span><span>${esg.consumo_kwh_giorno?.toFixed(0) ?? '–'} kWh/g (benchmark ${esg.benchmark_kwh ?? '–'})</span></div>
@@ -194,7 +194,7 @@ async function apriModaleAsset(id) {
           <div class="mm-esg-bar"><div class="mm-esg-bar-fill" style="width:${Math.min(pctM3,100)}%;background:${pctM3 > 100 ? '#F39C12' : '#27AE60'}"></div></div>
         </div>`;
     } else {
-      esgHtml = '<p style="color:var(--text-secondary);font-size:13px">Nessun dato ESG disponibile per questo asset.</p>';
+      esgHtml = '<p style="color:var(--text-secondary);font-size:13px">Nessun dato di efficienza energetica disponibile per questo asset.</p>';
     }
     document.getElementById('mm-panel-esg').innerHTML = esgHtml;
 

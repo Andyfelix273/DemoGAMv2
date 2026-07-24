@@ -203,14 +203,14 @@ const i18n = (() => {
       'imp.ruolo_admin':     'Amministratore',
       'imp.ruolo_user':      'Utente',
 
-      // ESG
-      'esg.titolo':              'Dati ESG',
+      // Efficienza energetica
+      'esg.titolo':              'Efficienza energetica',
       'esg.energia':             'Energia',
       'esg.acqua':               'Acqua',
       'esg.co2':                 'CO₂ totale',
       'esg.scope1':              'Scope 1',
       'esg.scope2':              'Scope 2',
-      'esg.rating':              'Rating ESG',
+      'esg.rating':              'Rating energetico',
       'esg.benchmark_kwh':       'Benchmark kWh',
       'esg.benchmark_m3':        'Benchmark m³',
       'esg.unita_kwh':           'kWh/g',
@@ -439,14 +439,14 @@ const i18n = (() => {
       'imp.ruolo_admin':     'Administrator',
       'imp.ruolo_user':      'User',
 
-      // ESG
-      'esg.titolo':              'ESG Data',
+      // Energy Efficiency
+      'esg.titolo':              'Energy Efficiency',
       'esg.energia':             'Energy',
       'esg.acqua':               'Water',
       'esg.co2':                 'Total CO₂',
       'esg.scope1':              'Scope 1',
       'esg.scope2':              'Scope 2',
-      'esg.rating':              'ESG Rating',
+      'esg.rating':              'Energy Rating',
       'esg.benchmark_kwh':       'kWh benchmark',
       'esg.benchmark_m3':        'm³ benchmark',
       'esg.unita_kwh':           'kWh/d',
