@@ -121,6 +121,33 @@ app.add_middleware(NoCacheHTMLMiddleware)
 
 
 # ── Utilità database ─────────────────────────────────────────────────────────
+class _CompatRow(dict):
+    """Riga compatibile sia con accesso per chiave (dict) che per indice numerico (tuple)."""
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+
+class _CompatCursor:
+    """Cursore wrapper che restituisce _CompatRow invece di RealDictRow."""
+    def __init__(self, cur):
+        self._cur = cur
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return _CompatRow(row) if row is not None else None
+
+    def fetchall(self):
+        return [_CompatRow(r) for r in (self._cur.fetchall() or [])]
+
+    def __iter__(self):
+        return (_CompatRow(r) for r in self._cur)
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+
 class _PgConnWrapper:
     """Wrapper che aggiunge .execute() e .row_factory compatibili con sqlite3.Row a una connessione psycopg2."""
     def __init__(self, conn):
@@ -132,7 +159,7 @@ class _PgConnWrapper:
             cur.execute(sql, params)
         else:
             cur.execute(sql)
-        return cur
+        return _CompatCursor(cur)
 
     def cursor(self, **kwargs):
         return self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
