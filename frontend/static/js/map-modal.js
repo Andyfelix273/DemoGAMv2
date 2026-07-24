@@ -67,10 +67,15 @@ async function apriModaleAsset(id) {
   document.getElementById('mm-panel-anagrafica').classList.add('active');
   document.getElementById('mm-panel-anagrafica').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
 
-  // Reset badge
-  document.getElementById('mm-alarm-badge').innerHTML = '';
-  document.getElementById('mm-wo-badge').innerHTML = '';
-  document.getElementById('mm-doc-badge').innerHTML = '';
+  // Reset badge (null-safe: alcuni elementi potrebbero non esistere in tutte le pagine)
+  const _elAlarmBadge = document.getElementById('mm-alarm-badge');
+  const _elWoBadge    = document.getElementById('mm-wo-badge');
+  const _elDocBadge   = document.getElementById('mm-doc-badge');
+  const _elDlBadge    = document.getElementById('mm-dl-badge');
+  if (_elAlarmBadge) _elAlarmBadge.innerHTML = '';
+  if (_elWoBadge)    _elWoBadge.innerHTML = '';
+  if (_elDocBadge)   _elDocBadge.innerHTML = '';
+  if (_elDlBadge)    _elDlBadge.innerHTML = '';
   document.getElementById('mm-title').textContent = 'Caricamento...';
   document.getElementById('mm-subtitle').textContent = '';
 
@@ -88,7 +93,8 @@ async function apriModaleAsset(id) {
     document.getElementById('mm-subtitle').textContent = a.tipo + ' · ' + a.citta + (a.provincia ? ' (' + a.provincia + ')' : '');
 
     // Pulsante anagrafica
-    document.getElementById('mm-btn-anagrafica').href = '/static/assets.html';
+    const _btnAnagrafica = document.getElementById('mm-btn-anagrafica');
+    if (_btnAnagrafica) _btnAnagrafica.href = '/static/assets.html';
 
     // Tab Planimetria, BIM e Modello 3D: visibili solo per asset con dati BIM
     const tabPlani    = document.querySelector('.mm-tab-planimetria');
