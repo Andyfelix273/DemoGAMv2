@@ -1136,7 +1136,7 @@ def crea_work_order(
         utente["username"]
     ))
     db.commit()
-    wo_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    wo_id = db.execute("SELECT id FROM work_orders WHERE codice=%s", (codice,)).fetchone()[0]
     return dettaglio_work_order(wo_id, db, utente)
 
 
@@ -1225,8 +1225,7 @@ async def carica_documento(
         (asset_id, file.filename, file.content_type, len(contenuto), nome_finale, utente["username"])
     )
     db.commit()
-    doc_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-    row = db.execute("SELECT * FROM documents WHERE id=%s", (doc_id,)).fetchone()
+    row = db.execute("SELECT * FROM documents WHERE asset_id=%s AND nome_file=%s ORDER BY id DESC LIMIT 1", (asset_id, file.filename)).fetchone()
     return dict(row)
 
 
@@ -1308,7 +1307,7 @@ def stats_scadenze(db=Depends(get_db), _=Depends(richiedi_permesso("deadlines.re
             COUNT(*) FILTER (WHERE stato = 'scaduta')                             AS scadute,
             COUNT(*) FILTER (WHERE stato = 'aperta' AND data_scadenza < %s)        AS in_ritardo,
             COUNT(*) FILTER (WHERE stato = 'aperta'
-                             AND data_scadenza BETWEEN %s AND date(%s, '+7 days'))   AS in_scadenza_7gg,
+                             AND data_scadenza BETWEEN %s AND (%s::date + interval '7 days'))   AS in_scadenza_7gg,
             COUNT(*) FILTER (WHERE stato NOT IN ('chiusa') AND priorita IN ('alta','critica')) AS urgenti
         FROM deadlines
     """, (oggi, oggi, oggi)).fetchone()
@@ -1345,7 +1344,8 @@ def crea_scadenza(
         utente["username"], now
     ))
     db.commit()
-    dl_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = db.execute("SELECT id FROM deadlines WHERE asset_id=%s AND titolo=%s ORDER BY id DESC LIMIT 1", (payload.asset_id, payload.titolo)).fetchone()
+    dl_id = row[0]
     return dettaglio_scadenza(dl_id, db, utente)
 
 
