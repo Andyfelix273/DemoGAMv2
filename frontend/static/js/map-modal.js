@@ -243,15 +243,19 @@ async function apriModaleAsset(id) {
     }
 
     // Tab Documenti
-    try {
-      const docs = await API.getAssetDocuments(id);
-      if (docs.length > 0) {
-        document.getElementById('mm-doc-badge').innerHTML = ` <span style="background:#3498DB;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${docs.length}</span>`;
-      }
-      const iconMap2 = { 'application/pdf': 'fa-file-pdf-o', 'image/': 'fa-file-image-o', 'application/vnd': 'fa-file-excel-o', 'text/': 'fa-file-text-o' };
-      function icona2(mime) { if (!mime) return 'fa-file-o'; for (const [k,v] of Object.entries(iconMap2)) { if (mime.startsWith(k)) return v; } return 'fa-file-o'; }
-      function fmtSize(b) { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
-      let docHtml = docs.length === 0
+    // ── Helper: renderizza la lista documenti nel pannello ──
+    const iconMap2 = { 'application/pdf': 'fa-file-pdf-o', 'image/': 'fa-file-image-o', 'application/vnd': 'fa-file-excel-o', 'text/': 'fa-file-text-o' };
+    function icona2(mime) { if (!mime) return 'fa-file-o'; for (const [k,v] of Object.entries(iconMap2)) { if (mime.startsWith(k)) return v; } return 'fa-file-o'; }
+    function fmtSize(b) { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
+
+    function _renderListaDocumenti(docs) {
+      const panel = document.getElementById('mm-panel-documenti');
+      if (!panel) return;
+      const badge = document.getElementById('mm-doc-badge');
+      if (badge) badge.innerHTML = docs.length > 0
+        ? ` <span style="background:#3498DB;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${docs.length}</span>`
+        : '';
+      const lista = docs.length === 0
         ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-folder-open-o"></i> Nessun documento allegato</p>'
         : docs.map(d => `<div class="mm-alarm-row">
             <i class="fa ${icona2(d.tipo_mime)}" style="color:#3498DB;font-size:16px;min-width:20px"></i>
@@ -259,7 +263,44 @@ async function apriModaleAsset(id) {
             <span style="font-size:11px;color:var(--text-secondary)">${fmtSize(d.dimensione)}</span>
             <a href="${API.getDocumentDownloadUrl(d.id)}" target="_blank" class="btn btn-secondary btn-sm" style="margin-left:8px;padding:2px 8px"><i class="fa fa-download"></i></a>
           </div>`).join('');
-      document.getElementById('mm-panel-documenti').innerHTML = docHtml;
+      // Pulsante upload + input nascosto + lista
+      const canUpload = API.can('documents.upload');
+      const uploadBar = canUpload
+        ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+            <input type="file" id="mm-doc-file-input" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt">
+            <button id="mm-doc-upload-btn" class="btn btn-primary btn-sm" style="padding:4px 12px;font-size:12px">
+              <i class="fa fa-upload" style="margin-right:5px"></i>Carica documento
+            </button>
+          </div>`
+        : '';
+      panel.innerHTML = uploadBar + lista;
+      if (canUpload) {
+        const btn = document.getElementById('mm-doc-upload-btn');
+        const inp = document.getElementById('mm-doc-file-input');
+        btn.addEventListener('click', () => inp.click());
+        inp.addEventListener('change', async () => {
+          const file = inp.files[0];
+          if (!file) return;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa fa-spinner fa-spin" style="margin-right:5px"></i>Caricamento...';
+          try {
+            await API.uploadDocument(id, file);
+            const nuoviDocs = await API.getAssetDocuments(id);
+            _renderListaDocumenti(nuoviDocs);
+          } catch(e) {
+            alert('Errore upload: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-upload" style="margin-right:5px"></i>Carica documento';
+          } finally {
+            inp.value = '';
+          }
+        });
+      }
+    }
+
+    try {
+      const docs = await API.getAssetDocuments(id);
+      _renderListaDocumenti(docs);
     } catch(docErr) {
       console.warn('[apriModaleAsset] Impossibile caricare i documenti per asset', id, ':', docErr.message);
       document.getElementById('mm-panel-documenti').innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-exclamation-circle" style="margin-right:5px"></i>Documenti non disponibili</p>';
