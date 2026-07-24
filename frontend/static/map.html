@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>GIS Asset Manager – Mappa</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/map.css">
+</head>
+<body>
+<!-- SIDEBAR -->
+<nav id="map-sidebar"></nav>
+
+<!-- TOPBAR -->
+<div class="topbar" id="topbar-root">
+  <!-- Logo + titolo -->
+  <img id="meta-logo" src="/static/img/logodark.png" alt="Metamorphosis" class="topbar-logo">
+  <div class="topbar-sep"></div>
+  <span class="topbar-title">GIS Asset Manager</span>
+  <!-- Ricerca + Filtri tipo asset (allineati a destra via margin-left:auto su search-wrap) -->
+  <div class="search-wrap">
+    <i class="fas fa-search search-icon-fa"></i>
+    <input type="text" id="search-input" class="search-input" data-i18n-placeholder="mappa.cerca" placeholder="Cerca asset...">
+    <div class="search-results" id="search-results"></div>
+  </div>
+  <!-- Filtri tipo asset (subito a destra della ricerca) -->
+  <div class="topbar-filters">
+    <button class="filter-btn active" data-tipo="tutti">
+      <i class="fas fa-layer-group" style="font-size:10px;"></i> <span data-i18n="tipo.tutti">Tutti</span>
+    </button>
+    <button class="filter-btn" data-tipo="stabilimento">
+      <i class="fas fa-industry" style="font-size:10px;"></i> <span data-i18n="tipo.stabilimenti">Stabilimenti</span>
+    </button>
+    <button class="filter-btn" data-tipo="ufficio">
+      <i class="fas fa-building" style="font-size:10px;"></i> <span data-i18n="tipo.uffici">Uffici</span>
+    </button>
+    <button class="filter-btn" data-tipo="magazzino">
+      <i class="fas fa-archive" style="font-size:10px;"></i> <span data-i18n="tipo.magazzini">Magazzini</span>
+    </button>
+    <button class="filter-btn" data-tipo="deposito">
+      <i class="fas fa-truck" style="font-size:10px;"></i> <span data-i18n="tipo.depositi">Depositi</span>
+    </button>
+  </div>
+  <!-- Controlli destra -->
+  <div class="topbar-controls">
+    <!-- Campanella allarmi -->
+    <div id="topbar-alarm-wrap" style="position:relative;margin-right:8px;cursor:pointer" onclick="window.location.href='/static/alarms.html'" title="Vai agli allarmi">
+      <i class="fa fa-bell" style="font-size:16px;color:var(--text-secondary)"></i>
+      <span id="topbar-alarm-badge" style="
+        display:none;
+        position:absolute;top:-6px;right:-8px;
+        background:#e74c3c;color:#fff;
+        border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;
+        min-width:16px;text-align:center;line-height:16px;
+      ">0</span>
+    </div>
+    <!-- Utente -->
+    <div class="topbar-user">
+      <span id="topbar-nome"></span>
+      <span id="topbar-badge" class="badge-role"></span>
+    </div>
+    <button class="btn-logout" id="btn-logout" title="Esci">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </div>
+</div>
+
+<!-- LAYOUT PRINCIPALE: mappa + pannello dx -->
+<div class="main-layout">
+  <!-- MAPPA -->
+  <div id="map">
+    <!-- KPI operativi spostati nel pannello laterale -->
+    <!-- Legenda marker stato (overlay) -->
+    <div class="marker-legend" id="marker-legend">
+      <div class="marker-legend-title">Stato operativo</div>
+      <div class="marker-legend-item" title="WO priorità critica aperto (fermo/sicurezza) o allarme grave attivo">
+        <div class="marker-legend-dot" style="color:#E74C3C;"></div>
+        <span>Critico</span>
+        <span style="font-size:9px;color:var(--text-secondary);margin-left:4px;">WO critico o allarme grave</span>
+      </div>
+      <div class="marker-legend-item" title="WO priorità alta aperto, allarme minore attivo o scadenza entro 7 giorni">
+        <div class="marker-legend-dot" style="color:#F39C12;"></div>
+        <span>Attenzione</span>
+        <span style="font-size:9px;color:var(--text-secondary);margin-left:4px;">WO alta priorità o scadenza</span>
+      </div>
+      <div class="marker-legend-item" title="Nessun work order critico o allarme aperto">
+        <div class="marker-legend-dot" style="color:#27AE60;"></div>
+        <span>Operativo</span>
+        <span style="font-size:9px;color:var(--text-secondary);margin-left:4px;">Nessun problema aperto</span>
+      </div>
+      <div class="marker-legend-item" title="Asset dismesso o fuori inventario operativo">
+        <div class="marker-legend-dot" style="color:#95A5A6;"></div>
+        <span>Inattivo</span>
+        <span style="font-size:9px;color:var(--text-secondary);margin-left:4px;">Asset dismesso</span>
+      </div>
+    </div>
+    <!-- Legenda tipologia asset rimossa: info nel pannello laterale -->
+    <!-- Loader -->
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <span style="font-size:12px;color:var(--text-secondary);" data-i18n="mappa.caricamento">Caricamento asset in corso...</span>
+    </div>
+  </div>
+
+  <!-- Toggle pannello laterale -->
+  <div class="panel-toggle" id="panel-toggle" title="Apri/chiudi pannello">
+    <i class="fas fa-chevron-right" id="panel-toggle-icon"></i>
+  </div>
+
+  <!-- PANNELLO LATERALE DESTRO -->
+  <div class="side-panel" id="side-panel">
+    <div class="panel-header">
+      <div class="panel-header-title" id="panel-header-title">
+        <span id="panel-header-text" data-i18n="mappa.quadro_sinottico">Quadro sinottico</span>
+      </div>
+      <div class="panel-header-meta" id="panel-header-meta">
+        <span class="meta-dot"></span>
+        <span id="panel-header-ts">Live &mdash; aggiornamento in corso&hellip;</span>
+      </div>
+    </div>
+    <!-- Vista panoramica (default) -->
+    <div class="overview-panel" id="overview-panel">
+      <div style="text-align:center;padding:30px;color:var(--text-secondary);">
+        <i class="fas fa-spinner fa-spin"></i>
+      </div>
+    </div>
+    </div>
+</div>
+
+<!-- MODALE DETTAGLIO ASSET (aperta al click sul marker) -->
+<div class="map-modal-overlay" id="map-modal-overlay">
+  <div class="map-modal">
+    <div class="map-modal-header">
+      <div>
+        <div class="map-modal-title" id="mm-title">Dettaglio asset</div>
+        <div class="map-modal-subtitle" id="mm-subtitle"></div>
+      </div>
+      <button class="map-modal-close" id="mm-close" title="Chiudi">&times;</button>
+    </div>
+    <div class="map-modal-tabs">
+      <button class="map-modal-tab active" data-mmpanel="anagrafica"><i class="fa fa-info-circle"></i> Anagrafica</button>
+      <button class="map-modal-tab" data-mmpanel="monitoraggio"><i class="fa fa-bar-chart"></i> Monitoraggio</button>
+      <button class="map-modal-tab" data-mmpanel="esg"><i class="fa fa-leaf"></i> ESG</button>
+      <button class="map-modal-tab" data-mmpanel="allarmi"><i class="fa fa-bell"></i> Allarmi <span id="mm-alarm-badge"></span></button>
+      <button class="map-modal-tab" data-mmpanel="workorders"><i class="fa fa-wrench"></i> Work Order <span id="mm-wo-badge"></span></button>
+      <button class="map-modal-tab" data-mmpanel="documenti"><i class="fa fa-file"></i> Documenti <span id="mm-doc-badge"></span></button>
+      <button class="map-modal-tab mm-tab-planimetria" data-mmpanel="planimetria" style="display:none"><i class="fa fa-map"></i> Planimetria</button>
+      <button class="map-modal-tab mm-tab-bim" data-mmpanel="bim" style="display:none"><i class="fa fa-building"></i> BIM</button>
+      <button class="map-modal-tab mm-tab-viewer3d" data-mmpanel="viewer3d" style="display:none"><i class="fa fa-cube"></i> Modello 3D</button>
+    </div>
+    <div class="map-modal-body">
+      <div class="map-modal-panel active" id="mm-panel-anagrafica"><div class="spinner" style="margin:24px auto"></div></div>
+      <div class="map-modal-panel" id="mm-panel-monitoraggio"></div>
+      <div class="map-modal-panel" id="mm-panel-esg"></div>
+      <div class="map-modal-panel" id="mm-panel-allarmi"></div>
+      <div class="map-modal-panel" id="mm-panel-workorders"></div>
+      <div class="map-modal-panel" id="mm-panel-documenti"></div>
+      <div class="map-modal-panel" id="mm-panel-planimetria"></div>
+      <div class="map-modal-panel" id="mm-panel-bim"></div>
+      <div class="map-modal-panel" id="mm-panel-viewer3d" style="padding:0;overflow:hidden">
+        <iframe id="ifc-viewer-iframe"
+          src=""
+          style="width:100%;height:100%;border:none;display:block;"
+          title="Viewer IFC 3D"
+        ></iframe>
+      </div>
+    </div>
+    <div class="map-modal-footer">
+      <button class="btn btn-secondary" id="mm-btn-chiudi">Chiudi</button>
+      <a class="btn btn-primary" id="mm-btn-anagrafica" target="_blank"><i class="fa fa-external-link"></i> Apri in anagrafica</a>
+    </div>
+  </div>
+</div>
+
+<!-- JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/i18n.js?v=6"></script>
+<script src="/static/js/api.js?v=6"></script>
+<!-- Configurazione centralizzata (deve precedere tutti i moduli mappa) -->
+<script src="/static/js/config.js"></script>
+<!-- Moduli mappa (ordine di caricamento obbligatorio) -->
+<script src="/static/js/map-config.js"></script>
+<script src="/static/js/map-core.js"></script>
+<script src="/static/js/ifc/three-136.min.js"></script>
+<script src="/static/js/map-bim.js"></script>
+<!-- viewer 3D usa iframe standalone ifc-viewer.html -->
+<script src="/static/js/map-modal.js"></script>
+<script src="/static/js/map-stats.js"></script>
+</body>
+</html>

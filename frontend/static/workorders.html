@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>GIS Asset Manager – Work Order</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height:100vh; display:flex; flex-direction:row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex:1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-actions { display:flex; gap:8px; align-items:center; }
+    .page-body { padding:16px 24px; }
+
+    /* KPI bar */
+    .kpi-bar { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    .kpi-card {
+      flex:1; min-width:100px; background:var(--bg-secondary);
+      border:1px solid var(--border-color); border-radius:8px;
+      padding:10px 14px; text-align:center;
+    }
+    .kpi-card .kpi-val { font-size:22px; font-weight:700; }
+    .kpi-card .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .kpi-card.danger .kpi-val { color:var(--accent-red); }
+    .kpi-card.warning .kpi-val { color:var(--accent-orange); }
+    .kpi-card.ok .kpi-val { color:var(--accent-green); }
+    .kpi-card.info .kpi-val { color:var(--accent-blue); }
+
+    /* Filtri */
+    .filter-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .filter-bar select, .filter-bar input { height:34px; font-size:13px; width:auto !important; }
+    .search-wrap { position:relative; flex:1; min-width:180px; max-width:280px; }
+    .search-wrap .fa { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted); }
+    .search-wrap input { padding-left:30px; width:100%; box-sizing:border-box; }
+    .record-count { font-size:12px; color:var(--text-muted); margin-left:auto; white-space:nowrap; }
+
+    /* Tabella */
+    .table-wrap { overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { background:var(--bg-secondary); padding:10px 12px; text-align:left; font-weight:600; color:var(--text-muted); font-size:11px; text-transform:uppercase; border-bottom:1px solid var(--border-color); white-space:nowrap; }
+    tbody tr { border-bottom:1px solid var(--border-color); transition:background 0.1s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:var(--bg-hover); }
+    tbody td { padding:10px 12px; vertical-align:middle; }
+
+    /* Badge stato */
+    .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+    .badge-aperto    { background:rgba(88,166,255,0.15);  color:var(--accent-blue); }
+    .badge-in_corso  { background:rgba(243,156,18,0.15);  color:var(--accent-orange); }
+    .badge-completato{ background:rgba(63,185,80,0.15);   color:var(--accent-green); }
+    .badge-annullato { background:rgba(110,118,129,0.15); color:var(--text-muted); }
+
+    /* Badge priorità */
+    .prio { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .prio-critica { background:rgba(248,81,73,0.15);  color:var(--accent-red); border:1px solid rgba(248,81,73,0.3); }
+    .prio-alta    { background:rgba(243,156,18,0.15); color:var(--accent-orange); border:1px solid rgba(243,156,18,0.3); }
+    .prio-media   { background:rgba(88,166,255,0.15); color:var(--accent-blue); border:1px solid rgba(88,166,255,0.3); }
+    .prio-bassa   { background:rgba(110,118,129,0.1); color:var(--text-muted); border:1px solid var(--border-color); }
+
+    /* Badge tipo */
+    .tipo-badge { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; color:var(--text-secondary); background:var(--bg-secondary); border:1px solid var(--border-color); }
+
+    /* Azioni riga */
+    .row-actions { display:flex; gap:4px; }
+    .btn-icon { background:none; border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; cursor:pointer; color:var(--text-secondary); font-size:12px; transition:all 0.15s; }
+    .btn-icon:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .btn-icon.danger:hover { border-color:var(--accent-red); color:var(--accent-red); }
+
+    /* Paginazione */
+    .pagination { display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:12px; }
+    .page-btn { min-width:32px; height:32px; padding:0 8px; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-secondary); color:var(--text-secondary); font-size:13px; cursor:pointer; transition:all 0.15s; }
+    .page-btn:hover:not(:disabled) { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .page-btn.active { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
+    .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* Modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:var(--bg-primary); border:1px solid var(--border-color); border-radius:12px; width:620px; max-width:95vw; max-height:90vh; display:flex; flex-direction:column; }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border-color); }
+    .modal-title { font-size:16px; font-weight:600; }
+    .modal-body { padding:20px; overflow-y:auto; flex:1; }
+    .modal-footer { padding:12px 20px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:8px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+    .form-grid .full { grid-column:1/-1; }
+    .form-group { margin-bottom:14px; }
+    .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; }
+    .form-group input, .form-group select, .form-group textarea { width:100%; box-sizing:border-box; }
+    .form-group textarea { resize:vertical; min-height:72px; }
+
+    /* Modal dettaglio */
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; }
+    .detail-item label { font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block; margin-bottom:2px; }
+    .detail-item span { font-size:13px; }
+    .detail-item.full { grid-column:1/-1; }
+    .detail-desc { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:10px; font-size:13px; line-height:1.5; margin-top:4px; }
+
+    /* Modal cambio stato */
+    .stato-options { display:flex; flex-direction:column; gap:8px; }
+    .stato-option { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; cursor:pointer; transition:all 0.15s; }
+    .stato-option:hover { border-color:var(--accent-blue); background:var(--bg-hover); }
+    .stato-option.selected { border-color:var(--accent-blue); background:rgba(88,166,255,0.08); }
+    .stato-option .stato-icon { font-size:16px; width:24px; text-align:center; }
+    .stato-option .stato-info { flex:1; }
+    .stato-option .stato-name { font-weight:600; font-size:13px; }
+    .stato-option .stato-desc { font-size:11px; color:var(--text-muted); }
+
+    /* Scaduto highlight */
+    .scaduto-row { background:rgba(248,81,73,0.04) !important; }
+    .scaduto-row:hover { background:rgba(248,81,73,0.08) !important; }
+    .scaduto-label { font-size:10px; color:var(--accent-red); font-weight:600; margin-left:4px; }
+  </style>
+</head>
+<body class="app-layout">
+
+<nav class="sidebar" id="sidebar"></nav>
+
+<div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="page">
+    <div class="page-header">
+      <div class="page-title"><i class="fa fa-wrench" style="margin-right:8px;color:var(--accent-blue)"></i>Work Order</div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-export-wo" onclick="window.location.href='/api/export/workorders/excel'" title="Esporta in Excel">
+          <i class="fa fa-file-excel-o"></i> Export Excel
+        </button>
+        <button class="btn btn-primary" id="btn-nuovo-wo" style="display:none" onclick="apriFormNuovo()">
+          <i class="fa fa-plus"></i> Nuovo WO
+        </button>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- KPI bar -->
+      <div class="kpi-bar" id="kpi-bar">
+        <div class="kpi-card danger"><div class="kpi-val" id="kpi-aperti">–</div><div class="kpi-lbl">Aperti</div></div>
+        <div class="kpi-card warning"><div class="kpi-val" id="kpi-in-corso">–</div><div class="kpi-lbl">In corso</div></div>
+        <div class="kpi-card danger"><div class="kpi-val" id="kpi-scaduti">–</div><div class="kpi-lbl">Scaduti</div></div>
+        <div class="kpi-card warning"><div class="kpi-val" id="kpi-urgenti">–</div><div class="kpi-lbl">Urgenti</div></div>
+        <div class="kpi-card ok"><div class="kpi-val" id="kpi-completati">–</div><div class="kpi-lbl">Completati</div></div>
+      </div>
+
+      <!-- Filtri -->
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <i class="fa fa-search"></i>
+          <input type="text" id="search-input" class="form-control" placeholder="Cerca WO, asset..." oninput="filtra()">
+        </div>
+        <select id="filter-stato" class="form-control" onchange="filtra()">
+          <option value="">Tutti gli stati</option>
+          <option value="aperto">Aperto</option>
+          <option value="in_corso">In corso</option>
+          <option value="completato">Completato</option>
+          <option value="annullato">Annullato</option>
+        </select>
+        <select id="filter-tipo" class="form-control" onchange="filtra()">
+          <option value="">Tutti i tipi</option>
+          <option value="correttivo">Correttivo</option>
+          <option value="preventivo">Preventivo</option>
+          <option value="ispezione">Ispezione</option>
+        </select>
+        <select id="filter-priorita" class="form-control" onchange="filtra()">
+          <option value="">Tutte le priorità</option>
+          <option value="critica">Critica</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="bassa">Bassa</option>
+        </select>
+        <span class="record-count" id="record-count"></span>
+      </div>
+
+      <!-- Tabella -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Codice</th>
+              <th>Titolo</th>
+              <th>Asset</th>
+              <th>Tipo</th>
+              <th>Priorità</th>
+              <th>Stato</th>
+              <th>Assegnatario</th>
+              <th>Data pianif.</th>
+              <th>Apertura</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="wo-tbody">
+            <tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-muted)">Caricamento...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Crea/Modifica WO -->
+<div class="modal-overlay" id="modal-form">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-form-title">Nuovo Work Order</span>
+      <button class="btn-icon" onclick="chiudiModal('modal-form')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Asset *</label>
+          <select id="f-asset" required></select>
+        </div>
+        <div class="form-group full">
+          <label>Titolo *</label>
+          <input type="text" id="f-titolo" placeholder="Descrizione breve dell'intervento" required>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="f-tipo">
+            <option value="correttivo">Correttivo</option>
+            <option value="preventivo">Preventivo</option>
+            <option value="ispezione">Ispezione</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priorità</label>
+          <select id="f-priorita">
+            <option value="bassa">Bassa</option>
+            <option value="media" selected>Media</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Critica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Assegnatario</label>
+          <input type="text" id="f-assegnatario" placeholder="Nome o team responsabile">
+        </div>
+        <div class="form-group">
+          <label>Data pianificata</label>
+          <input type="date" id="f-data-pianificata">
+        </div>
+        <div class="form-group full">
+          <label>Descrizione</label>
+          <textarea id="f-descrizione" placeholder="Dettagli dell'intervento, cause, note operative..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="chiudiModal('modal-form')">Annulla</button>
+      <button class="btn btn-primary" onclick="salvaWO()"><i class="fa fa-save"></i> Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Dettaglio WO -->
+<div class="modal-overlay" id="modal-dettaglio">
+  <div class="modal" style="width:680px">
+    <div class="modal-header">
+      <span class="modal-title" id="det-codice">WO-0000</span>
+      <button class="btn-icon" onclick="chiudiModal('modal-dettaglio')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <span id="det-stato-badge"></span>
+        <span id="det-prio-badge"></span>
+        <span id="det-tipo-badge"></span>
+        <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="det-creato-da"></span>
+      </div>
+      <div class="detail-grid" style="margin-bottom:16px">
+        <div class="detail-item full">
+          <label>Titolo</label>
+          <span id="det-titolo" style="font-size:15px;font-weight:600"></span>
+        </div>
+        <div class="detail-item">
+          <label>Asset</label>
+          <span id="det-asset"></span>
+        </div>
+        <div class="detail-item">
+          <label>Assegnatario</label>
+          <span id="det-assegnatario"></span>
+        </div>
+        <div class="detail-item">
+          <label>Data apertura</label>
+          <span id="det-apertura"></span>
+        </div>
+        <div class="detail-item">
+          <label>Data pianificata</label>
+          <span id="det-pianificata"></span>
+        </div>
+        <div class="detail-item" id="det-chiusura-wrap" style="display:none">
+          <label>Data chiusura</label>
+          <span id="det-chiusura"></span>
+        </div>
+      </div>
+      <div class="detail-item full" id="det-desc-wrap">
+        <label>Descrizione</label>
+        <div class="detail-desc" id="det-descrizione"></div>
+      </div>
+      <div class="detail-item full" id="det-note-wrap" style="display:none;margin-top:12px">
+        <label>Note di chiusura</label>
+        <div class="detail-desc" id="det-note-chiusura"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="chiudiModal('modal-dettaglio')">Chiudi</button>
+      <button class="btn btn-secondary" id="det-btn-modifica" onclick="apriModificaDaDettaglio()" style="display:none"><i class="fa fa-pencil"></i> Modifica</button>
+      <button class="btn btn-primary" id="det-btn-stato" onclick="apriCambioStatoDaDettaglio()" style="display:none"><i class="fa fa-exchange"></i> Cambia stato</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cambio stato -->
+<div class="modal-overlay" id="modal-stato">
+  <div class="modal" style="width:440px">
+    <div class="modal-header">
+      <span class="modal-title">Cambia stato — <span id="stato-wo-codice"></span></span>
+      <button class="btn-icon" onclick="chiudiModal('modal-stato')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="stato-options" id="stato-options"></div>
+      <div class="form-group" id="note-chiusura-wrap" style="display:none;margin-top:16px">
+        <label>Note di chiusura</label>
+        <textarea id="note-chiusura-input" placeholder="Descrivi come è stato risolto o perché è stato annullato..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="chiudiModal('modal-stato')">Annulla</button>
+      <button class="btn btn-primary" onclick="confermaCambioStato()"><i class="fa fa-check"></i> Conferma</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/i18n.js?v=6"></script>
+<script src="/static/js/api.js?v=6"></script>
+<script src="/static/js/utils.js?v=6"></script>
+<script>
+requireAuth();
+renderSidebar('workorders');
+renderTopbar('workorders', { filtri: false });
+initAlarmNotifications();
+
+// ── Stato locale ──────────────────────────────────────────────────────────────
+var woList = [];
+var woFiltrati = [];
+var woCorrente = null;
+var assetsCache = [];
+var PAGE_SIZE = 15;
+var paginaCorrente = 1;
+var oggi = new Date().toISOString().split('T')[0];
+
+// ── Avvio ─────────────────────────────────────────────────────────────────────
+(async function init() {
+  // Permessi
+  if (API.can('work_orders.create')) {
+    document.getElementById('btn-nuovo-wo').style.display = '';
+  }
+
+  // Carica asset per il form
+  try {
+    const res = await API.getAssets();
+    assetsCache = res.features.map(f => ({ id: f.properties.id, nome: f.properties.nome, tipo: f.properties.tipo }));
+    const sel = document.getElementById('f-asset');
+    assetsCache.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `${a.nome} (${a.tipo})`;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.warn('Errore caricamento asset:', e); }
+
+  // Prefill da parametri URL (es. da pagina allarmi)
+  const urlParams = new URLSearchParams(window.location.search);
+  const prefillAssetId = urlParams.get('asset_id');
+  const prefillTitolo  = urlParams.get('titolo');
+  const prefillTipo    = urlParams.get('tipo');
+  const prefillPriorita = urlParams.get('priorita');
+
+  await caricaKPI();
+  await caricaWO();
+
+  // Apri automaticamente il form se arriva da un allarme
+  if (prefillAssetId && prefillTitolo && API.can('work_orders.create')) {
+    apriFormNuovo({
+      asset_id: parseInt(prefillAssetId),
+      titolo: decodeURIComponent(prefillTitolo),
+      tipo: prefillTipo || 'correttivo',
+      priorita: prefillPriorita || 'alta',
+    });
+  }
+})();
+
+// ── KPI ───────────────────────────────────────────────────────────────────────
+async function caricaKPI() {
+  try {
+    const s = await API.getWorkOrderStats();
+    document.getElementById('kpi-aperti').textContent    = s.aperti    ?? 0;
+    document.getElementById('kpi-in-corso').textContent  = s.in_corso  ?? 0;
+    document.getElementById('kpi-scaduti').textContent   = s.scaduti   ?? 0;
+    document.getElementById('kpi-urgenti').textContent   = s.urgenti   ?? 0;
+    document.getElementById('kpi-completati').textContent= s.completati ?? 0;
+  } catch(e) { console.warn('Errore KPI WO:', e); }
+}
+
+// ── Caricamento lista ─────────────────────────────────────────────────────────
+async function caricaWO() {
+  try {
+    woList = await API.getWorkOrders();
+    filtra();
+  } catch(e) {
+    document.getElementById('wo-tbody').innerHTML =
+      `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--accent-red)">Errore caricamento work order</td></tr>`;
+  }
+}
+
+// ── Filtri ────────────────────────────────────────────────────────────────────
+function filtra() {
+  const q      = document.getElementById('search-input').value.toLowerCase();
+  const stato  = document.getElementById('filter-stato').value;
+  const tipo   = document.getElementById('filter-tipo').value;
+  const prio   = document.getElementById('filter-priorita').value;
+
+  woFiltrati = woList.filter(wo => {
+    if (stato && wo.stato !== stato) return false;
+    if (tipo  && wo.tipo  !== tipo)  return false;
+    if (prio  && wo.priorita !== prio) return false;
+    if (q && !`${wo.codice} ${wo.titolo} ${wo.asset_nome} ${wo.assegnatario || ''}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  paginaCorrente = 1;
+  renderTabella();
+}
+
+// ── Render tabella ────────────────────────────────────────────────────────────
+function renderTabella() {
+  const start = (paginaCorrente - 1) * PAGE_SIZE;
+  const pagina = woFiltrati.slice(start, start + PAGE_SIZE);
+  const tbody = document.getElementById('wo-tbody');
+
+  document.getElementById('record-count').textContent =
+    `${woFiltrati.length} work order`;
+
+  if (!pagina.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun work order trovato</td></tr>`;
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = pagina.map(wo => {
+    const scaduto = wo.data_pianificata && wo.data_pianificata < oggi &&
+                    !['completato','annullato'].includes(wo.stato);
+    const rowClass = scaduto ? 'scaduto-row' : '';
+    const dataPian = wo.data_pianificata
+      ? `${formatData(wo.data_pianificata)}${scaduto ? '<span class="scaduto-label">SCADUTO</span>' : ''}`
+      : '<span style="color:var(--text-muted)">—</span>';
+
+    const canEdit   = API.can('work_orders.update');
+    const canDelete = API.can('work_orders.delete');
+    const canStato  = API.can('work_orders.update') && !['completato','annullato'].includes(wo.stato);
+
+    return `<tr class="${rowClass}" ondblclick="apriDettaglio(${wo.id})">
+      <td><span style="font-family:monospace;font-size:12px;font-weight:600">${wo.codice}</span></td>
+      <td style="max-width:260px">
+        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${wo.titolo}">${wo.titolo}</div>
+      </td>
+      <td>
+        <div style="font-size:12px">${wo.asset_nome}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${wo.asset_citta || ''}</div>
+      </td>
+      <td><span class="tipo-badge">${wo.tipo}</span></td>
+      <td><span class="prio prio-${wo.priorita}">${wo.priorita.toUpperCase()}</span></td>
+      <td><span class="badge badge-${wo.stato}">${labelStato(wo.stato)}</span></td>
+      <td style="font-size:12px">${wo.assegnatario || '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td style="font-size:12px">${dataPian}</td>
+      <td style="font-size:12px">${formatDataOra(wo.data_apertura)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-icon" title="Dettaglio" onclick="apriDettaglio(${wo.id})"><i class="fa fa-eye"></i></button>
+          ${canStato ? `<button class="btn-icon" title="Cambia stato" onclick="apriCambioStato(${wo.id})"><i class="fa fa-exchange"></i></button>` : ''}
+          ${canEdit  ? `<button class="btn-icon" title="Modifica" onclick="apriModifica(${wo.id})"><i class="fa fa-pencil"></i></button>` : ''}
+          ${canDelete? `<button class="btn-icon danger" title="Elimina" onclick="eliminaWO(${wo.id})"><i class="fa fa-trash"></i></button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  renderPaginazione();
+}
+
+// ── Paginazione ───────────────────────────────────────────────────────────────
+function renderPaginazione() {
+  const totPagine = Math.ceil(woFiltrati.length / PAGE_SIZE);
+  if (totPagine <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+  let html = `<button class="page-btn" onclick="cambiaPagina(${paginaCorrente-1})" ${paginaCorrente===1?'disabled':''}>‹</button>`;
+  for (let i = 1; i <= totPagine; i++) {
+    html += `<button class="page-btn ${i===paginaCorrente?'active':''}" onclick="cambiaPagina(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" onclick="cambiaPagina(${paginaCorrente+1})" ${paginaCorrente===totPagine?'disabled':''}>›</button>`;
+  document.getElementById('pagination').innerHTML = html;
+}
+function cambiaPagina(n) { paginaCorrente = n; renderTabella(); }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function labelStato(s) {
+  return { aperto:'Aperto', in_corso:'In corso', completato:'Completato', annullato:'Annullato' }[s] || s;
+}
+function formatData(d) {
+  if (!d) return '—';
+  const [y,m,g] = d.split('-');
+  return `${g}/${m}/${y}`;
+}
+function formatDataOra(dt) {
+  if (!dt) return '—';
+  const [d, t] = dt.split(' ');
+  const [y,m,g] = d.split('-');
+  return `${g}/${m}/${y} ${t ? t.substring(0,5) : ''}`;
+}
+
+// ── Modal form nuovo/modifica ─────────────────────────────────────────────────
+function apriFormNuovo(prefill = {}) {
+  woCorrente = null;
+  document.getElementById('modal-form-title').textContent = 'Nuovo Work Order';
+  document.getElementById('f-titolo').value = prefill.titolo || '';
+  document.getElementById('f-tipo').value   = prefill.tipo   || 'correttivo';
+  document.getElementById('f-priorita').value = prefill.priorita || 'media';
+  document.getElementById('f-assegnatario').value = prefill.assegnatario || '';
+  document.getElementById('f-data-pianificata').value = prefill.data_pianificata || '';
+  document.getElementById('f-descrizione').value = prefill.descrizione || '';
+  if (prefill.asset_id) document.getElementById('f-asset').value = prefill.asset_id;
+  document.getElementById('modal-form').classList.add('open');
+}
+
+function apriModifica(id) {
+  const wo = woList.find(w => w.id === id);
+  if (!wo) return;
+  woCorrente = wo;
+  document.getElementById('modal-form-title').textContent = `Modifica ${wo.codice}`;
+  document.getElementById('f-asset').value = wo.asset_id;
+  document.getElementById('f-titolo').value = wo.titolo;
+  document.getElementById('f-tipo').value   = wo.tipo;
+  document.getElementById('f-priorita').value = wo.priorita;
+  document.getElementById('f-assegnatario').value = wo.assegnatario || '';
+  document.getElementById('f-data-pianificata').value = wo.data_pianificata || '';
+  document.getElementById('f-descrizione').value = wo.descrizione || '';
+  document.getElementById('modal-form').classList.add('open');
+}
+
+function apriModificaDaDettaglio() {
+  chiudiModal('modal-dettaglio');
+  if (woCorrente) apriModifica(woCorrente.id);
+}
+
+async function salvaWO() {
+  const titolo = document.getElementById('f-titolo').value.trim();
+  if (!titolo) { alert('Il titolo è obbligatorio.'); return; }
+  const payload = {
+    asset_id: parseInt(document.getElementById('f-asset').value),
+    tipo:     document.getElementById('f-tipo').value,
+    priorita: document.getElementById('f-priorita').value,
+    titolo,
+    descrizione: document.getElementById('f-descrizione').value.trim() || null,
+    assegnatario: document.getElementById('f-assegnatario').value.trim() || null,
+    data_pianificata: document.getElementById('f-data-pianificata').value || null,
+  };
+  try {
+    if (woCorrente) {
+      await API.updateWorkOrder(woCorrente.id, payload);
+    } else {
+      await API.createWorkOrder(payload);
+    }
+    chiudiModal('modal-form');
+    await caricaKPI();
+    await caricaWO();
+  } catch(e) { alert('Errore salvataggio: ' + e.message); }
+}
+
+// ── Modal dettaglio ───────────────────────────────────────────────────────────
+async function apriDettaglio(id) {
+  try {
+    const wo = await API.getWorkOrder(id);
+    woCorrente = wo;
+    document.getElementById('det-codice').textContent = wo.codice;
+    document.getElementById('det-titolo').textContent = wo.titolo;
+    document.getElementById('det-stato-badge').innerHTML = `<span class="badge badge-${wo.stato}">${labelStato(wo.stato)}</span>`;
+    document.getElementById('det-prio-badge').innerHTML  = `<span class="prio prio-${wo.priorita}">${wo.priorita.toUpperCase()}</span>`;
+    document.getElementById('det-tipo-badge').innerHTML  = `<span class="tipo-badge">${wo.tipo}</span>`;
+    document.getElementById('det-creato-da').textContent = `Creato da ${wo.creato_da}`;
+    document.getElementById('det-asset').textContent     = `${wo.asset_nome} — ${wo.asset_citta || ''}`;
+    document.getElementById('det-assegnatario').textContent = wo.assegnatario || '—';
+    document.getElementById('det-apertura').textContent  = formatDataOra(wo.data_apertura);
+    document.getElementById('det-pianificata').textContent = wo.data_pianificata ? formatData(wo.data_pianificata) : '—';
+
+    const chiusuraWrap = document.getElementById('det-chiusura-wrap');
+    if (wo.data_chiusura) {
+      chiusuraWrap.style.display = '';
+      document.getElementById('det-chiusura').textContent = formatDataOra(wo.data_chiusura);
+    } else { chiusuraWrap.style.display = 'none'; }
+
+    document.getElementById('det-descrizione').textContent = wo.descrizione || '—';
+    const noteWrap = document.getElementById('det-note-wrap');
+    if (wo.note_chiusura) {
+      noteWrap.style.display = '';
+      document.getElementById('det-note-chiusura').textContent = wo.note_chiusura;
+    } else { noteWrap.style.display = 'none'; }
+
+    const canEdit  = API.can('work_orders.update');
+    const canStato = canEdit && !['completato','annullato'].includes(wo.stato);
+    document.getElementById('det-btn-modifica').style.display = canEdit ? '' : 'none';
+    document.getElementById('det-btn-stato').style.display    = canStato ? '' : 'none';
+
+    document.getElementById('modal-dettaglio').classList.add('open');
+  } catch(e) { alert('Errore caricamento dettaglio: ' + e.message); }
+}
+
+// ── Modal cambio stato ────────────────────────────────────────────────────────
+let _cambioStatoId = null;
+let _cambioStatoScelto = null;
+
+function apriCambioStato(id) {
+  const wo = woList.find(w => w.id === id);
+  if (!wo) return;
+  _cambioStatoId = id;
+  _cambioStatoScelto = null;
+  document.getElementById('stato-wo-codice').textContent = wo.codice;
+  document.getElementById('note-chiusura-input').value = '';
+  document.getElementById('note-chiusura-wrap').style.display = 'none';
+
+  const opzioni = [
+    { val:'aperto',     icon:'🔵', name:'Aperto',     desc:'Il WO è stato aperto ma non ancora preso in carico.' },
+    { val:'in_corso',   icon:'🟡', name:'In corso',   desc:'Intervento in corso — qualcuno sta lavorando su questo WO.' },
+    { val:'completato', icon:'🟢', name:'Completato', desc:'Intervento terminato con successo.' },
+    { val:'annullato',  icon:'⚫', name:'Annullato',  desc:'WO annullato — non verrà eseguito.' },
+  ].filter(o => o.val !== wo.stato);
+
+  document.getElementById('stato-options').innerHTML = opzioni.map(o => `
+    <div class="stato-option" onclick="selezionaStato('${o.val}', this)">
+      <span class="stato-icon">${o.icon}</span>
+      <div class="stato-info">
+        <div class="stato-name">${o.name}</div>
+        <div class="stato-desc">${o.desc}</div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('modal-stato').classList.add('open');
+}
+
+function apriCambioStatoDaDettaglio() {
+  chiudiModal('modal-dettaglio');
+  if (woCorrente) apriCambioStato(woCorrente.id);
+}
+
+function selezionaStato(val, el) {
+  _cambioStatoScelto = val;
+  document.querySelectorAll('.stato-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  const noteWrap = document.getElementById('note-chiusura-wrap');
+  noteWrap.style.display = ['completato','annullato'].includes(val) ? '' : 'none';
+}
+
+async function confermaCambioStato() {
+  if (!_cambioStatoScelto) { alert('Seleziona un nuovo stato.'); return; }
+  const payload = { stato: _cambioStatoScelto };
+  const note = document.getElementById('note-chiusura-input').value.trim();
+  if (note) payload.note_chiusura = note;
+  try {
+    await API.updateWorkOrder(_cambioStatoId, payload);
+    chiudiModal('modal-stato');
+    await caricaKPI();
+    await caricaWO();
+  } catch(e) { alert('Errore cambio stato: ' + e.message); }
+}
+
+// ── Elimina ───────────────────────────────────────────────────────────────────
+function eliminaWO(id) {
+  const wo = woList.find(w => w.id === id);
+  if (!wo) return;
+  showConfirm(`Eliminare il work order <strong>${wo.codice}</strong>?<br><small>${wo.titolo}</small>`, async () => {
+    try {
+      await API.deleteWorkOrder(id);
+      await caricaKPI();
+      await caricaWO();
+    } catch(e) { alert('Errore eliminazione: ' + e.message); }
+  });
+}
+
+// ── Chiudi modal ──────────────────────────────────────────────────────────────
+function chiudiModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    ['modal-stato','modal-dettaglio','modal-form'].forEach(chiudiModal);
+  }
+});
+</script>
+</body>
+</html>

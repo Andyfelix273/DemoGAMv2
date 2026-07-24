@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Impostazioni</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:24px; max-width:760px; }
+
+    /* Sezioni impostazioni */
+    .settings-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .settings-section-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+    }
+    .settings-section-icon {
+      width: 32px; height: 32px; border-radius: 6px;
+      background: rgba(88,166,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--accent-blue);
+    }
+    .settings-section-icon.green { background: rgba(39,174,96,0.12); color: #27AE60; }
+    .settings-section-icon.orange { background: rgba(243,156,18,0.12); color: #F39C12; }
+    .settings-section-title { font-size: 14px; font-weight: 600; }
+    .settings-section-body { padding: 16px 18px; }
+
+    /* Riga impostazione */
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border-color);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 13px; color: var(--text-primary); }
+    .setting-desc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .setting-control { display: flex; align-items: center; gap: 8px; }
+
+    /* Radio group */
+    .radio-group { display: flex; gap: 8px; }
+    .radio-btn {
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border-color); cursor: pointer;
+      background: var(--bg-tertiary); color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .radio-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+    /* Input numerico impostazioni */
+    .setting-input {
+      width: 90px; padding: 5px 10px;
+      background: var(--input-bg); border: 1px solid var(--input-border);
+      border-radius: 6px; color: var(--text-primary); font-size: 13px; text-align: right;
+    }
+    .setting-input:focus { outline: none; border-color: var(--accent-blue); }
+    .setting-unit { font-size: 11px; color: var(--text-muted); min-width: 55px; }
+
+    /* Profilo utente */
+    .profile-avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(88,166,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: var(--accent-blue);
+      margin-bottom: 12px;
+    }
+    .profile-nome  { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .profile-ruolo { font-size: 12px; color: var(--text-secondary); }
+
+    /* Rating grid */
+    .rating-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px; }
+    .rating-card {
+      text-align:center; padding:10px 6px; border-radius:8px;
+      border:1px solid var(--border-color);
+    }
+    .rating-letter { font-size:22px; font-weight:700; }
+    .rating-range  { font-size:10px; color:var(--text-muted); margin-top:2px; }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fa fa-cog" style="margin-right:8px;color:var(--accent-blue);"></i>Impostazioni Asset Efficiency</h1>
+      <div id="admin-save" style="display:none">
+        <button class="btn btn-primary" id="btn-salva">
+          <i class="fa fa-save"></i> Salva impostazioni
+        </button>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- Sezione: Profilo utente -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-user"></i></div>
+          <span class="settings-section-title">Profilo utente</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="profile-avatar"><i class="fa fa-user"></i></div>
+          <div class="profile-nome" id="profile-nome">–</div>
+          <div class="profile-ruolo" id="profile-ruolo">–</div>
+          <div class="setting-row" style="margin-top:12px">
+            <div><div class="setting-label">Username</div></div>
+            <span id="profile-username" style="font-size:13px;color:var(--text-secondary)">–</span>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Email</div></div>
+            <span id="profile-email" style="font-size:13px;color:var(--text-secondary)">–</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Tema interfaccia -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-adjust"></i></div>
+          <span class="settings-section-title">Tema interfaccia</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Tema</div>
+              <div class="setting-desc">Scegli tra tema scuro e tema chiaro</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="tema-group">
+                <span class="radio-btn" data-val="dark">Scuro</span>
+                <span class="radio-btn" data-val="light">Chiaro</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Lingua -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-language"></i></div>
+          <span class="settings-section-title">Lingua</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Lingua interfaccia</div>
+              <div class="setting-desc">Italiano / English</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="lingua-group">
+                <span class="radio-btn" data-val="it">Italiano</span>
+                <span class="radio-btn" data-val="en">English</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Parametri energetici -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon green"><i class="fa fa-bolt"></i></div>
+          <span class="settings-section-title">Parametri energetici</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Fattore CO₂ rete elettrica</div>
+              <div class="setting-desc">kg CO₂ per kWh consumato dalla rete</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="0.001" id="cfg-co2-kwh" value="0.233">
+              <span class="setting-unit">kg/kWh</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Fattore CO₂ gas naturale</div>
+              <div class="setting-desc">kg CO₂ per Smc di gas consumato</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="0.001" id="cfg-co2-gas" value="1.960">
+              <span class="setting-unit">kg/Smc</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Costo energia elettrica</div>
+              <div class="setting-desc">Costo medio per kWh (IVA inclusa)</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="0.001" id="cfg-costo-kwh" value="0.28">
+              <span class="setting-unit">€/kWh</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Costo gas naturale</div>
+              <div class="setting-desc">Costo medio per Smc (IVA inclusa)</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="0.001" id="cfg-costo-gas" value="1.15">
+              <span class="setting-unit">€/Smc</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Intervallo refresh dati</div>
+              <div class="setting-desc">Frequenza aggiornamento automatico della mappa</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="refresh-group">
+                <span class="radio-btn" data-val="30">30s</span>
+                <span class="radio-btn active" data-val="60">1 min</span>
+                <span class="radio-btn" data-val="300">5 min</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Classificazione rating ESG -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon green"><i class="fa fa-leaf"></i></div>
+          <span class="settings-section-title">Classificazione rating ESG energetico</span>
+        </div>
+        <div class="settings-section-body">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+            Il rating viene calcolato in base al consumo normalizzato per superficie (kWh/m²/giorno).
+            I valori di soglia sono configurabili per tipo di asset.
+          </p>
+          <div class="rating-grid">
+            <div class="rating-card" style="border-color:#27AE60;background:rgba(39,174,96,0.08);">
+              <div class="rating-letter" style="color:#27AE60">A</div>
+              <div class="rating-range">≤ 0.10 kWh/m²</div>
+            </div>
+            <div class="rating-card" style="border-color:#4CAF50;background:rgba(76,175,80,0.08);">
+              <div class="rating-letter" style="color:#4CAF50">B</div>
+              <div class="rating-range">0.10–0.20</div>
+            </div>
+            <div class="rating-card" style="border-color:#F39C12;background:rgba(243,156,18,0.08);">
+              <div class="rating-letter" style="color:#F39C12">C</div>
+              <div class="rating-range">0.20–0.35</div>
+            </div>
+            <div class="rating-card" style="border-color:#E74C3C;background:rgba(231,76,60,0.08);">
+              <div class="rating-letter" style="color:#E74C3C">D</div>
+              <div class="rating-range">0.35–0.50</div>
+            </div>
+            <div class="rating-card" style="border-color:#c0392b;background:rgba(192,57,43,0.08);">
+              <div class="rating-letter" style="color:#c0392b">E</div>
+              <div class="rating-range">&gt; 0.50 kWh/m²</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Occupancy -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon orange"><i class="fa fa-users"></i></div>
+          <span class="settings-section-title">Parametri occupancy</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Soglia occupancy alta</div>
+              <div class="setting-desc">Percentuale oltre la quale l'occupancy è considerata alta</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="1" min="50" max="100" id="cfg-occ-alta" value="85">
+              <span class="setting-unit">%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Soglia occupancy media</div>
+              <div class="setting-desc">Percentuale oltre la quale l'occupancy è considerata media</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="1" min="20" max="85" id="cfg-occ-media" value="50">
+              <span class="setting-unit">%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Correlazione occupancy-energia</div>
+              <div class="setting-desc">Mostra la correlazione tra occupancy e consumi nella mappa</div>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group" id="corr-group">
+                <span class="radio-btn active" data-val="true">Attiva</span>
+                <span class="radio-btn" data-val="false">Disattiva</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione: Informazioni applicazione -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon"><i class="fa fa-info-circle"></i></div>
+          <span class="settings-section-title">Informazioni</span>
+        </div>
+        <div class="settings-section-body">
+          <div class="setting-row">
+            <div class="setting-label">Asset Efficiency</div>
+            <span style="font-size:12px;color:var(--text-muted)">v1.0</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Sviluppato da</div>
+            <span style="font-size:12px;color:var(--text-secondary)">KeyBiz / Metamorphosis</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Dati energetici</div>
+            <span style="font-size:12px;color:var(--text-secondary)">API /api/energy/* + /api/occupancy/*</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Mappa</div>
+            <span style="font-size:12px;color:var(--text-secondary)">Jawg Maps + Leaflet.js</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/i18n.js?v=6"></script>
+  <script src="/static/js/api.js?v=6"></script>
+  <script src="/static/js/utils.js?v=6"></script>
+  <script>
+  /**
+   * efficiency-settings.html — Impostazioni del dimostratore Asset Efficiency
+   * Basato su settings.html del GIS Asset Manager
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('efficiency-impostazioni', { filtri: false, titolo: 'Asset Efficiency' });
+
+  // Sidebar autonoma del dimostratore efficiency
+  renderSidebar('efficiency-impostazioni');
+  setTimeout(() => {
+    const sb = document.getElementById('sidebar');
+    if (!sb) return;
+    sb.innerHTML = `
+      <a href="/static/efficiency-map.html" class="sidebar-link" title="Mappa efficienza">
+        <i class="fa fa-map-marker"></i>
+        <span>Mappa</span>
+      </a>
+      <a href="/static/efficiency-assets.html" class="sidebar-link" title="Anagrafica asset">
+        <i class="fa fa-database"></i>
+        <span>Anagrafica</span>
+      </a>
+      <a href="/static/efficiency-alarms.html" class="sidebar-link" title="Allarmi energetici">
+        <i class="fa fa-bell"></i>
+        <span>Allarmi</span>
+      </a>
+      <a href="/static/efficiency-settings.html" class="sidebar-link active" title="Impostazioni">
+        <i class="fa fa-cog"></i>
+        <span>Impostazioni</span>
+      </a>
+      <div style="flex:1;"></div>
+      <button class="sidebar-link" onclick="API.logout(); window.location.href='/static/login.html';" title="Esci">
+        <i class="fa fa-sign-out"></i>
+        <span>Esci</span>
+      </button>`;
+  }, 50);
+
+  initAlarmNotifications();
+  i18n.apply();
+
+  const isAdmin    = API.isAdmin();
+  const canSettings = API.can('settings.update');
+
+  let cfg = {
+    tema:   Tema.get(),
+    lingua: i18n.getLang()
+  };
+
+  // ── Caricamento profilo ──────────────────────────────────────
+  async function caricaDati() {
+    try {
+      const me = await API.me();
+      document.getElementById('profile-nome').textContent     = me.nome_completo || me.username;
+      document.getElementById('profile-username').textContent = me.username;
+      document.getElementById('profile-email').textContent    = me.email || '–';
+      document.getElementById('profile-ruolo').innerHTML =
+        `<span class="badge badge-ok" style="font-size:11px">${me.role}</span>`;
+    } catch (_) {}
+
+    // Applica valori ai controlli
+    setRadioGroup('tema-group',   cfg.tema);
+    setRadioGroup('lingua-group', cfg.lingua);
+
+    // Carica parametri salvati in localStorage
+    const saved = JSON.parse(localStorage.getItem('efficiency_params') || '{}');
+    if (saved.co2_kwh)   document.getElementById('cfg-co2-kwh').value   = saved.co2_kwh;
+    if (saved.co2_gas)   document.getElementById('cfg-co2-gas').value   = saved.co2_gas;
+    if (saved.costo_kwh) document.getElementById('cfg-costo-kwh').value = saved.costo_kwh;
+    if (saved.costo_gas) document.getElementById('cfg-costo-gas').value = saved.costo_gas;
+    if (saved.occ_alta)  document.getElementById('cfg-occ-alta').value  = saved.occ_alta;
+    if (saved.occ_media) document.getElementById('cfg-occ-media').value = saved.occ_media;
+    if (saved.refresh)   setRadioGroup('refresh-group', saved.refresh);
+    if (saved.correlazione !== undefined) setRadioGroup('corr-group', saved.correlazione);
+
+    // Mostra pulsante salva
+    document.getElementById('admin-save').style.display = 'block';
+  }
+
+  // ── Gestione radio group ──────────────────────────────────────
+  function setRadioGroup(groupId, valore) {
+    document.querySelectorAll(`#${groupId} .radio-btn`).forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === String(valore));
+    });
+  }
+
+  function getRadioValue(groupId) {
+    const active = document.querySelector(`#${groupId} .radio-btn.active`);
+    return active ? active.dataset.val : null;
+  }
+
+  // Click sui radio button
+  document.querySelectorAll('.radio-group').forEach(group => {
+    group.addEventListener('click', e => {
+      const btn = e.target.closest('.radio-btn');
+      if (!btn) return;
+      const groupId = group.id;
+      group.querySelectorAll('.radio-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (groupId === 'tema-group') {
+        Tema.set(btn.dataset.val);
+        cfg.tema = btn.dataset.val;
+      } else if (groupId === 'lingua-group') {
+        i18n.setLang(btn.dataset.val);
+        cfg.lingua = btn.dataset.val;
+        i18n.apply();
+      }
+    });
+  });
+
+  // ── Salvataggio impostazioni ──────────────────────────────────
+  document.getElementById('btn-salva')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-salva');
+    btn.disabled = true;
+    try {
+      // Salva parametri energetici in localStorage
+      const params = {
+        co2_kwh:     parseFloat(document.getElementById('cfg-co2-kwh').value) || 0.233,
+        co2_gas:     parseFloat(document.getElementById('cfg-co2-gas').value) || 1.960,
+        costo_kwh:   parseFloat(document.getElementById('cfg-costo-kwh').value) || 0.28,
+        costo_gas:   parseFloat(document.getElementById('cfg-costo-gas').value) || 1.15,
+        occ_alta:    parseInt(document.getElementById('cfg-occ-alta').value) || 85,
+        occ_media:   parseInt(document.getElementById('cfg-occ-media').value) || 50,
+        refresh:     getRadioValue('refresh-group') || '60',
+        correlazione: getRadioValue('corr-group') || 'true'
+      };
+      localStorage.setItem('efficiency_params', JSON.stringify(params));
+
+      // Salva anche tema/lingua nel backend (se disponibile)
+      try {
+        await API.updateConfig({
+          tema:   getRadioValue('tema-group')   || cfg.tema,
+          lingua: getRadioValue('lingua-group') || cfg.lingua
+        });
+      } catch (_) {}
+
+      showToast('Impostazioni salvate', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Avvio ─────────────────────────────────────────────────────
+  caricaDati();
+  </script>
+</body>
+</html>

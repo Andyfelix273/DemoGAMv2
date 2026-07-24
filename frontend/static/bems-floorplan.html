@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BEMS Floorplan Viewer — GAM Platform</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    :root {
+      --bg-primary: #060d1a;
+      --bg-secondary: #0d1829;
+      --bg-card: #0f1e3d;
+      --border-color: #1e3a5f;
+      --accent-blue: #3498DB;
+      --accent-green: #27AE60;
+      --accent-yellow: #F39C12;
+      --accent-red: #E74C3C;
+      --text-primary: #e2e8f0;
+      --text-muted: #7BAFC4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 14px; font-weight: 700; color: var(--accent-blue); }
+    .header .subtitle { font-size: 11px; color: var(--text-muted); }
+    .header-spacer { flex: 1; }
+    .floor-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 5px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .floor-btn.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #fff;
+    }
+    .mode-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    .mode-btn.active { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .refresh-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+    #last-update { font-size: 10px; color: var(--text-muted); }
+
+    /* ── Layout principale ── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar KPI ── */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .sidebar-section {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .sidebar-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .kpi-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .kpi-label { font-size: 11px; color: var(--text-muted); }
+    .kpi-value { font-size: 13px; font-weight: 700; }
+    .zone-list-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 2px;
+    }
+    .zone-list-item:hover { background: var(--bg-card); }
+    .zone-list-item.selected { background: rgba(52,152,219,0.15); border: 1px solid rgba(52,152,219,0.3); }
+    .zone-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .zone-name { flex: 1; font-size: 11px; }
+    .zone-badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; }
+
+    /* ── Area mappa ── */
+    .map-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #060d1a;
+    }
+    #svg-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #svg-container svg {
+      max-width: 100%;
+      max-height: 100%;
+      cursor: default;
+    }
+
+    /* ── Overlay zona ── */
+    .zone-overlay {
+      position: absolute;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      opacity: 0.35;
+      border-radius: 3px;
+    }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: absolute;
+      background: rgba(13,24,41,0.95);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      min-width: 180px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    #tooltip .tt-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    #tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 3px; }
+    #tooltip .tt-label { color: var(--text-muted); }
+    #tooltip .tt-value { font-weight: 600; }
+
+    /* ── Legenda colorazione ── */
+    .legend-bar {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(13,24,41,0.9);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 10px;
+    }
+    .legend-title { color: var(--text-muted); margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .legend-gradient {
+      width: 120px;
+      height: 8px;
+      border-radius: 4px;
+      margin-bottom: 3px;
+    }
+    .legend-labels { display: flex; justify-content: space-between; color: var(--text-muted); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 4px 16px;
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    .status-dot.green { background: var(--accent-green); }
+    .status-dot.yellow { background: var(--accent-yellow); }
+    .status-dot.red { background: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header h1" style="font-size:14px;font-weight:700;color:#3498DB;">
+      <i class="fa fa-building" style="margin-right:6px;"></i>BEMS Floorplan Viewer
+    </div>
+    <div class="subtitle">GAM Platform — Sede Centrale Roma</div>
+  </div>
+  <div class="header-spacer"></div>
+  <button class="floor-btn active" id="btn-p4" onclick="caricaPiano('P4')">Piano 4</button>
+  <button class="floor-btn" id="btn-p5" onclick="caricaPiano('P5')">Piano 5</button>
+  <div style="width:1px;height:24px;background:var(--border-color);margin:0 4px;"></div>
+  <button class="mode-btn active" id="mode-occupancy" onclick="setMode('occupancy')"><i class="fa fa-users"></i> Occupancy</button>
+  <button class="mode-btn" id="mode-energy" onclick="setMode('energy')"><i class="fa fa-bolt"></i> Energia</button>
+  <button class="mode-btn" id="mode-temp" onclick="setMode('temp')"><i class="fa fa-thermometer-half"></i> Temp.</button>
+  <button class="mode-btn" id="mode-co2" onclick="setMode('co2')"><i class="fa fa-leaf"></i> CO₂</button>
+  <div style="width:1px;height:24px;background:var(--border-color);margin:0 4px;"></div>
+  <button class="refresh-btn" onclick="aggiornaColori()"><i class="fa fa-refresh"></i> Aggiorna</button>
+  <span id="last-update">—</span>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Sidebar KPI -->
+  <div class="sidebar">
+    <!-- KPI globali -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">KPI Piano</div>
+      <div class="kpi-row">
+        <span class="kpi-label"><i class="fa fa-bolt" style="color:#F39C12;margin-right:4px;"></i>Potenza totale</span>
+        <span class="kpi-value" id="kpi-power">— kW</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-label"><i class="fa fa-users" style="color:#27AE60;margin-right:4px;"></i>Zone occupate</span>
+        <span class="kpi-value" id="kpi-occ">—</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-label"><i class="fa fa-thermometer-half" style="color:#3498DB;margin-right:4px;"></i>Temp. media</span>
+        <span class="kpi-value" id="kpi-temp">— °C</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-label"><i class="fa fa-leaf" style="color:#27AE60;margin-right:4px;"></i>CO₂ media</span>
+        <span class="kpi-value" id="kpi-co2">— ppm</span>
+      </div>
+    </div>
+
+    <!-- Lista zone -->
+    <div class="sidebar-section" style="flex:1;">
+      <div class="sidebar-title">Zone</div>
+      <div id="zone-list"></div>
+    </div>
+  </div>
+
+  <!-- Area mappa -->
+  <div class="map-area">
+    <div id="svg-container">
+      <div style="color:var(--text-muted);font-size:13px;">Caricamento planimetria...</div>
+    </div>
+    <div id="tooltip"></div>
+
+    <!-- Legenda -->
+    <div class="legend-bar" id="legend-bar">
+      <div class="legend-title" id="legend-title">Occupancy</div>
+      <div class="legend-gradient" id="legend-gradient"
+           style="background: linear-gradient(to right, #95A5A6, #27AE60, #F39C12, #E74C3C);"></div>
+      <div class="legend-labels">
+        <span id="legend-min">Libera</span>
+        <span id="legend-max">Piena</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span><span class="status-dot green" id="status-dot"></span><span id="status-text">Connesso</span></span>
+  <span id="status-count">0 zone monitorate</span>
+  <span id="status-asset">Asset: Sede Centrale Roma (ID 6)</span>
+  <span style="margin-left:auto;"><span id="status-mode">Modalità: Occupancy</span></span>
+</div>
+
+<script>
+// ── Configurazione ──────────────────────────────────────────────
+const ASSET_ID = 6;
+let currentFloor = 'P4';
+let currentMode = 'occupancy';
+let telData = {};
+let zonesData = [];
+let selectedZone = null;
+let autoRefreshTimer = null;
+
+// Mapping zone SVG → zone_id BEMS (Piano 4)
+// Coordinate lette da piano4_clean_opt.svg (viewBox 0 0 1460 900)
+const ZONE_MAP_P4 = {
+  'Z-P4-01': { label: 'Ufficio 1',      rect: { x: 60,   y: 60,  w: 160, h: 270 } },
+  'Z-P4-02': { label: 'Ufficio 2',      rect: { x: 220,  y: 60,  w: 160, h: 270 } },
+  'Z-P4-03': { label: 'Ufficio 3',      rect: { x: 380,  y: 60,  w: 160, h: 270 } },
+  'Z-P4-04': { label: 'Ufficio 4',      rect: { x: 540,  y: 60,  w: 160, h: 270 } },
+  'Z-P4-05': { label: 'Dir. Generale',  rect: { x: 990,  y: 60,  w: 170, h: 270 } },
+  'Z-P4-06': { label: 'Sala Riunioni',  rect: { x: 1160, y: 60,  w: 240, h: 270 } },
+  'Z-P4-07': { label: 'Lab IoT',        rect: { x: 430,  y: 390, w: 270, h: 430 } },
+  'Z-P4-08': { label: 'Open Space A',   rect: { x: 60,   y: 390, w: 370, h: 430 } },
+  'Z-P4-09': { label: 'Open Space B',   rect: { x: 700,  y: 390, w: 360, h: 430 } },
+  'Z-P4-10': { label: 'Sala Break',     rect: { x: 1110, y: 390, w: 290, h: 180 } },
+};
+
+// Mapping zone SVG → zone_id BEMS (Piano 5)
+// Coordinate lette da piano5_final_opt.svg (viewBox 0 0 1800 1200)
+const ZONE_MAP_P5 = {
+  'Z-P5-01': { label: 'Sala Flip 1',  rect: { x: 40,   y: 45,  w: 240, h: 245 } },
+  'Z-P5-02': { label: 'Sala Flip 2',  rect: { x: 460,  y: 45,  w: 240, h: 245 } },
+  'Z-P5-03': { label: 'Sales',        rect: { x: 700,  y: 45,  w: 200, h: 245 } },
+  'Z-P5-04': { label: 'CEO + CFO',    rect: { x: 900,  y: 45,  w: 300, h: 305 } },
+  'Z-P5-05': { label: 'CTO',          rect: { x: 40,   y: 420, w: 240, h: 260 } },
+  'Z-P5-06': { label: 'AMM.',         rect: { x: 280,  y: 45,  w: 180, h: 155 } },
+  'Z-P5-07': { label: 'Open Space',   rect: { x: 40,   y: 680, w: 460, h: 480 } },
+};
+
+// ── Autenticazione ──────────────────────────────────────────────
+let authToken = null;
+
+async function login() {
+  try {
+    const r = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'username=admin&password=demo2026'
+    });
+    if (!r.ok) throw new Error('Login fallito');
+    const d = await r.json();
+    authToken = d.access_token;
+    return true;
+  } catch(e) {
+    // Prova a leggere il token dal localStorage (se già loggato)
+    authToken = localStorage.getItem('gam_token');
+    return !!authToken;
+  }
+}
+
+function apiHeaders() {
+  return { 'Authorization': 'Bearer ' + authToken };
+}
+
+// ── Caricamento dati ────────────────────────────────────────────
+async function caricaTelemetria() {
+  try {
+    const r = await fetch(`/api/bems/buildings/${ASSET_ID}/telemetry/latest`, { headers: apiHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    telData = await r.json();
+    document.getElementById('last-update').textContent = 'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
+    document.getElementById('status-dot').className = 'status-dot green';
+    document.getElementById('status-text').textContent = 'Connesso';
+    return true;
+  } catch(e) {
+    document.getElementById('status-dot').className = 'status-dot red';
+    document.getElementById('status-text').textContent = 'Errore connessione';
+    return false;
+  }
+}
+
+async function caricaZone() {
+  try {
+    const r = await fetch(`/api/bems/buildings/${ASSET_ID}/zones?floor_id=${currentFloor}`, { headers: apiHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    zonesData = await r.json();
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+// ── Calcolo colori ──────────────────────────────────────────────
+function getColor(zoneId, mode) {
+  const tel = telData[zoneId];
+  if (!tel) return null;
+
+  if (mode === 'occupancy') {
+    return tel.occupancy ? '#27AE60' : '#95A5A6';
+  } else if (mode === 'energy') {
+    const kw = tel.power_kw || 0;
+    if (kw <= 0) return '#95A5A6';
+    if (kw < 1.5) return '#27AE60';
+    if (kw < 3.0) return '#F39C12';
+    return '#E74C3C';
+  } else if (mode === 'temp') {
+    const t = tel.temp_c;
+    if (t == null) return null;
+    if (t < 19) return '#3498DB';
+    if (t < 21) return '#27AE60';
+    if (t < 24) return '#F39C12';
+    return '#E74C3C';
+  } else if (mode === 'co2') {
+    const c = tel.co2_ppm || 0;
+    if (c <= 0) return null;
+    if (c < 600) return '#27AE60';
+    if (c < 900) return '#F39C12';
+    return '#E74C3C';
+  }
+  return null;
+}
+
+function getOpacity(zoneId, mode) {
+  const tel = telData[zoneId];
+  if (!tel) return 0.1;
+  if (mode === 'occupancy') return tel.occupancy ? 0.45 : 0.15;
+  return 0.40;
+}
+
+// ── Aggiornamento overlay ───────────────────────────────────────
+function aggiornaColori() {
+  const zoneMap = currentFloor === 'P4' ? ZONE_MAP_P4 : ZONE_MAP_P5;
+  const svg = document.querySelector('#svg-container svg');
+  if (!svg) return;
+
+  // Rimuovi overlay esistenti
+  svg.querySelectorAll('.bems-overlay').forEach(el => el.remove());
+
+  // Calcola viewBox per scaling
+  const vb = svg.viewBox.baseVal;
+  const svgW = svg.clientWidth || svg.getBoundingClientRect().width;
+  const svgH = svg.clientHeight || svg.getBoundingClientRect().height;
+  const scaleX = svgW / vb.width;
+  const scaleY = svgH / vb.height;
+
+  let totalPower = 0, countOcc = 0, countZones = 0;
+  let temps = [], co2s = [];
+
+  for (const [zoneId, info] of Object.entries(zoneMap)) {
+    const tel = telData[zoneId];
+    if (!tel) continue;
+    countZones++;
+
+    const color = getColor(zoneId, currentMode);
+    if (!color) continue;
+
+    const opacity = getOpacity(zoneId, currentMode);
+    const r = info.rect;
+
+    // Crea overlay rect SVG
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', r.x);
+    rect.setAttribute('y', r.y);
+    rect.setAttribute('width', r.w);
+    rect.setAttribute('height', r.h);
+    rect.setAttribute('fill', color);
+    rect.setAttribute('opacity', opacity);
+    rect.setAttribute('class', 'bems-overlay');
+    rect.setAttribute('data-zone-id', zoneId);
+    rect.style.cursor = 'pointer';
+    rect.style.transition = 'opacity 0.3s';
+
+    // Tooltip
+    rect.addEventListener('mouseenter', (e) => mostraTooltip(e, zoneId, info.label));
+    rect.addEventListener('mousemove', (e) => muoviTooltip(e));
+    rect.addEventListener('mouseleave', () => nascondiTooltip());
+    rect.addEventListener('click', () => selezionaZona(zoneId));
+
+    svg.appendChild(rect);
+
+    // Accumula KPI
+    if (tel.power_kw) totalPower += tel.power_kw;
+    if (tel.occupancy) countOcc++;
+    if (tel.temp_c != null) temps.push(tel.temp_c);
+    if (tel.co2_ppm != null) co2s.push(tel.co2_ppm);
+  }
+
+  // Aggiorna KPI sidebar
+  document.getElementById('kpi-power').textContent = totalPower.toFixed(1) + ' kW';
+  document.getElementById('kpi-occ').textContent = countOcc + '/' + countZones;
+  document.getElementById('kpi-temp').textContent = temps.length > 0 ? (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1) + ' °C' : '—';
+  document.getElementById('kpi-co2').textContent = co2s.length > 0 ? (co2s.reduce((a,b)=>a+b,0)/co2s.length).toFixed(0) + ' ppm' : '—';
+  document.getElementById('status-count').textContent = countZones + ' zone monitorate';
+
+  // Aggiorna lista zone sidebar
+  aggiornaListaZone(zoneMap);
+}
+
+function aggiornaListaZone(zoneMap) {
+  const el = document.getElementById('zone-list');
+  let html = '';
+  for (const [zoneId, info] of Object.entries(zoneMap)) {
+    const tel = telData[zoneId];
+    const color = tel ? (getColor(zoneId, currentMode) || '#95A5A6') : '#374151';
+    const isSelected = selectedZone === zoneId;
+    const tempStr = tel && tel.temp_c != null ? tel.temp_c.toFixed(1) + '°C' : '';
+    html += `
+      <div class="zone-list-item ${isSelected ? 'selected' : ''}" onclick="selezionaZona('${zoneId}')">
+        <div class="zone-dot" style="background:${color};"></div>
+        <span class="zone-name">${info.label}</span>
+        ${tempStr ? `<span style="font-size:9px;color:var(--text-muted);">${tempStr}</span>` : ''}
+        ${tel ? `<span class="zone-badge" style="background:${color}20;color:${color};">${tel.occupancy ? 'OCC' : 'LIB'}</span>` : ''}
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ── Tooltip ─────────────────────────────────────────────────────
+function mostraTooltip(e, zoneId, label) {
+  const tel = telData[zoneId];
+  if (!tel) return;
+  const tt = document.getElementById('tooltip');
+  const occStr = tel.occupancy ? '<span style="color:#27AE60">Occupata</span>' : '<span style="color:#95A5A6">Libera</span>';
+  tt.innerHTML = `
+    <div class="tt-title">${label}</div>
+    <div class="tt-row"><span class="tt-label">Stato</span><span class="tt-value">${occStr}</span></div>
+    ${tel.power_kw != null ? `<div class="tt-row"><span class="tt-label"><i class="fa fa-bolt" style="color:#F39C12;"></i> Potenza</span><span class="tt-value">${tel.power_kw.toFixed(2)} kW</span></div>` : ''}
+    ${tel.temp_c != null ? `<div class="tt-row"><span class="tt-label"><i class="fa fa-thermometer-half" style="color:#3498DB;"></i> Temp.</span><span class="tt-value">${tel.temp_c.toFixed(1)} °C</span></div>` : ''}
+    ${tel.humidity != null ? `<div class="tt-row"><span class="tt-label"><i class="fa fa-tint" style="color:#3498DB;"></i> Umidità</span><span class="tt-value">${tel.humidity.toFixed(0)}%</span></div>` : ''}
+    ${tel.co2_ppm != null ? `<div class="tt-row"><span class="tt-label"><i class="fa fa-leaf" style="color:#27AE60;"></i> CO₂</span><span class="tt-value">${tel.co2_ppm.toFixed(0)} ppm</span></div>` : ''}
+    ${tel.ts ? `<div style="font-size:9px;color:var(--text-muted);margin-top:5px;">${new Date(tel.ts).toLocaleString('it-IT')}</div>` : ''}`;
+  tt.style.display = 'block';
+  muoviTooltip(e);
+}
+
+function muoviTooltip(e) {
+  const tt = document.getElementById('tooltip');
+  const mapArea = document.querySelector('.map-area');
+  const rect = mapArea.getBoundingClientRect();
+  let x = e.clientX - rect.left + 12;
+  let y = e.clientY - rect.top + 12;
+  if (x + 200 > rect.width) x = e.clientX - rect.left - 200;
+  if (y + 160 > rect.height) y = e.clientY - rect.top - 160;
+  tt.style.left = x + 'px';
+  tt.style.top = y + 'px';
+}
+
+function nascondiTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+
+// ── Selezione zona ───────────────────────────────────────────────
+function selezionaZona(zoneId) {
+  selectedZone = selectedZone === zoneId ? null : zoneId;
+  const zoneMap = currentFloor === 'P4' ? ZONE_MAP_P4 : ZONE_MAP_P5;
+  aggiornaListaZone(zoneMap);
+  // Evidenzia overlay
+  document.querySelectorAll('.bems-overlay').forEach(el => {
+    if (el.getAttribute('data-zone-id') === selectedZone) {
+      el.setAttribute('opacity', '0.7');
+      el.setAttribute('stroke', '#fff');
+      el.setAttribute('stroke-width', '2');
+    } else {
+      el.removeAttribute('stroke');
+      el.removeAttribute('stroke-width');
+      el.setAttribute('opacity', getOpacity(el.getAttribute('data-zone-id'), currentMode));
+    }
+  });
+}
+
+// ── Cambio piano ─────────────────────────────────────────────────
+async function caricaPiano(floor) {
+  currentFloor = floor;
+  selectedZone = null;
+  document.getElementById('btn-p4').classList.toggle('active', floor === 'P4');
+  document.getElementById('btn-p5').classList.toggle('active', floor === 'P5');
+
+  const container = document.getElementById('svg-container');
+  container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Caricamento planimetria...</div>';
+
+  try {
+    const svgFile = floor === 'P4' ? 'piano4_clean_opt.svg' : 'piano5_final_opt.svg';
+    const r = await fetch('/static/' + svgFile);
+    if (!r.ok) throw new Error('SVG non trovato');
+    const svgText = await r.text();
+    container.innerHTML = svgText;
+
+    // Rendi SVG responsivo
+    const svg = container.querySelector('svg');
+    if (svg) {
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.style.maxWidth = '100%';
+      svg.style.maxHeight = '100%';
+    }
+
+    await caricaZone();
+    aggiornaColori();
+  } catch(e) {
+    container.innerHTML = `<div style="color:var(--accent-red);font-size:13px;">Errore caricamento planimetria: ${e.message}</div>`;
+  }
+}
+
+// ── Cambio modalità ──────────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  ['occupancy','energy','temp','co2'].forEach(m => {
+    document.getElementById('mode-' + m).classList.toggle('active', m === mode);
+  });
+  document.getElementById('status-mode').textContent = 'Modalità: ' + {
+    occupancy: 'Occupancy', energy: 'Energia', temp: 'Temperatura', co2: 'CO₂'
+  }[mode];
+
+  // Aggiorna legenda
+  const legends = {
+    occupancy: { title: 'Occupancy', min: 'Libera', max: 'Piena', gradient: 'linear-gradient(to right, #95A5A6, #27AE60)' },
+    energy:    { title: 'Potenza (kW)', min: '0 kW', max: '> 3 kW', gradient: 'linear-gradient(to right, #27AE60, #F39C12, #E74C3C)' },
+    temp:      { title: 'Temperatura', min: '< 19°C', max: '> 24°C', gradient: 'linear-gradient(to right, #3498DB, #27AE60, #F39C12, #E74C3C)' },
+    co2:       { title: 'CO₂ (ppm)', min: '< 600', max: '> 900', gradient: 'linear-gradient(to right, #27AE60, #F39C12, #E74C3C)' },
+  };
+  const l = legends[mode];
+  document.getElementById('legend-title').textContent = l.title;
+  document.getElementById('legend-min').textContent = l.min;
+  document.getElementById('legend-max').textContent = l.max;
+  document.getElementById('legend-gradient').style.background = l.gradient;
+
+  aggiornaColori();
+}
+
+// ── Auto-refresh ─────────────────────────────────────────────────
+async function aggiornaLoop() {
+  await caricaTelemetria();
+  aggiornaColori();
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+async function init() {
+  // Prova a leggere il token dal localStorage (sessione GAM)
+  authToken = localStorage.getItem('gam_token');
+  if (!authToken) {
+    await login();
+  }
+
+  await caricaTelemetria();
+  await caricaPiano('P4');
+
+  // Auto-refresh ogni 30 secondi
+  autoRefreshTimer = setInterval(aggiornaLoop, 30000);
+}
+
+init();
+</script>
+</body>
+</html>

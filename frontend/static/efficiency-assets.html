@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Anagrafica</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-actions { display:flex; gap:8px; align-items:center; }
+    .page-body { padding:16px 24px; }
+
+    /* Barra ricerca + contatore */
+    .table-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; gap: 12px;
+    }
+    .table-header-left { display:flex; gap:8px; align-items:center; flex:1; }
+    .search-wrap { position:relative; flex:1; max-width:320px; }
+    .search-wrap .fa { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted); }
+    .search-wrap input { padding-left:30px; }
+    .record-count { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+
+    /* Tabella */
+    .table-wrap { overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; }
+    .stato-badge {
+      display:inline-block; padding:2px 8px; border-radius:20px;
+      font-size:11px; font-weight:600;
+    }
+    .stato-attivo      { background:rgba(63,185,80,0.15);  color:var(--accent-green); }
+    .stato-manutenzione{ background:rgba(243,156,18,0.15); color:var(--accent-orange); }
+    .stato-inattivo    { background:rgba(110,118,129,0.15);color:var(--text-muted); }
+
+    /* Paginazione */
+    .pagination {
+      display:flex; align-items:center; justify-content:flex-end;
+      gap:4px; margin-top:12px;
+    }
+    .page-btn {
+      min-width:32px; height:32px; padding:0 8px;
+      border:1px solid var(--border-color); border-radius:6px;
+      background:var(--bg-secondary); color:var(--text-secondary);
+      font-size:13px; cursor:pointer; transition:all 0.15s;
+    }
+    .page-btn:hover:not(:disabled) { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .page-btn.active { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
+    .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* Modal form asset */
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+    .form-grid .full { grid-column:1/-1; }
+
+    /* Modal dettaglio asset */
+    .detail-tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:16px; }
+    .detail-tab {
+      padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer;
+      border-bottom:2px solid transparent; color:var(--text-secondary);
+      transition:all 0.15s; background:none; border-top:none; border-left:none; border-right:none;
+    }
+    .detail-tab:hover { color:var(--text-primary); }
+    .detail-tab.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
+    .detail-panel { display:none; }
+    .detail-panel.active { display:block; }
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; }
+    .detail-row { display:flex; flex-direction:column; gap:2px; }
+    .detail-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+    .detail-value { font-size:14px; color:var(--text-primary); }
+    .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+    .kpi-card { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center; }
+    .kpi-val { font-size:22px; font-weight:700; color:var(--accent-blue); }
+    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .alarm-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:13px; }
+    .alarm-row:last-child { border-bottom:none; }
+    .esg-bar-wrap { margin-bottom:10px; }
+    .esg-bar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
+    .esg-bar { height:8px; border-radius:4px; background:var(--border-color); overflow:hidden; }
+    .esg-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+
+    /* Import Excel */
+    .import-zone {
+      border:2px dashed var(--border-color); border-radius:8px;
+      padding:24px; text-align:center; cursor:pointer;
+      transition:border-color 0.15s;
+    }
+    .import-zone:hover { border-color:var(--accent-blue); }
+    .import-zone.drag-over { border-color:var(--accent-blue); background:rgba(88,166,255,0.05); }
+    .import-result { margin-top:12px; font-size:13px; }
+
+    /* Badge efficienza */
+    .eff-badge {
+      display:inline-block; padding:2px 8px; border-radius:20px;
+      font-size:11px; font-weight:700;
+    }
+    .eff-alta    { background:rgba(39,174,96,0.15);  color:#27AE60; }
+    .eff-media   { background:rgba(243,156,18,0.15); color:#F39C12; }
+    .eff-bassa   { background:rgba(231,76,60,0.15);  color:#E74C3C; }
+    .eff-nd      { background:rgba(149,165,166,0.15);color:#95A5A6; }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fa fa-database" style="margin-right:8px;color:var(--accent-blue);"></i>Anagrafica asset</h1>
+      <div class="page-actions" id="admin-actions" style="display:none">
+        <button class="btn btn-secondary btn-sm" id="btn-export-excel" title="Esporta in Excel">
+          <i class="fa fa-file-excel-o"></i> Export Excel
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-import" title="Importa da Excel">
+          <i class="fa fa-upload"></i> Importa Excel
+        </button>
+        <button class="btn btn-primary btn-sm" id="btn-nuovo">
+          <i class="fa fa-plus"></i> Nuovo asset
+        </button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="table-header">
+        <div class="table-header-left">
+          <div class="search-wrap">
+            <i class="fa fa-search"></i>
+            <input class="form-control" type="text" id="search-input" placeholder="Cerca...">
+          </div>
+          <select class="form-control" id="filter-tipo" style="width:auto">
+            <option value="">Tutti i tipi</option>
+            <option value="stabilimento">Stabilimento</option>
+            <option value="ufficio">Ufficio</option>
+            <option value="magazzino">Magazzino</option>
+            <option value="deposito">Deposito</option>
+          </select>
+          <select class="form-control" id="filter-stato" style="width:auto">
+            <option value="">Tutti gli stati</option>
+            <option value="attivo">Attivo</option>
+            <option value="manutenzione">Manutenzione</option>
+            <option value="inattivo">Inattivo</option>
+          </select>
+          <select class="form-control" id="filter-efficienza" style="width:auto">
+            <option value="">Tutte le efficienze</option>
+            <option value="alta">Alta (A/B)</option>
+            <option value="media">Media (C)</option>
+            <option value="bassa">Bassa (D/E)</option>
+          </select>
+        </div>
+        <span class="record-count" id="record-count"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="assets-table">
+          <thead>
+            <tr>
+              <th>Codice</th>
+              <th>Nome</th>
+              <th>Tipo</th>
+              <th>Città</th>
+              <th>Stato</th>
+              <th>Efficienza</th>
+              <th>kWh/giorno</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="assets-tbody">
+            <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">
+              <div class="spinner" style="margin:0 auto"></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <!-- Modal: Nuovo / Modifica asset -->
+  <div class="modal-overlay" id="modal-asset" style="display:none">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title">Nuovo asset</span>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <form id="asset-form">
+        <input type="hidden" id="asset-id">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Codice</label>
+            <input class="form-control" type="text" id="f-codice" required>
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select class="form-control" id="f-tipo" required>
+              <option value="stabilimento">Stabilimento</option>
+              <option value="ufficio">Ufficio</option>
+              <option value="magazzino">Magazzino</option>
+              <option value="deposito">Deposito</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Nome</label>
+            <input class="form-control" type="text" id="f-nome" required>
+          </div>
+          <div class="form-group full">
+            <label>Indirizzo</label>
+            <input class="form-control" type="text" id="f-indirizzo">
+          </div>
+          <div class="form-group">
+            <label>Città</label>
+            <input class="form-control" type="text" id="f-citta">
+          </div>
+          <div class="form-group">
+            <label>Provincia</label>
+            <input class="form-control" type="text" id="f-provincia" maxlength="2">
+          </div>
+          <div class="form-group">
+            <label>CAP</label>
+            <input class="form-control" type="text" id="f-cap" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label>Stato</label>
+            <select class="form-control" id="f-stato">
+              <option value="attivo">Attivo</option>
+              <option value="manutenzione">In manutenzione</option>
+              <option value="inattivo">Inattivo</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Latitudine</label>
+            <input class="form-control" type="number" step="0.0001" id="f-lat" required>
+          </div>
+          <div class="form-group">
+            <label>Longitudine</label>
+            <input class="form-control" type="number" step="0.0001" id="f-lon" required>
+          </div>
+          <div class="form-group">
+            <label>Referente</label>
+            <input class="form-control" type="text" id="f-referente">
+          </div>
+          <div class="form-group">
+            <label>Telefono</label>
+            <input class="form-control" type="text" id="f-telefono">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input class="form-control" type="email" id="f-email">
+          </div>
+          <div class="form-group">
+            <label>Superficie (mq)</label>
+            <input class="form-control" type="number" id="f-superficie">
+          </div>
+          <div class="form-group">
+            <label>Anno costruzione</label>
+            <input class="form-control" type="number" id="f-anno" min="1900" max="2030">
+          </div>
+          <div class="form-group full">
+            <label>Note</label>
+            <textarea class="form-control" id="f-note" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-annulla">Annulla</button>
+          <button type="submit" class="btn btn-primary" id="btn-salva">Salva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Import Excel -->
+  <div class="modal-overlay" id="modal-import" style="display:none">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <span class="modal-title">Importa da Excel</span>
+        <button class="modal-close" id="import-close">&times;</button>
+      </div>
+      <div class="import-zone" id="import-zone">
+        <i class="fa fa-file-excel-o" style="font-size:32px;color:var(--accent-green);margin-bottom:8px"></i>
+        <p style="font-size:14px;margin-bottom:4px">Trascina il file .xlsx qui</p>
+        <p style="font-size:12px;color:var(--text-muted)">oppure clicca per selezionare</p>
+        <input type="file" id="import-file" accept=".xlsx" style="display:none">
+      </div>
+      <div class="import-result" id="import-result"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="import-cancel">Annulla</button>
+        <button class="btn btn-primary" id="btn-scarica-template">
+          <i class="fa fa-download"></i> Template Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- La modale dettaglio asset è iniettata da efficiency-detail-modal.js -->
+
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="/static/js/i18n.js?v=6"></script>
+  <script src="/static/js/api.js?v=6"></script>
+  <script src="/static/js/utils.js?v=6"></script>
+  <script src="/static/js/efficiency-detail-modal.js?v=1"></script>
+  <script>
+  /**
+   * efficiency-assets.html — Anagrafica asset del dimostratore Asset Efficiency
+   * Basato su assets.html del GIS Asset Manager
+   * Tab dettaglio: Anagrafica, Consumi, Occupancy, Allarmi Energetici, ESG Energia
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+
+  // Topbar con titolo Asset Efficiency
+  renderTopbar('efficiency-anagrafica', { filtri: false, titolo: 'Asset Efficiency' });
+
+  // Sidebar con navigazione del dimostratore efficiency (override)
+  (function() {
+    const sb = document.getElementById('sidebar');
+    if (!sb) return;
+    // Aspetta che renderSidebar abbia popolato il DOM, poi sostituisce i link
+    renderSidebar('efficiency-anagrafica');
+    setTimeout(() => {
+      // Sostituisce i link della sidebar con quelli del dimostratore efficiency
+      sb.innerHTML = `
+        <a href="/static/efficiency-map.html" class="sidebar-btn" title="Mappa efficienza">
+          <i class="fa fa-map-marker"></i>
+        </a>
+        <a href="/static/efficiency-assets.html" class="sidebar-btn active" title="Anagrafica asset">
+          <i class="fa fa-database"></i>
+        </a>
+        <a href="/static/efficiency-alarms.html" class="sidebar-btn" title="Allarmi energetici" id="sb-allarmi">
+          <i class="fa fa-bell"></i>
+          <span class="sidebar-dot" id="sb-alarm-dot"></span>
+        </a>
+        <a href="/static/efficiency-settings.html" class="sidebar-btn" title="Impostazioni">
+          <i class="fa fa-cog"></i>
+        </a>
+        <div class="sidebar-spacer"></div>
+        <button class="sidebar-btn" onclick="API.logout(); window.location.href='/static/login.html';" title="Esci">
+          <i class="fa fa-sign-out"></i>
+        </button>`;
+    }, 50);
+  })();
+
+  initAlarmNotifications();
+  i18n.apply();
+
+  // Mostra azioni admin
+  if (API.can('assets.create')) {
+    document.getElementById('admin-actions').style.display = 'flex';
+  }
+
+  // Stato
+  let allAssets      = [];
+  let energySummary  = [];
+  let filtered       = [];
+  let pagina         = 1;
+  const PER_PAG      = 15;
+
+  // Caricamento asset + dati energetici
+  async function caricaAssets() {
+    try {
+      const [geojson, summary] = await Promise.all([
+        API.getAssets(),
+        fetch('/api/energy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } })
+          .then(r => r.ok ? r.json() : [])
+          .catch(() => [])
+      ]);
+      allAssets = (geojson.features || []).map(f => ({
+        ...f.properties,
+        lat: f.geometry?.coordinates[1],
+        lon: f.geometry?.coordinates[0]
+      }));
+      energySummary = summary;
+      applicaFiltri();
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  // Helper: ottieni dati energetici per un asset
+  function getEnergyData(assetId) {
+    return energySummary.find(i => i.asset_id === assetId) || null;
+  }
+
+  // Helper: calcola livello efficienza da rating
+  function livelloEfficienza(rating) {
+    if (!rating) return 'nd';
+    if (rating === 'A' || rating === 'B') return 'alta';
+    if (rating === 'C') return 'media';
+    return 'bassa';
+  }
+
+  // Filtri e ricerca
+  function applicaFiltri() {
+    const testo = document.getElementById('search-input').value.toLowerCase();
+    const tipo  = document.getElementById('filter-tipo').value;
+    const stato = document.getElementById('filter-stato').value;
+    const eff   = document.getElementById('filter-efficienza').value;
+    filtered = allAssets.filter(a => {
+      if (tipo  && a.tipo  !== tipo)  return false;
+      if (stato && a.stato !== stato) return false;
+      if (testo && !a.nome.toLowerCase().includes(testo) &&
+          !a.codice.toLowerCase().includes(testo) &&
+          !(a.citta||'').toLowerCase().includes(testo)) return false;
+      if (eff) {
+        const ed = getEnergyData(a.id);
+        const lv = ed ? livelloEfficienza(ed.rating_esg) : 'nd';
+        if (lv !== eff) return false;
+      }
+      return true;
+    });
+    pagina = 1;
+    renderTabella();
+  }
+
+  // Rendering tabella
+  function renderTabella() {
+    const totale = filtered.length;
+    const inizio = (pagina - 1) * PER_PAG;
+    const pagina_items = filtered.slice(inizio, inizio + PER_PAG);
+
+    document.getElementById('record-count').textContent = totale + ' asset';
+
+    const tbody = document.getElementById('assets-tbody');
+    if (pagina_items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">Nessun asset trovato</td></tr>`;
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+
+    const canEdit   = API.can('assets.update');
+    const canDelete = API.can('assets.delete');
+    const tipoLabel = { stabilimento:'Stabilimento', ufficio:'Ufficio', magazzino:'Magazzino', deposito:'Deposito' };
+    const ratingColor = { A:'#27AE60', B:'#4CAF50', C:'#F39C12', D:'#E74C3C', E:'#c0392b' };
+
+    tbody.innerHTML = pagina_items.map(a => {
+      const ed = getEnergyData(a.id);
+      const lv = ed ? livelloEfficienza(ed.rating_esg) : 'nd';
+      const rc = ed ? (ratingColor[ed.rating_esg] || '#95A5A6') : '#95A5A6';
+      const kwh = ed ? (ed.kwh_giorno||0).toFixed(0) : '–';
+      return `
+      <tr style="cursor:pointer" ondblclick="apriDettaglio(${a.id})">
+        <td><code style="font-size:12px;color:var(--text-secondary)">${a.codice}</code></td>
+        <td>${a.nome}</td>
+        <td><i class="fa ${iconaTipo(a.tipo)} tipo-icon"></i> ${tipoLabel[a.tipo]||a.tipo}</td>
+        <td>${a.citta||'–'} ${a.provincia?'('+a.provincia+')':''}</td>
+        <td><span class="stato-badge stato-${a.stato}">${a.stato}</span></td>
+        <td>
+          ${ed ? `<span class="eff-badge eff-${lv}" style="color:${rc};border:1px solid ${rc}40;">${ed.rating_esg||'–'}</span>` : '<span class="eff-badge eff-nd">N/D</span>'}
+        </td>
+        <td style="font-weight:600;color:${ed&&ed.anomalia_rilevata?'#E74C3C':'var(--text-primary)'};">${kwh}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="apriDettaglio(${a.id})" title="Visualizza dettaglio">
+            <i class="fa fa-eye"></i>
+          </button>
+          <a class="btn btn-ghost btn-sm" href="/static/efficiency-map.html?asset_id=${a.id}" title="Vedi su mappa">
+            <i class="fa fa-map-marker"></i>
+          </a>
+          ${canEdit ? `
+            <button class="btn btn-ghost btn-sm" onclick="apriModifica(${a.id})" title="Modifica">
+              <i class="fa fa-pencil"></i>
+            </button>` : ''}
+          ${canDelete ? `
+            <button class="btn btn-ghost btn-sm" style="color:var(--accent-red)" onclick="eliminaAsset(${a.id},'${a.nome.replace(/'/g,"\\'")}')">
+              <i class="fa fa-trash"></i>
+            </button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Paginazione
+    const totPag = Math.ceil(totale / PER_PAG);
+    const pag = document.getElementById('pagination');
+    if (totPag <= 1) { pag.innerHTML = ''; return; }
+    let html = `<button class="page-btn" ${pagina===1?'disabled':''} onclick="cambiaPagina(${pagina-1})"><i class="fa fa-chevron-left"></i></button>`;
+    for (let i = 1; i <= totPag; i++) {
+      if (totPag > 7 && Math.abs(i - pagina) > 2 && i !== 1 && i !== totPag) {
+        if (i === 2 || i === totPag - 1) html += '<span style="padding:0 4px;color:var(--text-muted)">…</span>';
+        continue;
+      }
+      html += `<button class="page-btn ${i===pagina?'active':''}" onclick="cambiaPagina(${i})">${i}</button>`;
+    }
+    html += `<button class="page-btn" ${pagina===totPag?'disabled':''} onclick="cambiaPagina(${pagina+1})"><i class="fa fa-chevron-right"></i></button>`;
+    pag.innerHTML = html;
+  }
+
+  function cambiaPagina(n) { pagina = n; renderTabella(); }
+
+  // ── Modal: Nuovo asset ───────────────────────────────────────
+  function apriNuovo() {
+    document.getElementById('modal-title').textContent = 'Nuovo asset';
+    document.getElementById('asset-form').reset();
+    document.getElementById('asset-id').value = '';
+    document.getElementById('modal-asset').style.display = 'flex';
+  }
+
+  // ── Modal: Modifica asset ────────────────────────────────────
+  async function apriModifica(id) {
+    document.getElementById('modal-title').textContent = 'Modifica asset';
+    document.getElementById('asset-id').value = id;
+    const a = allAssets.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('f-codice').value    = a.codice || '';
+    document.getElementById('f-nome').value      = a.nome || '';
+    document.getElementById('f-tipo').value      = a.tipo || 'ufficio';
+    document.getElementById('f-indirizzo').value = a.indirizzo || '';
+    document.getElementById('f-citta').value     = a.citta || '';
+    document.getElementById('f-provincia').value = a.provincia || '';
+    document.getElementById('f-cap').value       = a.cap || '';
+    document.getElementById('f-stato').value     = a.stato || 'attivo';
+    document.getElementById('f-lat').value       = a.lat || '';
+    document.getElementById('f-lon').value       = a.lon || '';
+    document.getElementById('f-referente').value = a.referente || '';
+    document.getElementById('f-telefono').value  = a.telefono || '';
+    document.getElementById('f-email').value     = a.email || '';
+    document.getElementById('f-superficie').value= a.superficie_mq || '';
+    document.getElementById('f-anno').value      = a.anno_costruzione || '';
+    document.getElementById('f-note').value      = a.note || '';
+    document.getElementById('modal-asset').style.display = 'flex';
+  }
+
+  // ── Salvataggio form ─────────────────────────────────────────
+  document.getElementById('asset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('asset-id').value;
+    const payload = {
+      codice:           document.getElementById('f-codice').value.trim(),
+      nome:             document.getElementById('f-nome').value.trim(),
+      tipo:             document.getElementById('f-tipo').value,
+      indirizzo:        document.getElementById('f-indirizzo').value.trim() || null,
+      citta:            document.getElementById('f-citta').value.trim() || null,
+      provincia:        document.getElementById('f-provincia').value.trim() || null,
+      cap:              document.getElementById('f-cap').value.trim() || null,
+      stato:            document.getElementById('f-stato').value,
+      lat:              parseFloat(document.getElementById('f-lat').value),
+      lon:              parseFloat(document.getElementById('f-lon').value),
+      referente:        document.getElementById('f-referente').value.trim() || null,
+      telefono:         document.getElementById('f-telefono').value.trim() || null,
+      email:            document.getElementById('f-email').value.trim() || null,
+      superficie_mq:    parseInt(document.getElementById('f-superficie').value) || null,
+      anno_costruzione: parseInt(document.getElementById('f-anno').value) || null,
+      note:             document.getElementById('f-note').value.trim() || null,
+    };
+    const btn = document.getElementById('btn-salva');
+    btn.disabled = true;
+    try {
+      if (id) {
+        await API.updateAsset(parseInt(id), payload);
+        showToast('Asset aggiornato', 'success');
+      } else {
+        await API.createAsset(payload);
+        showToast('Asset creato', 'success');
+      }
+      chiudiModal();
+      await caricaAssets();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Eliminazione asset ───────────────────────────────────────
+  function eliminaAsset(id, nome) {
+    showConfirm('Eliminare "' + nome + '"?', async () => {
+      try {
+        await API.deleteAsset(id);
+        showToast('Asset eliminato', 'success');
+        await caricaAssets();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  // ── Chiudi modal ─────────────────────────────────────────────
+  function chiudiModal() {
+    document.getElementById('modal-asset').style.display = 'none';
+    document.getElementById('modal-import').style.display = 'none';
+    // modal-dettaglio rimossa (ora gestita da efficiency-detail-modal.js)
+  }
+
+  // ── Dettaglio asset: delega alla modale condivisa ───────────
+  function apriDettaglio(id) { apriDettaglioAsset(id); }
+
+  // STUB LEGACY (non più usato)
+  async function _apriDettaglio_LEGACY(id) {
+    const overlay = null; // rimosso
+    // Reset tab
+    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('.detail-tab[data-tab="anagrafica"]').classList.add('active');
+    document.getElementById('panel-anagrafica').classList.add('active');
+    document.getElementById('det-anagrafica-grid').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+    document.getElementById('det-alarm-badge').innerHTML = '';
+
+    try {
+      const d = await API.getAsset(id);
+      const a = d.asset;
+
+      document.getElementById('dettaglio-titolo').textContent = a.codice + ' — ' + a.nome;
+
+      const btnMappa = document.getElementById('dettaglio-mappa-btn');
+      btnMappa.style.display = 'inline-flex';
+      btnMappa.onclick = () => { window.location.href = '/static/efficiency-map.html?asset_id=' + a.id; };
+
+      // ── Tab Anagrafica ──────────────────────────────────────
+      const campiAna = [
+        ['Codice', a.codice], ['Tipo', a.tipo], ['Stato', a.stato],
+        ['Indirizzo', a.indirizzo], ['Città', a.citta + (a.provincia ? ' (' + a.provincia + ')' : '')],
+        ['CAP', a.cap], ['Superficie', a.superficie_mq ? a.superficie_mq + ' mq' : '–'],
+        ['Anno costruzione', a.anno_costruzione || '–'],
+        ['Referente', a.referente || '–'], ['Telefono', a.telefono || '–'],
+        ['Email', a.email || '–'], ['Coordinate', a.lat + ', ' + a.lon],
+        ['Note', a.note || '–', true]
+      ];
+      document.getElementById('det-anagrafica-grid').innerHTML = campiAna.map(([lbl, val, full]) =>
+        `<div class="detail-row${full ? '" style="grid-column:1/-1' : ''}">
+          <span class="detail-label">${lbl}</span>
+          <span class="detail-value">${val || '–'}</span>
+        </div>`
+      ).join('');
+
+      // ── Tab Consumi ─────────────────────────────────────────
+      document.getElementById('det-consumi-content').innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <select id="det-consumi-ore" style="background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-primary);padding:4px 8px;border-radius:6px;font-size:12px;">
+            <option value="24">Ultime 24 ore</option>
+            <option value="168" selected>Ultima settimana</option>
+            <option value="720">Ultimo mese</option>
+          </select>
+          <span style="font-size:11px;color:var(--text-muted);" id="det-consumi-status">Caricamento...</span>
+        </div>
+        <div id="det-consumi-chart" style="width:100%;height:200px;"></div>
+        <div id="det-consumi-kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;"></div>`;
+      caricaConsumiDettaglio(id, 168);
+      document.getElementById('det-consumi-ore').addEventListener('change', (e) => {
+        caricaConsumiDettaglio(id, parseInt(e.target.value));
+      });
+
+      // ── Tab Occupancy ───────────────────────────────────────
+      document.getElementById('det-occupancy-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+      caricaOccupancyDettaglio(id);
+
+      // ── Tab Allarmi Energetici ──────────────────────────────
+      document.getElementById('det-allarmi-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+      caricaAllarmiEnergyDettaglio(id, a.nome);
+
+      // ── Tab ESG Energia ─────────────────────────────────────
+      document.getElementById('det-esg-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+      caricaEsgEnergyDettaglio(id);
+
+      // ── Tab Impianti ────────────────────────────────────────
+      document.getElementById('det-impianti-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+      caricaImpiantiDettaglio(id);
+
+      // ── Tab Zone ────────────────────────────────────────────
+      document.getElementById('det-zone-content').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+      caricaZoneDettaglio(id);
+
+      // ── Bottone Floorplan BEMS ──────────────────────────────
+      const btnFloorplan = document.getElementById('dettaglio-floorplan-btn');
+      if (btnFloorplan) {
+        // Mostra solo per edifici con BEMS (asset_id=6 Sede Centrale Roma)
+        if (id === 6) {
+          btnFloorplan.style.display = 'inline-flex';
+          btnFloorplan.onclick = () => window.open('/static/bems-floorplan.html', '_blank');
+        } else {
+          btnFloorplan.style.display = 'none';
+        }
+      }
+
+    } catch (e) {
+      document.getElementById('det-anagrafica-grid').innerHTML =
+        `<p style="color:var(--accent-red)">${e.message}</p>`;
+    }
+  }
+
+  // ── Carica consumi ──────────────────────────────────────────
+  async function caricaConsumiDettaglio(assetId, ore) {
+    const statusEl = document.getElementById('det-consumi-status');
+    const chartEl  = document.getElementById('det-consumi-chart');
+    const kpiEl    = document.getElementById('det-consumi-kpi');
+    if (!chartEl) return;
+    if (statusEl) statusEl.textContent = 'Caricamento...';
+    try {
+      // Carica letture storiche e telemetria real-time in parallelo
+      const [readRes, telRes] = await Promise.all([
+        fetch(`/api/energy/readings/${assetId}?ore=${ore}`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }),
+        fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
+      ]);
+      if (!readRes.ok) throw new Error('HTTP ' + readRes.status);
+      const readings = await readRes.json();
+      const telData = telRes && telRes.ok ? await telRes.json() : {};
+
+      // KW istantaneo dalla telemetria (somma potenza impianti)
+      const telValues = Object.values(telData);
+      const kwIstantaneo = telValues.reduce((s, z) => s + (z.power_kw || 0), 0);
+      const tempMedia = telValues.filter(z => z.temp_c != null).reduce((s, z, _, a) => s + z.temp_c / a.length, 0);
+      const co2Media = telValues.filter(z => z.co2_ppm != null).reduce((s, z, _, a) => s + z.co2_ppm / a.length, 0);
+
+      if (!readings || readings.length === 0) {
+        // Mostra solo KPI real-time se non ci sono letture storiche
+        if (kpiEl && kwIstantaneo > 0) kpiEl.innerHTML = `
+          <div class="kpi-card"><div class="kpi-val" style="font-size:18px;color:#F39C12">${kwIstantaneo.toFixed(1)}</div><div class="kpi-lbl">kW istantaneo</div></div>
+          ${tempMedia > 0 ? `<div class="kpi-card"><div class="kpi-val" style="font-size:18px">${tempMedia.toFixed(1)}°C</div><div class="kpi-lbl">Temp. media</div></div>` : ''}
+          ${co2Media > 0 ? `<div class="kpi-card"><div class="kpi-val" style="font-size:18px">${co2Media.toFixed(0)}</div><div class="kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+        chartEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:20px;text-align:center;">Nessuna lettura storica disponibile.</p>';
+        if (statusEl) statusEl.textContent = '';
+        return;
+      }
+      const totale = readings.reduce((s, r) => s + (r.valore || 0), 0);
+      const media  = totale / readings.length;
+      const max    = Math.max(...readings.map(r => r.valore || 0));
+      if (kpiEl) kpiEl.innerHTML = `
+        ${kwIstantaneo > 0 ? `<div class="kpi-card" style="border-color:#F39C12"><div class="kpi-val" style="font-size:18px;color:#F39C12">${kwIstantaneo.toFixed(1)}</div><div class="kpi-lbl"><i class="fa fa-bolt"></i> kW ora</div></div>` : ''}
+        <div class="kpi-card"><div class="kpi-val" style="font-size:18px">${totale.toFixed(0)}</div><div class="kpi-lbl">Totale ${readings[0]?.unita || 'kWh'}</div></div>
+        <div class="kpi-card"><div class="kpi-val" style="font-size:18px">${media.toFixed(1)}</div><div class="kpi-lbl">Media per lettura</div></div>
+        <div class="kpi-card"><div class="kpi-val" style="font-size:18px">${max.toFixed(1)}</div><div class="kpi-lbl">Picco massimo</div></div>
+        ${tempMedia > 0 ? `<div class="kpi-card"><div class="kpi-val" style="font-size:18px">${tempMedia.toFixed(1)}°C</div><div class="kpi-lbl">Temp. media</div></div>` : ''}
+        ${co2Media > 0 ? `<div class="kpi-card"><div class="kpi-val" style="font-size:18px">${co2Media.toFixed(0)}</div><div class="kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+      if (statusEl) statusEl.textContent = `${readings.length} letture`;
+
+      // Grafico Plotly se disponibile
+      if (typeof Plotly !== 'undefined') {
+        const tipi = [...new Set(readings.map(r => r.tipo || r.label || 'Energia'))];
+        const colori = ['#3498DB', '#27AE60', '#F39C12', '#9B59B6', '#E74C3C'];
+        const traces = tipi.map((tipo, idx) => {
+          const dati = readings.filter(r => (r.tipo || r.label || 'Energia') === tipo);
+          return { x: dati.map(r => r.ts), y: dati.map(r => r.valore), name: tipo, type: 'scatter', mode: 'lines', line: { color: colori[idx % colori.length], width: 2 } };
+        });
+        const layout = {
+          paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+          font: { color: '#7BAFC4', size: 10, family: 'Inter, sans-serif' },
+          xaxis: { gridcolor: '#1E3A5F' }, yaxis: { gridcolor: '#1E3A5F', title: { text: readings[0]?.unita || 'kWh', font: { size: 10 } } },
+          margin: { t: 10, r: 10, b: 40, l: 50 }, legend: { orientation: 'h', y: -0.25, font: { size: 10 } }
+        };
+        Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false });
+      } else {
+        chartEl.innerHTML = `<p style="color:var(--text-muted);font-size:12px;padding:8px;">Totale: <strong>${totale.toFixed(1)} ${readings[0]?.unita || 'kWh'}</strong> (${readings.length} letture)</p>`;
+      }
+    } catch(e) {
+      if (chartEl) chartEl.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Dati consumi non disponibili</p>`;
+      if (statusEl) statusEl.textContent = '';
+    }
+  }
+
+  // ── Carica occupancy ────────────────────────────────────────
+  async function caricaOccupancyDettaglio(assetId) {
+    const el = document.getElementById('det-occupancy-content');
+    if (!el) return;
+    try {
+      // Carica summary occupancy e telemetria BEMS in parallelo
+      const [summaryRes, telRes, zonesRes] = await Promise.all([
+        fetch('/api/occupancy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } }),
+        fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null),
+        fetch(`/api/bems/buildings/${assetId}/zones`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
+      ]);
+      const items = summaryRes.ok ? await summaryRes.json() : [];
+      const telData = telRes && telRes.ok ? await telRes.json() : {};
+      const zones = zonesRes && zonesRes.ok ? await zonesRes.json() : [];
+      const occ = items.find(i => i.asset_id === assetId);
+
+      // Conta zone occupate dalla telemetria BEMS
+      const telValues = Object.values(telData);
+      const zoneOccupate = telValues.filter(z => z.occupancy === true).length;
+      const zoneTotali = telValues.length;
+
+      // KPI aggregati
+      const pct = occ ? (occ.pct_occupancy || 0) : (zoneTotali > 0 ? (zoneOccupate / zoneTotali * 100) : 0);
+      const presenti = occ ? occ.presenti : zoneOccupate;
+      const capMax = occ ? occ.capacita_max : zones.reduce((s, z) => s + (z.capacita_persone || 0), 0);
+      const statoColor = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#F39C12' : pct > 0 ? '#27AE60' : '#95A5A6';
+
+      let html = `
+        <div class="kpi-grid" style="margin-bottom:12px;">
+          <div class="kpi-card"><div class="kpi-val" style="color:${statoColor};">${presenti}</div><div class="kpi-lbl">Presenti</div></div>
+          <div class="kpi-card"><div class="kpi-val">${capMax || '–'}</div><div class="kpi-lbl">Capienza max</div></div>
+          <div class="kpi-card"><div class="kpi-val" style="color:${statoColor};">${pct.toFixed(0)}%</div><div class="kpi-lbl">Occupancy</div></div>
+          ${zoneTotali > 0 ? `<div class="kpi-card"><div class="kpi-val">${zoneOccupate}/${zoneTotali}</div><div class="kpi-lbl">Zone attive</div></div>` : ''}
+        </div>
+        <div style="background:var(--bg-secondary);border-radius:4px;height:6px;overflow:hidden;margin-bottom:14px;">
+          <div style="background:${statoColor};height:100%;width:${Math.min(pct,100)}%;border-radius:4px;transition:width 0.5s;"></div>
+        </div>`;
+
+      // Dettaglio per zona BEMS (se disponibile)
+      if (zones.length > 0 && Object.keys(telData).length > 0) {
+        // Raggruppa per piano
+        const piani = {};
+        zones.forEach(z => {
+          const k = z.floor_nome || z.floor_id || 'Piano';
+          if (!piani[k]) piani[k] = [];
+          piani[k].push(z);
+        });
+
+        html += `<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Dettaglio per zona</div>`;
+
+        for (const [pianoNome, zoneList] of Object.entries(piani)) {
+          const zoneConTel = zoneList.filter(z => telData[z.zone_id]);
+          if (zoneConTel.length === 0) continue;
+          html += `<div style="font-size:10px;font-weight:600;color:var(--accent-blue);margin-bottom:5px;">${pianoNome}</div>`;
+          html += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">`;
+          zoneConTel.forEach(z => {
+            const tel = telData[z.zone_id] || {};
+            const isOcc = tel.occupancy === true;
+            const oc = isOcc ? '#27AE60' : '#95A5A6';
+            const tempStr = tel.temp_c != null ? `${tel.temp_c.toFixed(1)}°C` : '';
+            const co2Str = tel.co2_ppm != null ? `${tel.co2_ppm.toFixed(0)} ppm` : '';
+            html += `
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-secondary);border-radius:6px;border-left:3px solid ${oc};">
+                <i class="fa fa-circle" style="font-size:8px;color:${oc};"></i>
+                <span style="flex:1;font-size:11px;">${z.nome}</span>
+                ${tempStr ? `<span style="font-size:10px;color:var(--text-muted);"><i class="fa fa-thermometer-half" style="margin-right:2px;"></i>${tempStr}</span>` : ''}
+                ${co2Str ? `<span style="font-size:10px;color:var(--text-muted);"><i class="fa fa-leaf" style="margin-right:2px;"></i>${co2Str}</span>` : ''}
+                <span style="font-size:10px;font-weight:600;color:${oc};">${isOcc ? 'Occupata' : 'Libera'}</span>
+              </div>`;
+          });
+          html += `</div>`;
+        }
+      }
+
+      el.innerHTML = html;
+    } catch(e) {
+      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Dati occupancy non disponibili</p>`;
+    }
+  }
+
+  // ── Carica allarmi energetici ────────────────────────────────
+  async function caricaAllarmiEnergyDettaglio(assetId, nomeAsset) {
+    const el = document.getElementById('det-allarmi-content');
+    if (!el) return;
+    try {
+      const res = await fetch('/api/energy/anomalies', { headers: { 'Authorization': 'Bearer ' + API.getToken() } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const anomalie = await res.json();
+      const lista = anomalie.filter(a => !a.nome || a.nome.toLowerCase().includes(nomeAsset.toLowerCase().split(' ')[0]));
+      const badge = document.getElementById('det-alarm-badge');
+      if (badge && lista.length > 0) {
+        badge.innerHTML = ` <span style="background:var(--accent-red);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px">${lista.length}</span>`;
+      }
+      if (lista.length === 0) {
+        el.innerHTML = '<p style="color:var(--accent-green);font-size:13px"><i class="fa fa-check-circle"></i> Nessuna anomalia energetica rilevata</p>';
+        return;
+      }
+      const sevColor = { alta: '#E74C3C', media: '#F39C12', bassa: '#F39C12' };
+      el.innerHTML = lista.map(a => `
+        <div class="alarm-row">
+          <i class="fa fa-bolt" style="color:${sevColor[a.severita]||'#F39C12'}"></i>
+          <span style="flex:1">${a.tipo || 'Anomalia consumo'}</span>
+          <span style="font-weight:600;color:${sevColor[a.severita]||'#F39C12'}">+${(a.delta_pct||0).toFixed(0)}%</span>
+          <span class="stato-badge" style="background:${sevColor[a.severita]||'#F39C12'}20;color:${sevColor[a.severita]||'#F39C12'}">${a.severita||'media'}</span>
+        </div>`).join('');
+    } catch(e) {
+      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Allarmi non disponibili</p>`;
+    }
+  }
+
+  // ── Carica ESG energia ───────────────────────────────────────
+  async function caricaEsgEnergyDettaglio(assetId) {
+    const el = document.getElementById('det-esg-content');
+    if (!el) return;
+    try {
+      const res = await fetch('/api/energy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const items = await res.json();
+      const item = items.find(i => i.asset_id === assetId);
+      if (!item) {
+        el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Dati ESG energetici non disponibili.</p>';
+        return;
+      }
+      const ratingColor = { A:'#27AE60', B:'#4CAF50', C:'#F39C12', D:'#E74C3C', E:'#c0392b' };
+      const rc = ratingColor[item.rating_esg] || 'var(--text-muted)';
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+          <div style="width:56px;height:56px;border-radius:50%;background:${rc};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;">${item.rating_esg||'–'}</div>
+          <div>
+            <div style="font-size:13px;color:var(--text-muted)">Rating ESG energetico</div>
+            <div style="font-size:22px;font-weight:700">${(item.kwh_giorno||0).toFixed(0)} kWh/giorno</div>
+            <div style="font-size:11px;color:var(--text-muted)">${(item.kwh_mq||0).toFixed(2)} kWh/m²</div>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-val" style="font-size:16px">${(item.co2_kg_giorno||0).toFixed(1)}</div><div class="kpi-lbl">kg CO₂/giorno</div></div>
+          <div class="kpi-card"><div class="kpi-val" style="font-size:16px">€ ${(item.costo_euro_giorno||0).toFixed(2)}</div><div class="kpi-lbl">Costo/giorno</div></div>
+          <div class="kpi-card"><div class="kpi-val" style="font-size:16px">${(item.efficienza_score||0).toFixed(0)}%</div><div class="kpi-lbl">Score efficienza</div></div>
+        </div>
+        ${item.anomalia_rilevata ? `
+        <div style="margin-top:12px;padding:8px 12px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#E74C3C;">
+          <i class="fa fa-exclamation-triangle" style="margin-right:5px;"></i>Anomalia di consumo rilevata
+        </div>` : `
+        <div style="margin-top:12px;padding:8px 12px;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:6px;font-size:12px;color:#27AE60;">
+          <i class="fa fa-check-circle" style="margin-right:5px;"></i>Consumi nella norma
+        </div>`}`;
+    } catch(e) {
+      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Dati ESG non disponibili</p>`;
+    }
+  }
+
+  // ── Carica impianti ────────────────────────────────────────
+  async function caricaImpiantiDettaglio(assetId) {
+    const el = document.getElementById('det-impianti-content');
+    if (!el) return;
+    try {
+      const res = await fetch(`/api/bems/buildings/${assetId}/plants`, {
+        headers: { 'Authorization': 'Bearer ' + API.getToken() }
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const plants = await res.json();
+      if (!plants || plants.length === 0) {
+        el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Nessun impianto registrato per questo asset.</p>';
+        return;
+      }
+      const statoColor = { attivo:'#27AE60', manutenzione:'#F39C12', fermo:'#E74C3C', inattivo:'#95A5A6' };
+      const tipoIcon = { hvac:'fa-snowflake-o', illuminazione:'fa-lightbulb-o', contatore:'fa-tachometer', sub_meter:'fa-plug', ups:'fa-battery-full', generatore:'fa-bolt', altro:'fa-cog' };
+      el.innerHTML = `
+        <div style="margin-bottom:8px;font-size:11px;color:var(--text-muted)">${plants.length} impianti registrati</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${plants.map(p => {
+            const sc = statoColor[p.stato] || '#95A5A6';
+            const ic = tipoIcon[p.tipo] || 'fa-cog';
+            const piano = p.floor_nome ? ` — ${p.floor_nome}` : '';
+            return `
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <i class="fa ${ic}" style="font-size:18px;color:${sc};width:24px;text-align:center;"></i>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;">${p.nome}</div>
+                <div style="font-size:11px;color:var(--text-muted);">${p.tipo}${piano}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:12px;font-weight:600;color:${sc};">${p.stato}</div>
+                ${p.potenza_kw ? `<div style="font-size:11px;color:var(--text-muted);">${p.potenza_kw} kW</div>` : ''}
+              </div>
+              <span style="background:${sc}20;color:${sc};border:1px solid ${sc}40;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:600;">${p.stato.toUpperCase()}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+    } catch(e) {
+      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Impianti non disponibili</p>`;
+    }
+  }
+
+  // ── Carica zone ──────────────────────────────────────────────
+  async function caricaZoneDettaglio(assetId) {
+    const el = document.getElementById('det-zone-content');
+    if (!el) return;
+    try {
+      // Carica zone BEMS e telemetria recente in parallelo
+      const [zonesRes, telRes] = await Promise.all([
+        fetch(`/api/bems/buildings/${assetId}/zones`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }),
+        fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
+      ]);
+      if (!zonesRes.ok) throw new Error('HTTP ' + zonesRes.status);
+      const zones = await zonesRes.json();
+      const telData = telRes && telRes.ok ? await telRes.json() : {};
+
+      if (!zones || zones.length === 0) {
+        el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Nessuna zona BEMS configurata per questo asset.</p>';
+        return;
+      }
+
+      // Raggruppa per piano
+      const piani = {};
+      zones.forEach(z => {
+        const k = z.floor_nome || z.floor_id || 'Piano';
+        if (!piani[k]) piani[k] = [];
+        piani[k].push(z);
+      });
+
+      const tipoIcon = { ufficio:'fa-briefcase', sala_riunioni:'fa-users', corridoio:'fa-arrows-h', bagno:'fa-male', reception:'fa-info-circle', server:'fa-server', archivio:'fa-archive', altro:'fa-th-large' };
+
+      let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-muted)">${zones.length} zone BEMS registrate</div>`;
+
+      for (const [pianoNome, zoneList] of Object.entries(piani)) {
+        html += `<div style="margin-bottom:12px;">`;
+        html += `<div style="font-size:11px;font-weight:700;color:var(--accent-blue);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border-color)">${pianoNome}</div>`;
+        html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;">`;
+        zoneList.forEach(z => {
+          const tel = telData[z.zone_id] || {};
+          const pct = tel.occupancy_pct || 0;
+          const oc = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#F39C12' : pct > 0 ? '#27AE60' : '#95A5A6';
+          const ic = tipoIcon[z.tipo] || 'fa-th-large';
+          const capStr = z.capacita_persone ? `/${z.capacita_persone}` : '';
+          html += `
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-left:3px solid ${oc};border-radius:8px;padding:10px 12px;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <i class="fa ${ic}" style="font-size:13px;color:${oc};"></i>
+                <div style="font-size:12px;font-weight:600;flex:1;">${z.nome}</div>
+                <span style="font-size:9px;color:var(--text-muted);background:var(--bg-primary);padding:1px 5px;border-radius:8px;">${z.tipo}</span>
+              </div>
+              ${z.superficie_mq ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;"><i class="fa fa-expand" style="margin-right:3px;"></i>${z.superficie_mq} m²${capStr ? ` · ${capStr.slice(1)} persone` : ''}</div>` : ''}
+              ${pct > 0 ? `
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:10px;color:var(--text-muted);">Occupancy</span>
+                <span style="font-size:11px;font-weight:600;color:${oc};">${pct.toFixed(0)}%</span>
+              </div>
+              <div style="background:var(--bg-primary);border-radius:3px;height:3px;overflow:hidden;margin-bottom:5px;">
+                <div style="background:${oc};height:100%;width:${Math.min(pct,100)}%;border-radius:3px;"></div>
+              </div>` : ''}
+              ${tel.power_kw != null ? `<div style="font-size:10px;color:var(--text-muted);"><i class="fa fa-bolt" style="margin-right:3px;color:#F39C12;"></i>${tel.power_kw.toFixed(2)} kW</div>` : ''}
+              ${tel.temp_c != null ? `<div style="font-size:10px;color:var(--text-muted);"><i class="fa fa-thermometer-half" style="margin-right:3px;color:#3498DB;"></i>${tel.temp_c.toFixed(1)}°C</div>` : ''}
+              ${tel.co2_ppm != null ? `<div style="font-size:10px;color:var(--text-muted);"><i class="fa fa-leaf" style="margin-right:3px;color:#27AE60;"></i>${tel.co2_ppm.toFixed(0)} ppm CO₂</div>` : ''}
+            </div>`;
+        });
+        html += `</div></div>`;
+      }
+      el.innerHTML = html;
+    } catch(e) {
+      if (el) el.innerHTML = `<p style="color:var(--accent-red);font-size:13px;padding:20px;text-align:center;">Zone non disponibili: ${e.message}</p>`;
+    }
+  }
+
+  // Tab switching e listener modale gestiti da efficiency-detail-modal.js
+
+  // ── Import Excel ─────────────────────────────────────────────
+  async function importaFile(file) {
+    const resultEl = document.getElementById('import-result');
+    resultEl.innerHTML = '<div class="spinner" style="margin:8px auto"></div>';
+    try {
+      const res = await API.importExcel(file);
+      resultEl.innerHTML = `<p style="color:var(--accent-green)"><i class="fa fa-check"></i> Import completato: ${res.inseriti} inseriti, ${res.aggiornati} aggiornati</p>`;
+      await caricaAssets();
+    } catch (err) {
+      resultEl.innerHTML = `<p style="color:var(--accent-red)"><i class="fa fa-times"></i> ${err.message}</p>`;
+    }
+  }
+
+  function scaricaTemplate() {
+    const intestazioni = 'codice,nome,tipo,indirizzo,citta,provincia,cap,lat,lon,referente,telefono,email,superficie_mq,anno_costruzione,stato,note';
+    const esempio = 'ASS-0021,Nuovo Asset,ufficio,Via Esempio 1,Milano,MI,20100,45.4642,9.1900,Mario Rossi,02-1234567,m.rossi@example.it,1000,2020,attivo,Note di esempio';
+    const blob = new Blob([intestazioni + '\n' + esempio], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'template_asset.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Event listeners ──────────────────────────────────────────
+  document.getElementById('btn-export-excel')?.addEventListener('click', () => {
+    window.location.href = '/api/export/assets/excel';
+  });
+  document.getElementById('btn-nuovo')?.addEventListener('click', apriNuovo);
+  document.getElementById('modal-close').addEventListener('click', chiudiModal);
+  document.getElementById('btn-annulla').addEventListener('click', chiudiModal);
+  document.getElementById('btn-import')?.addEventListener('click', () => {
+    document.getElementById('import-result').innerHTML = '';
+    document.getElementById('modal-import').style.display = 'flex';
+  });
+  document.getElementById('import-close').addEventListener('click', chiudiModal);
+  document.getElementById('import-cancel').addEventListener('click', chiudiModal);
+  document.getElementById('btn-scarica-template').addEventListener('click', scaricaTemplate);
+
+  const importZone = document.getElementById('import-zone');
+  importZone.addEventListener('click', () => document.getElementById('import-file').click());
+  importZone.addEventListener('dragover', e => { e.preventDefault(); importZone.classList.add('drag-over'); });
+  importZone.addEventListener('dragleave', () => importZone.classList.remove('drag-over'));
+  importZone.addEventListener('drop', e => {
+    e.preventDefault(); importZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) importaFile(file);
+  });
+  document.getElementById('import-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) importaFile(file);
+  });
+
+  document.getElementById('search-input').addEventListener('input', applicaFiltri);
+  document.getElementById('filter-tipo').addEventListener('change', applicaFiltri);
+  document.getElementById('filter-stato').addEventListener('change', applicaFiltri);
+  document.getElementById('filter-efficienza').addEventListener('change', applicaFiltri);
+
+  // Plotly caricato via <script> nel head
+
+  // Avvio
+  caricaAssets();
+
+  // Deep link: ?asset_id=N
+  const urlParams = new URLSearchParams(window.location.search);
+  const deepAssetId = urlParams.get('asset_id');
+  if (deepAssetId) {
+    // Aspetta che gli asset siano caricati
+    const waitAndOpen = setInterval(() => {
+      if (allAssets.length > 0) {
+        clearInterval(waitAndOpen);
+        apriDettaglioAsset(parseInt(deepAssetId));
+      }
+    }, 200);
+  }
+  </script>
+</body>
+</html>

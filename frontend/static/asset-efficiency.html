@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>GIS Asset Manager – Asset Efficiency</title>
+
+  <!-- CSS librerie esterne -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- CSS progetto (gestisce sidebar fixed, topbar fixed, sidebar-content) -->
+  <link rel="stylesheet" href="/static/css/theme.css">
+
+  <style>
+    /* ── Layout base (stesso pattern di assets.html / alarms.html) ─── */
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+
+    /* ── Topbar subtitle badge ─────────────────────────────────────── */
+    .topbar-subtitle {
+      font-size: 12px; color: var(--accent-blue); font-weight: 500;
+      background: rgba(0,163,224,0.12); border: 1px solid rgba(0,163,224,0.25);
+      border-radius: 4px; padding: 2px 8px; white-space: nowrap;
+    }
+
+    /* ── Area contenuto sotto topbar ───────────────────────────────── */
+    .efficiency-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: calc(100vh - 52px);
+    }
+
+    /* ── Tab bar ───────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      align-items: center;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 16px;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      font-size: 13px; font-weight: 500;
+      color: var(--text-secondary);
+      border: none; background: none; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+    .tab-refresh-info {
+      margin-left: auto;
+      font-size: 11px; color: var(--text-muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent-green);
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* ── Pannelli tab ──────────────────────────────────────────────── */
+    .tab-panel { display: none; flex: 1; overflow: hidden; }
+    .tab-panel.active { display: flex; }
+
+    /* ── Tab Mappa ─────────────────────────────────────────────────── */
+    .map-panel { flex: 1; display: flex; overflow: hidden; position: relative; }
+    #efficiency-map { flex: 1; z-index: 1; }
+
+    .map-sidebar {
+      width: 300px; min-width: 300px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      display: flex; flex-direction: column; overflow: hidden;
+      z-index: 2;
+    }
+    .map-sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+      flex-shrink: 0;
+    }
+    .map-sidebar-body { flex: 1; overflow-y: auto; padding: 8px; }
+
+    .asset-card {
+      padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--border-color); margin-bottom: 6px;
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      background: var(--bg-tertiary);
+    }
+    .asset-card:hover { border-color: var(--accent-blue); background: var(--bg-card); }
+    .asset-card.selected { border-color: var(--accent-blue); background: rgba(0,163,224,0.08); }
+    .asset-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .asset-card-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0;
+    }
+    .asset-card-name { font-size: 12px; font-weight: 600; line-height: 1.3; }
+    .asset-card-meta { font-size: 11px; color: var(--text-muted); }
+    .asset-card-kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .kpi-mini { background: var(--bg-secondary); border-radius: 4px; padding: 4px 8px; }
+    .kpi-mini-label { font-size: 10px; color: var(--text-muted); }
+    .kpi-mini-value { font-size: 12px; font-weight: 600; }
+
+    /* Legenda mappa */
+    .map-legend {
+      position: absolute; bottom: 24px; left: 16px;
+      background: rgba(19,35,56,0.92); border: 1px solid var(--border-color);
+      border-radius: 8px; padding: 10px 14px; z-index: 500;
+      font-size: 11px; backdrop-filter: blur(8px);
+    }
+    .map-legend-title { font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
+    .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Tab Dashboard ─────────────────────────────────────────────── */
+    .dashboard-panel { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .kpi-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .kpi-card-header { display: flex; align-items: center; gap: 8px; }
+    .kpi-card-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .kpi-card-label { font-size: 12px; color: var(--text-secondary); }
+    .kpi-card-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
+    .kpi-card-sub { font-size: 11px; color: var(--text-muted); }
+    .kpi-trend-up { color: var(--accent-red); }
+    .kpi-trend-down { color: var(--accent-green); }
+    .kpi-trend-neutral { color: var(--text-muted); }
+
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .chart-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 10px; padding: 14px;
+    }
+    .chart-card-full {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 10px; padding: 14px;
+    }
+    .chart-card-title {
+      font-size: 13px; font-weight: 600; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Tab Occupancy ─────────────────────────────────────────────── */
+    .occupancy-panel { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+    .occ-asset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .occ-asset-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 10px; padding: 14px;
+    }
+    .occ-asset-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .occ-asset-name { font-size: 13px; font-weight: 600; }
+    .occ-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .occ-badge-ok    { background: rgba(39,174,96,0.2);  color: var(--accent-green); }
+    .occ-badge-warning { background: rgba(243,156,18,0.2); color: var(--accent-orange); }
+    .occ-badge-high  { background: rgba(231,76,60,0.2);  color: var(--accent-red); }
+    .occ-zones { display: flex; flex-direction: column; gap: 6px; }
+    .occ-zone-row { display: flex; align-items: center; gap: 8px; }
+    .occ-zone-name { font-size: 11px; color: var(--text-secondary); width: 140px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .occ-bar-wrap { flex: 1; background: var(--bg-tertiary); border-radius: 4px; height: 8px; overflow: hidden; }
+    .occ-bar { height: 100%; border-radius: 4px; transition: width 0.5s; }
+    .occ-pct { font-size: 11px; font-weight: 600; width: 36px; text-align: right; flex-shrink: 0; }
+
+    /* ── Tab Anomalie ──────────────────────────────────────────────── */
+    .anomalies-panel { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    .anomaly-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 10px; padding: 14px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .anomaly-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .anomaly-info { flex: 1; }
+    .anomaly-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .anomaly-detail { font-size: 12px; color: var(--text-secondary); }
+    .anomaly-delta { font-size: 20px; font-weight: 700; text-align: right; flex-shrink: 0; }
+    .anomaly-alta  { border-left: 3px solid var(--accent-red); }
+    .anomaly-media { border-left: 3px solid var(--accent-orange); }
+
+    /* ── Spinner ───────────────────────────────────────────────────── */
+    .spinner-wrap {
+      display: flex; align-items: center; justify-content: center;
+      padding: 40px; color: var(--text-muted); gap: 10px; font-size: 13px;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .chart-row { grid-template-columns: 1fr; }
+      .occ-asset-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .map-sidebar { display: none; }
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SIDEBAR (popolata da renderSidebar) -->
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <!-- CONTENUTO PRINCIPALE (margin-left e margin-top gestiti da theme.css .sidebar-content) -->
+  <div class="sidebar-content">
+
+    <!-- TOPBAR (popolata da renderTopbar) -->
+    <header class="topbar" id="topbar"></header>
+
+    <!-- CORPO PAGINA -->
+    <div class="efficiency-body">
+
+      <!-- TAB BAR -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="mappa">
+          <i class="fa fa-map"></i> Mappa Heatmap
+        </button>
+        <button class="tab-btn" data-tab="dashboard">
+          <i class="fa fa-tachometer-alt"></i> Dashboard KPI
+        </button>
+        <button class="tab-btn" data-tab="occupancy">
+          <i class="fa fa-users"></i> Occupancy
+        </button>
+        <button class="tab-btn" data-tab="anomalie">
+          <i class="fa fa-exclamation-triangle"></i> Anomalie
+        </button>
+        <div class="tab-refresh-info">
+          <div class="live-dot"></div>
+          <span id="last-update-ts">Aggiornamento in corso...</span>
+        </div>
+      </div>
+
+      <!-- TAB: MAPPA HEATMAP -->
+      <div class="tab-panel active" id="tab-mappa">
+        <div class="map-panel">
+          <div id="efficiency-map"></div>
+          <div class="map-legend" id="map-legend">
+            <div class="map-legend-title">Efficienza energetica</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#27AE60"></div> Alta (kWh/m² basso)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#F39C12"></div> Media</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div> Bassa (kWh/m² alto)</div>
+          </div>
+          <div class="map-sidebar">
+            <div class="map-sidebar-header">
+              <i class="fa fa-list" style="color:var(--accent-blue)"></i>
+              Asset – Consumi oggi
+            </div>
+            <div class="map-sidebar-body" id="asset-list-sidebar">
+              <div class="spinner-wrap"><i class="fa fa-spinner fa-spin"></i> Caricamento...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: DASHBOARD KPI -->
+      <div class="tab-panel" id="tab-dashboard">
+        <div class="dashboard-panel" id="dashboard-content">
+          <div class="spinner-wrap"><i class="fa fa-spinner fa-spin"></i> Caricamento KPI...</div>
+        </div>
+      </div>
+
+      <!-- TAB: OCCUPANCY -->
+      <div class="tab-panel" id="tab-occupancy">
+        <div class="occupancy-panel" id="occupancy-content">
+          <div class="spinner-wrap"><i class="fa fa-spinner fa-spin"></i> Caricamento dati occupancy...</div>
+        </div>
+      </div>
+
+      <!-- TAB: ANOMALIE -->
+      <div class="tab-panel" id="tab-anomalie">
+        <div class="anomalies-panel" id="anomalies-content">
+          <div class="spinner-wrap"><i class="fa fa-spinner fa-spin"></i> Analisi anomalie in corso...</div>
+        </div>
+      </div>
+
+    </div><!-- /efficiency-body -->
+  </div><!-- /sidebar-content -->
+
+  <!-- LIBRERIE JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+
+  <script>
+  // ============================================================
+  // INIT PAGINA (pattern standard del progetto)
+  // ============================================================
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('efficiency', { filtri: false });
+  renderSidebar('efficiency');
+  initAlarmNotifications();
+
+  // Aggiunge il badge "Asset Efficiency" nella topbar dopo renderTopbar
+  (function() {
+    const topbar = document.getElementById('topbar');
+    if (!topbar) return;
+    // Inserisce il badge dopo il titolo
+    const title = topbar.querySelector('.topbar-title');
+    if (title) {
+      const badge = document.createElement('span');
+      badge.className = 'topbar-subtitle';
+      badge.innerHTML = '<i class="fa fa-bolt" style="margin-right:4px"></i>Asset Efficiency';
+      title.after(badge);
+    }
+  })();
+
+  // ============================================================
+  // COSTANTI
+  // ============================================================
+  const JAWG_TOKEN = 'QHoHKE9mfIrm3sUkmrrM1v95NtcsqYNtMOdLeC91Hb1n1mLrqMzLWKzTkHLON1bD';
+  const isDark = Tema.get() !== 'light';
+  const PLOTLY_THEME = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    font: { color: isDark ? '#7BAFC4' : '#57606a', size: 11, family: 'Inter, Segoe UI, sans-serif' },
+    xaxis: { gridcolor: isDark ? '#1E3A5F' : '#d0d7de', linecolor: isDark ? '#1E3A5F' : '#d0d7de', zerolinecolor: isDark ? '#1E3A5F' : '#d0d7de' },
+    yaxis: { gridcolor: isDark ? '#1E3A5F' : '#d0d7de', linecolor: isDark ? '#1E3A5F' : '#d0d7de', zerolinecolor: isDark ? '#1E3A5F' : '#d0d7de' },
+    margin: { t: 10, r: 10, b: 40, l: 50 },
+  };
+  const TIPO_ICONE = {
+    stabilimento: 'fa-industry',
+    ufficio: 'fa-building',
+    magazzino: 'fa-archive',
+    deposito: 'fa-truck',
+  };
+  const TIPO_COLORI = {
+    stabilimento: '#E74C3C',
+    ufficio: '#00A3E0',
+    magazzino: '#F39C12',
+    deposito: '#27AE60',
+  };
+
+  // ============================================================
+  // MAPPA LEAFLET
+  // ============================================================
+  const jawgStyle = Tema.get() === 'dark' ? 'jawg-dark' : 'jawg-light';
+  const map = L.map('efficiency-map', { center: [42.5, 12.5], zoom: 6, zoomControl: true });
+  L.tileLayer(`https://tile.jawg.io/${jawgStyle}/{z}/{x}/{y}{r}.png?access-token=${JAWG_TOKEN}`, {
+    attribution: '&copy; Jawg Maps &copy; OpenStreetMap', maxZoom: 18,
+  }).addTo(map);
+
+  let _markers = {};
+  let _heatmapData = [];
+  let _selectedAsset = null;
+
+  function creaIconaEfficiency(asset, selected = false) {
+    const color = selected ? '#F39C12' : (asset.color === 'green' ? '#27AE60' : asset.color === 'orange' ? '#F39C12' : '#E74C3C');
+    const icona = TIPO_ICONE[asset.tipo] || 'fa-map-marker';
+    return L.divIcon({
+      className: '',
+      html: `<div style="
+        width:32px;height:32px;border-radius:50%;
+        background:${color};
+        border:2px solid ${selected ? '#fff' : 'rgba(255,255,255,0.3)'};
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 2px 8px rgba(0,0,0,0.5);
+      "><i class="fa ${icona}" style="color:#fff;font-size:13px"></i></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+  }
+
+  async function caricaHeatmap() {
+    try {
+      _heatmapData = await API.get('/api/energy/heatmap');
+      Object.values(_markers).forEach(m => m.remove());
+      _markers = {};
+      _heatmapData.forEach(asset => {
+        if (!asset.lat || !asset.lon) return;
+        const marker = L.marker([asset.lat, asset.lon], { icon: creaIconaEfficiency(asset) });
+        marker.bindTooltip(`
+          <b>${asset.nome}</b><br>
+          ${asset.kwh_oggi.toFixed(1)} kWh oggi<br>
+          ${asset.kwh_m2_oggi.toFixed(4)} kWh/m²<br>
+          Efficienza: ${asset.efficiency_score.toFixed(0)}/100
+        `, { sticky: true });
+        marker.on('click', () => selezionaAsset(asset.asset_id));
+        marker.addTo(map);
+        _markers[asset.asset_id] = marker;
+      });
+      aggiornaListaSidebar();
+    } catch (e) { console.error('[heatmap]', e); }
+  }
+
+  function aggiornaListaSidebar() {
+    const container = document.getElementById('asset-list-sidebar');
+    if (!container || !_heatmapData.length) return;
+    const sorted = [..._heatmapData].sort((a, b) => b.kwh_oggi - a.kwh_oggi);
+    container.innerHTML = sorted.map(a => {
+      const bgColor = a.color === 'green' ? 'rgba(39,174,96,0.2)' : a.color === 'orange' ? 'rgba(243,156,18,0.2)' : 'rgba(231,76,60,0.2)';
+      const txtColor = a.color === 'green' ? '#27AE60' : a.color === 'orange' ? '#F39C12' : '#E74C3C';
+      return `
+        <div class="asset-card ${_selectedAsset === a.asset_id ? 'selected' : ''}" onclick="selezionaAsset(${a.asset_id})" id="ac-${a.asset_id}">
+          <div class="asset-card-header">
+            <div class="asset-card-icon" style="background:${bgColor}">
+              <i class="fa ${TIPO_ICONE[a.tipo] || 'fa-map-marker'}" style="color:${txtColor}"></i>
+            </div>
+            <div>
+              <div class="asset-card-name">${a.nome}</div>
+              <div class="asset-card-meta">${a.tipo} · ${a.citta || ''}</div>
+            </div>
+          </div>
+          <div class="asset-card-kpi">
+            <div class="kpi-mini">
+              <div class="kpi-mini-label">kWh oggi</div>
+              <div class="kpi-mini-value" style="color:${txtColor}">${a.kwh_oggi.toFixed(1)}</div>
+            </div>
+            <div class="kpi-mini">
+              <div class="kpi-mini-label">Efficienza</div>
+              <div class="kpi-mini-value">${a.efficiency_score.toFixed(0)}/100</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function selezionaAsset(assetId) {
+    if (_selectedAsset && _markers[_selectedAsset]) {
+      const prev = _heatmapData.find(a => a.asset_id === _selectedAsset);
+      if (prev) _markers[_selectedAsset].setIcon(creaIconaEfficiency(prev, false));
+    }
+    _selectedAsset = assetId;
+    const asset = _heatmapData.find(a => a.asset_id === assetId);
+    if (asset && _markers[assetId]) {
+      _markers[assetId].setIcon(creaIconaEfficiency(asset, true));
+      map.panTo([asset.lat, asset.lon]);
+    }
+    aggiornaListaSidebar();
+  }
+
+  // ============================================================
+  // DASHBOARD KPI
+  // ============================================================
+  async function caricaDashboard() {
+    const container = document.getElementById('dashboard-content');
+    try {
+      const [summary, occSummary] = await Promise.all([
+        API.get('/api/energy/summary'),
+        API.get('/api/occupancy/summary'),
+      ]);
+
+      let totKwh = 0, totCo2 = 0, totCosto = 0, totM2 = 0;
+      summary.forEach(a => {
+        totKwh  += a.totale_kwh_oggi || 0;
+        totCo2  += a.co2_kg_oggi || 0;
+        totCosto += a.costo_eur_oggi || 0;
+        totM2   += a.superficie_mq || 0;
+      });
+      const kwh_m2 = totM2 > 0 ? totKwh / totM2 : 0;
+      const trends = summary.filter(a => a.trend_vs_settimana_prec_pct !== null).map(a => a.trend_vs_settimana_prec_pct);
+      const trendMedio = trends.length ? trends.reduce((s, v) => s + v, 0) / trends.length : 0;
+      const trendClass = trendMedio > 5 ? 'kpi-trend-up' : trendMedio < -5 ? 'kpi-trend-down' : 'kpi-trend-neutral';
+      const trendIcon  = trendMedio > 5 ? 'fa-arrow-up' : trendMedio < -5 ? 'fa-arrow-down' : 'fa-minus';
+
+      container.innerHTML = `
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(0,163,224,0.15)"><i class="fa fa-bolt" style="color:var(--accent-blue)"></i></div>
+              <div class="kpi-card-label">Consumo totale oggi</div>
+            </div>
+            <div class="kpi-card-value">${(totKwh/1000).toFixed(1)} <span style="font-size:14px;font-weight:400;color:var(--text-muted)">MWh</span></div>
+            <div class="kpi-card-sub ${trendClass}"><i class="fa ${trendIcon}"></i> ${Math.abs(trendMedio).toFixed(1)}% vs settimana prec.</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(39,174,96,0.15)"><i class="fa fa-leaf" style="color:var(--accent-green)"></i></div>
+              <div class="kpi-card-label">Intensità energetica</div>
+            </div>
+            <div class="kpi-card-value">${kwh_m2.toFixed(3)} <span style="font-size:14px;font-weight:400;color:var(--text-muted)">kWh/m²</span></div>
+            <div class="kpi-card-sub" style="color:var(--text-muted)">${summary.length} asset monitorati</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(243,156,18,0.15)"><i class="fa fa-cloud" style="color:var(--accent-orange)"></i></div>
+              <div class="kpi-card-label">CO₂ stimata oggi</div>
+            </div>
+            <div class="kpi-card-value">${(totCo2/1000).toFixed(2)} <span style="font-size:14px;font-weight:400;color:var(--text-muted)">t CO₂</span></div>
+            <div class="kpi-card-sub" style="color:var(--text-muted)">Fattore 0.233 kg/kWh (IT 2024)</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(231,76,60,0.15)"><i class="fa fa-euro-sign" style="color:var(--accent-red)"></i></div>
+              <div class="kpi-card-label">Costo stimato oggi</div>
+            </div>
+            <div class="kpi-card-value">€ ${totCosto.toFixed(0)}</div>
+            <div class="kpi-card-sub" style="color:var(--text-muted)">Tariffe medie IT 2024</div>
+          </div>
+        </div>
+
+        <div class="chart-row">
+          <div class="chart-card">
+            <div class="chart-card-title"><i class="fa fa-bar-chart" style="color:var(--accent-blue)"></i> Top 10 asset per consumo oggi (kWh)</div>
+            <div id="chart-top10" style="height:240px"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title"><i class="fa fa-pie-chart" style="color:var(--accent-orange)"></i> Distribuzione per vettore energetico</div>
+            <div id="chart-vettori" style="height:240px"></div>
+          </div>
+        </div>
+
+        <div class="chart-card-full">
+          <div class="chart-card-title"><i class="fa fa-line-chart" style="color:var(--accent-green)"></i> Trend consumi – Ultimi 7 giorni (kWh/giorno)</div>
+          <div id="chart-trend7" style="height:200px"></div>
+        </div>
+      `;
+
+      // Top 10 barre
+      const top10 = [...summary].sort((a, b) => b.totale_kwh_oggi - a.totale_kwh_oggi).slice(0, 10);
+      Plotly.newPlot('chart-top10', [{
+        type: 'bar', orientation: 'h',
+        x: top10.map(a => a.totale_kwh_oggi),
+        y: top10.map(a => a.asset_nome.length > 22 ? a.asset_nome.substring(0, 22) + '…' : a.asset_nome),
+        marker: { color: top10.map(a => {
+          const h = _heatmapData.find(x => x.asset_id === a.asset_id);
+          return h ? (h.color === 'green' ? '#27AE60' : h.color === 'orange' ? '#F39C12' : '#E74C3C') : '#00A3E0';
+        })},
+        text: top10.map(a => a.totale_kwh_oggi.toFixed(1) + ' kWh'),
+        textposition: 'outside',
+        hovertemplate: '<b>%{y}</b><br>%{x:.1f} kWh<extra></extra>',
+      }], { ...PLOTLY_THEME, xaxis: { ...PLOTLY_THEME.xaxis, title: 'kWh' }, margin: { t: 10, r: 70, b: 40, l: 170 } },
+      { responsive: true, displayModeBar: false });
+
+      // Vettori torta
+      const vettoriTot = { elettrico: 0, termico: 0, gas: 0 };
+      summary.forEach(a => {
+        if (a.vettori) {
+          vettoriTot.elettrico += (a.vettori.elettrico?.kwh_oggi || 0);
+          vettoriTot.termico   += (a.vettori.termico?.kwh_oggi   || 0);
+          vettoriTot.gas       += (a.vettori.gas?.kwh_oggi       || 0);
+        }
+      });
+      Plotly.newPlot('chart-vettori', [{
+        type: 'pie',
+        labels: ['Elettrico', 'Termico', 'Gas'],
+        values: [vettoriTot.elettrico, vettoriTot.termico, vettoriTot.gas],
+        marker: { colors: ['#00A3E0', '#F39C12', '#E74C3C'] },
+        hole: 0.4, textinfo: 'label+percent',
+        hovertemplate: '<b>%{label}</b><br>%{value:.1f} kWh<br>%{percent}<extra></extra>',
+      }], { ...PLOTLY_THEME, margin: { t: 10, r: 10, b: 10, l: 10 }, showlegend: false },
+      { responsive: true, displayModeBar: false });
+
+      // Trend 7 giorni
+      if (summary.length) {
+        try {
+          const readings = await API.get(`/api/energy/readings/${summary[0].asset_id}?ore=168`);
+          const byDay = {};
+          readings.forEach(r => { const d = r.ts.substring(0, 10); byDay[d] = (byDay[d] || 0) + r.valore; });
+          const days = Object.keys(byDay).sort();
+          Plotly.newPlot('chart-trend7', [{
+            type: 'scatter', mode: 'lines+markers',
+            x: days, y: days.map(d => byDay[d]),
+            line: { color: '#00A3E0', width: 2 },
+            marker: { color: '#00A3E0', size: 6 },
+            fill: 'tozeroy', fillcolor: 'rgba(0,163,224,0.1)',
+            name: summary[0].asset_nome,
+            hovertemplate: '<b>%{x}</b><br>%{y:.1f} kWh<extra></extra>',
+          }], { ...PLOTLY_THEME, xaxis: { ...PLOTLY_THEME.xaxis, type: 'date' }, yaxis: { ...PLOTLY_THEME.yaxis, title: 'kWh/giorno' } },
+          { responsive: true, displayModeBar: false });
+        } catch (_) {}
+      }
+
+    } catch (e) {
+      container.innerHTML = `<div class="spinner-wrap" style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Errore: ${e.message}</div>`;
+    }
+  }
+
+  // ============================================================
+  // OCCUPANCY
+  // ============================================================
+  async function caricaOccupancy() {
+    const container = document.getElementById('occupancy-content');
+    try {
+      const summary = await API.get('/api/occupancy/summary');
+      if (!summary.length) {
+        container.innerHTML = `<div class="spinner-wrap"><i class="fa fa-info-circle"></i> Nessun dato occupancy disponibile</div>`;
+        return;
+      }
+      const occMedia    = summary.reduce((s, a) => s + (a.pct_occupancy || 0), 0) / summary.length;
+      const totPresenti = summary.reduce((s, a) => s + (a.presenti || 0), 0);
+      const totCapacita = summary.reduce((s, a) => s + (a.capacita_max || 0), 0);
+
+      container.innerHTML = `
+        <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(0,163,224,0.15)"><i class="fa fa-users" style="color:var(--accent-blue)"></i></div>
+              <div class="kpi-card-label">Presenti ora</div>
+            </div>
+            <div class="kpi-card-value">${totPresenti}</div>
+            <div class="kpi-card-sub" style="color:var(--text-muted)">su ${totCapacita} posti totali</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(39,174,96,0.15)"><i class="fa fa-percent" style="color:var(--accent-green)"></i></div>
+              <div class="kpi-card-label">Occupancy media</div>
+            </div>
+            <div class="kpi-card-value">${occMedia.toFixed(1)}%</div>
+            <div class="kpi-card-sub" style="color:var(--text-muted)">${summary.length} asset monitorati</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <div class="kpi-card-icon" style="background:rgba(243,156,18,0.15)"><i class="fa fa-building" style="color:var(--accent-orange)"></i></div>
+              <div class="kpi-card-label">Asset attivi</div>
+            </div>
+            <div class="kpi-card-value">${summary.filter(a => a.pct_occupancy > 0).length}</div>
+            <div class="kpi-card-sub" style="color:var(--text-muted)">con occupancy > 0%</div>
+          </div>
+        </div>
+
+        <div class="occ-asset-grid">
+          ${summary.map(a => {
+            const stato = a.pct_occupancy >= 80 ? 'alta' : a.pct_occupancy >= 40 ? 'media' : 'bassa';
+            const badgeClass = stato === 'alta' ? 'occ-badge-high' : stato === 'media' ? 'occ-badge-warning' : 'occ-badge-ok';
+            const barColor = a.pct_occupancy >= 80 ? '#E74C3C' : a.pct_occupancy >= 50 ? '#F39C12' : '#27AE60';
+            return `
+              <div class="occ-asset-card">
+                <div class="occ-asset-header">
+                  <div class="occ-asset-name">
+                    <i class="fa ${TIPO_ICONE[a.tipo] || 'fa-building'}" style="color:${TIPO_COLORI[a.tipo] || '#7BAFC4'};margin-right:6px"></i>
+                    ${a.nome}
+                  </div>
+                  <span class="occ-badge ${badgeClass}">${stato.charAt(0).toUpperCase() + stato.slice(1)}</span>
+                </div>
+                <div class="occ-zones">
+                  <div class="occ-zone-row">
+                    <div class="occ-zone-name">Totale asset</div>
+                    <div class="occ-bar-wrap"><div class="occ-bar" style="width:${a.pct_occupancy}%;background:${barColor}"></div></div>
+                    <div class="occ-pct" style="color:${barColor}">${a.pct_occupancy.toFixed(1)}%</div>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                    <i class="fa fa-user" style="margin-right:4px"></i>${a.presenti} presenti &nbsp;·&nbsp;
+                    <i class="fa fa-door-open" style="margin-right:4px"></i>${a.capacita_max} capienza max
+                  </div>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+
+        <div class="chart-card-full">
+          <div class="chart-card-title"><i class="fa fa-bar-chart" style="color:var(--accent-blue)"></i> Occupancy per asset (% attuale)</div>
+          <div id="chart-occ-bar" style="height:200px"></div>
+        </div>
+      `;
+
+      const sorted = [...summary].sort((a, b) => b.pct_occupancy - a.pct_occupancy);
+      Plotly.newPlot('chart-occ-bar', [{
+        type: 'bar',
+        x: sorted.map(a => a.nome.length > 22 ? a.nome.substring(0, 22) + '…' : a.nome),
+        y: sorted.map(a => a.pct_occupancy),
+        marker: { color: sorted.map(a => a.pct_occupancy >= 80 ? '#E74C3C' : a.pct_occupancy >= 50 ? '#F39C12' : '#27AE60') },
+        text: sorted.map(a => a.pct_occupancy.toFixed(1) + '%'),
+        textposition: 'outside',
+        hovertemplate: '<b>%{x}</b><br>%{y:.1f}%<extra></extra>',
+      }], { ...PLOTLY_THEME, yaxis: { ...PLOTLY_THEME.yaxis, title: '% occupancy', range: [0, 110] }, margin: { t: 10, r: 10, b: 80, l: 50 } },
+      { responsive: true, displayModeBar: false });
+
+    } catch (e) {
+      container.innerHTML = `<div class="spinner-wrap" style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Errore: ${e.message}</div>`;
+    }
+  }
+
+  // ============================================================
+  // ANOMALIE
+  // ============================================================
+  async function caricaAnomalie() {
+    const container = document.getElementById('anomalies-content');
+    try {
+      const anomalies = await API.get('/api/energy/anomalies');
+      if (!anomalies.length) {
+        container.innerHTML = `
+          <div class="spinner-wrap" style="color:var(--accent-green)">
+            <i class="fa fa-check-circle" style="font-size:32px"></i>
+            <div>
+              <div style="font-size:15px;font-weight:600">Nessuna anomalia rilevata</div>
+              <div style="font-size:12px;color:var(--text-muted)">Tutti gli asset mostrano consumi nella norma</div>
+            </div>
+          </div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">
+          <i class="fa fa-exclamation-triangle" style="color:var(--accent-orange);margin-right:6px"></i>
+          Rilevate <b>${anomalies.length}</b> anomalie energetiche (consumo +30% rispetto alla media storica)
+        </div>
+        ${anomalies.map(a => `
+          <div class="anomaly-card anomaly-${a.severita}">
+            <div class="anomaly-icon" style="background:${a.severita === 'alta' ? 'rgba(231,76,60,0.15)' : 'rgba(243,156,18,0.15)'}">
+              <i class="fa fa-exclamation-triangle" style="color:${a.severita === 'alta' ? '#E74C3C' : '#F39C12'}"></i>
+            </div>
+            <div class="anomaly-info">
+              <div class="anomaly-name">
+                <i class="fa ${TIPO_ICONE[a.tipo] || 'fa-building'}" style="color:${TIPO_COLORI[a.tipo] || '#7BAFC4'};margin-right:6px"></i>
+                ${a.nome}
+              </div>
+              <div class="anomaly-detail">
+                Ultimi 2 giorni: <b>${a.kwh_ultimi_2gg.toFixed(1)} kWh</b>
+                &nbsp;·&nbsp; Media storica: ${a.media_2gg_storica.toFixed(1)} kWh
+                &nbsp;·&nbsp; Severità: <b style="color:${a.severita === 'alta' ? '#E74C3C' : '#F39C12'}">${a.severita.toUpperCase()}</b>
+              </div>
+            </div>
+            <div class="anomaly-delta" style="color:${a.severita === 'alta' ? '#E74C3C' : '#F39C12'}">
+              +${a.delta_pct.toFixed(1)}%
+            </div>
+          </div>`).join('')}
+      `;
+    } catch (e) {
+      container.innerHTML = `<div class="spinner-wrap" style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Errore: ${e.message}</div>`;
+    }
+  }
+
+  // ============================================================
+  // NAVIGAZIONE TAB
+  // ============================================================
+  const _tabLoaded = {};
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(`tab-${tab}`).classList.add('active');
+      if (!_tabLoaded[tab]) {
+        _tabLoaded[tab] = true;
+        if (tab === 'dashboard') caricaDashboard();
+        else if (tab === 'occupancy') caricaOccupancy();
+        else if (tab === 'anomalie') caricaAnomalie();
+      }
+      // Forza resize Plotly
+      setTimeout(() => {
+        document.querySelectorAll('[id^="chart-"]').forEach(el => {
+          try { Plotly.relayout(el, { autosize: true }); } catch (_) {}
+        });
+      }, 100);
+    });
+  });
+
+  // ============================================================
+  // AGGIORNAMENTO LIVE
+  // ============================================================
+  function aggiornaTimestamp() {
+    const ts = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('last-update-ts').textContent = `Aggiornato alle ${ts}`;
+  }
+
+  async function aggiornaLive() {
+    await caricaHeatmap();
+    aggiornaTimestamp();
+    const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+    if (activeTab === 'dashboard') caricaDashboard();
+    else if (activeTab === 'occupancy') caricaOccupancy();
+    else if (activeTab === 'anomalie') caricaAnomalie();
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  (async () => {
+    await caricaHeatmap();
+    aggiornaTimestamp();
+    setInterval(aggiornaLive, 5 * 60 * 1000);
+  })();
+  </script>
+</body>
+</html>

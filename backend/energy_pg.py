@@ -1,0 +1,767 @@
+"""
+GIS Asset Manager - Modulo Energy (PostgreSQL + TimescaleDB)
+Versione: 2.0
+Autore: Felix / KeyBiz
+
+Gestisce il metering energetico near-real-time per il modulo Asset Efficiency.
+Usa psycopg2 con PostgreSQL e TimescaleDB per la tabella energy_readings (hypertable).
+
+Tabelle gestite:
+  energy_meters     - configurazione contatori per asset (elettrico, termico, gas)
+  energy_readings   - letture storiche (15-min interval) — hypertable TimescaleDB
+  energy_targets    - target di consumo mensili per asset
+"""
+
+import asyncio
+import random
+import os
+import psycopg2
+import psycopg2.extras
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, HTTPException
+
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://gamuser:gampassword@localhost:5432/gamdb"
+)
+
+
+def _get_pg_conn():
+    return psycopg2.connect(DATABASE_URL)
+
+
+# ── Schema DB ─────────────────────────────────────────────────────────────────
+
+def migrate_energy_schema(database_url: str = None):
+    """Applica lo schema energy al DB PostgreSQL. Crea hypertable TimescaleDB."""
+    url = database_url or DATABASE_URL
+    conn = psycopg2.connect(url)
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS energy_meters (
+            id         SERIAL PRIMARY KEY,
+            asset_id   INTEGER NOT NULL REFERENCES assets(id),
+            tipo       TEXT NOT NULL,
+            label      TEXT NOT NULL,
+            unita      TEXT NOT NULL DEFAULT 'kWh',
+            attivo     INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(asset_id, tipo)
+        );
+
+        CREATE TABLE IF NOT EXISTS energy_readings (
+            id             SERIAL,
+            meter_id       INTEGER NOT NULL REFERENCES energy_meters(id),
+            asset_id       INTEGER NOT NULL,
+            ts             TIMESTAMPTZ NOT NULL,
+            valore         DOUBLE PRECISION NOT NULL,
+            intervallo_min INTEGER NOT NULL DEFAULT 15,
+            UNIQUE(meter_id, ts)
+        );
+
+        CREATE TABLE IF NOT EXISTS energy_targets (
+            id         SERIAL PRIMARY KEY,
+            asset_id   INTEGER NOT NULL REFERENCES assets(id),
+            anno       INTEGER NOT NULL,
+            mese       INTEGER NOT NULL,
+            tipo       TEXT NOT NULL,
+            target_kwh DOUBLE PRECISION NOT NULL,
+            UNIQUE(asset_id, anno, mese, tipo)
+        );
+        """)
+        conn.commit()
+
+        # Converti energy_readings in hypertable TimescaleDB (idempotente)
+        try:
+            cur.execute("""
+                SELECT create_hypertable(
+                    'energy_readings', 'ts',
+                    if_not_exists => TRUE,
+                    migrate_data => TRUE
+                );
+            """)
+            conn.commit()
+            print("[energy] hypertable TimescaleDB creata per energy_readings")
+        except Exception as e:
+            conn.rollback()
+            print(f"[energy] TimescaleDB non disponibile, uso indici standard: {e}")
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_energy_readings_asset_ts
+                    ON energy_readings(asset_id, ts DESC);
+                CREATE INDEX IF NOT EXISTS idx_energy_readings_meter_ts
+                    ON energy_readings(meter_id, ts DESC);
+            """)
+            conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── Profili di carico simulati ────────────────────────────────────────────────
+
+_LOAD_WEEKDAY = [
+    0.10, 0.08, 0.08, 0.08, 0.09, 0.12,
+    0.25, 0.55, 0.80, 0.90, 0.95, 0.92,
+    0.85, 0.88, 0.92, 0.90, 0.85, 0.70,
+    0.45, 0.30, 0.22, 0.18, 0.14, 0.11,
+]
+
+_LOAD_WEEKEND = [
+    0.08, 0.07, 0.07, 0.07, 0.07, 0.08,
+    0.10, 0.12, 0.15, 0.18, 0.20, 0.18,
+    0.15, 0.14, 0.13, 0.12, 0.11, 0.10,
+    0.09, 0.09, 0.08, 0.08, 0.08, 0.08,
+]
+
+_BASE_KW_PER_100M2 = {
+    "ufficio":      8.0,
+    "stabilimento": 18.0,
+    "magazzino":    5.0,
+    "deposito":     3.0,
+}
+
+_VECTOR_FACTOR = {
+    "elettrico": 1.0,
+    "termico":   0.6,
+    "gas":       0.4,
+}
+
+
+def _simulate_reading(asset_tipo: str, superficie_mq: int,
+                      vettore: str, ts: datetime,
+                      intervallo_min: int = 15) -> float:
+    tipo_norm = (asset_tipo or "ufficio").lower()
+    base_kw = _BASE_KW_PER_100M2.get(tipo_norm, 6.0)
+    factor_v = _VECTOR_FACTOR.get(vettore, 1.0)
+    is_weekend = ts.weekday() >= 5
+    profile = _LOAD_WEEKEND if is_weekend else _LOAD_WEEKDAY
+    load = profile[ts.hour]
+    load = max(0.02, min(1.0, load + random.gauss(0, 0.04)))
+    kw_totali = base_kw * (superficie_mq / 100.0) * factor_v * load
+    kwh = kw_totali * (intervallo_min / 60.0)
+    return round(kwh, 4)
+
+
+# ── Simulatore asincrono ──────────────────────────────────────────────────────
+
+async def run_energy_simulator(db_path: str = None, intervallo_sec: int = 300):
+    """Task asincrono che genera letture simulate ogni intervallo_sec secondi."""
+    while True:
+        try:
+            conn = _get_pg_conn()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            now = datetime.now(timezone.utc)
+
+            cur.execute("""
+                SELECT em.id, em.asset_id, em.tipo,
+                       a.tipo AS asset_tipo, a.superficie_mq
+                FROM energy_meters em
+                JOIN assets a ON a.id = em.asset_id
+                WHERE em.attivo = 1
+            """)
+            meters = cur.fetchall()
+
+            for m in meters:
+                superficie = m["superficie_mq"] or 500
+                valore = _simulate_reading(
+                    asset_tipo=m["asset_tipo"],
+                    superficie_mq=superficie,
+                    vettore=m["tipo"],
+                    ts=now,
+                    intervallo_min=intervallo_sec // 60,
+                )
+                cur.execute("""
+                    INSERT INTO energy_readings (meter_id, asset_id, ts, valore, intervallo_min)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (meter_id, ts) DO NOTHING
+                """, (m["id"], m["asset_id"], now, valore, intervallo_sec // 60))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as exc:
+            print(f"[energy-simulator] errore: {exc}")
+
+        await asyncio.sleep(intervallo_sec)
+
+
+# ── Seed dati ─────────────────────────────────────────────────────────────────
+
+def seed_energy_meters(db_path: str = None):
+    """Popola energy_meters per tutti gli asset attivi (skip se già presenti)."""
+    conn = _get_pg_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT id, tipo FROM assets WHERE stato='attivo'")
+    assets = cur.fetchall()
+
+    vettori = [
+        ("elettrico", "kWh",    "Contatore Elettrico"),
+        ("termico",   "kWh_th", "Contatore Termico"),
+        ("gas",       "m3",     "Contatore Gas"),
+    ]
+
+    for asset in assets:
+        for tipo, unita, label in vettori:
+            cur.execute("""
+                INSERT INTO energy_meters (asset_id, tipo, label, unita)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (asset_id, tipo) DO NOTHING
+            """, (asset["id"], tipo, label, unita))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def seed_energy_history(db_path: str = None, giorni: int = 30):
+    """Genera letture storiche simulate. Skip se il DB contiene già letture."""
+    conn = _get_pg_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM energy_readings")
+    if cur.fetchone()["cnt"] > 0:
+        cur.close()
+        conn.close()
+        return
+
+    cur.execute("""
+        SELECT em.id, em.asset_id, em.tipo,
+               a.tipo AS asset_tipo, a.superficie_mq
+        FROM energy_meters em
+        JOIN assets a ON a.id = em.asset_id
+        WHERE em.attivo = 1
+    """)
+    meters = cur.fetchall()
+
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=giorni)
+    step = timedelta(minutes=15)
+
+    batch = []
+    ts = start
+    while ts <= now:
+        for m in meters:
+            superficie = m["superficie_mq"] or 500
+            valore = _simulate_reading(
+                asset_tipo=m["asset_tipo"],
+                superficie_mq=superficie,
+                vettore=m["tipo"],
+                ts=ts,
+                intervallo_min=15,
+            )
+            batch.append((m["id"], m["asset_id"], ts, valore, 15))
+        ts += step
+        if len(batch) >= 5000:
+            psycopg2.extras.execute_values(cur, """
+                INSERT INTO energy_readings (meter_id, asset_id, ts, valore, intervallo_min)
+                VALUES %s
+                ON CONFLICT (meter_id, ts) DO NOTHING
+            """, batch)
+            conn.commit()
+            batch = []
+
+    if batch:
+        psycopg2.extras.execute_values(cur, """
+            INSERT INTO energy_readings (meter_id, asset_id, ts, valore, intervallo_min)
+            VALUES %s
+            ON CONFLICT (meter_id, ts) DO NOTHING
+        """, batch)
+        conn.commit()
+
+    cur.close()
+    conn.close()
+    print(f"[energy] storico {giorni}gg generato per {len(meters)} contatori")
+
+
+# ── Router FastAPI ────────────────────────────────────────────────────────────
+
+def register_energy_routes(app, get_db, get_utente_corrente):
+    """Registra gli endpoint energy sull'app FastAPI."""
+
+    def _ts_range(ore: int):
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(hours=ore)
+        return ts_from, now
+
+    def _kwh_period(cur, asset_id: int, tipo: str, ts_from, ts_to) -> float:
+        cur.execute("""
+            SELECT COALESCE(SUM(r.valore), 0.0) AS tot
+            FROM energy_readings r
+            JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.asset_id = %s AND m.tipo = %s
+              AND r.ts >= %s AND r.ts <= %s
+        """, (asset_id, tipo, ts_from, ts_to))
+        return round(cur.fetchone()["tot"], 2)
+
+    def _co2_from_kwh(kwh: float) -> float:
+        return round(kwh * 0.233, 2)
+
+    def _cost_from_kwh(kwh: float, tipo: str) -> float:
+        tariffe = {"elettrico": 0.25, "termico": 0.12, "gas": 0.95}
+        return round(kwh * tariffe.get(tipo, 0.20), 2)
+
+    @app.get("/api/energy/meters", tags=["energy"])
+    def get_meters(asset_id: Optional[int] = None,
+                   _=Depends(get_utente_corrente),
+                   db=Depends(get_db)):
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if asset_id:
+            cur.execute("""
+                SELECT em.*, a.nome AS asset_nome, a.tipo AS asset_tipo
+                FROM energy_meters em
+                JOIN assets a ON a.id = em.asset_id
+                WHERE em.asset_id = %s AND em.attivo = 1
+                ORDER BY em.tipo
+            """, (asset_id,))
+        else:
+            cur.execute("""
+                SELECT em.*, a.nome AS asset_nome, a.tipo AS asset_tipo
+                FROM energy_meters em
+                JOIN assets a ON a.id = em.asset_id
+                WHERE em.attivo = 1
+                ORDER BY em.asset_id, em.tipo
+            """)
+        return [dict(r) for r in cur.fetchall()]
+
+    @app.get("/api/energy/readings/{asset_id}", tags=["energy"])
+    def get_readings(asset_id: int,
+                     ore: int = 24,
+                     tipo: Optional[str] = None,
+                     _=Depends(get_utente_corrente),
+                     db=Depends(get_db)):
+        ts_from, ts_to = _ts_range(ore)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if tipo:
+            cur.execute("""
+                SELECT r.ts, r.valore, r.intervallo_min, m.tipo, m.unita, m.label
+                FROM energy_readings r
+                JOIN energy_meters m ON m.id = r.meter_id
+                WHERE r.asset_id = %s AND m.tipo = %s
+                  AND r.ts >= %s AND r.ts <= %s
+                ORDER BY r.ts ASC
+            """, (asset_id, tipo, ts_from, ts_to))
+        else:
+            cur.execute("""
+                SELECT r.ts, r.valore, r.intervallo_min, m.tipo, m.unita, m.label
+                FROM energy_readings r
+                JOIN energy_meters m ON m.id = r.meter_id
+                WHERE r.asset_id = %s
+                  AND r.ts >= %s AND r.ts <= %s
+                ORDER BY m.tipo, r.ts ASC
+            """, (asset_id, ts_from, ts_to))
+        rows = cur.fetchall()
+        # Serializza datetime in ISO string
+        result = []
+        for r in rows:
+            d = dict(r)
+            if isinstance(d.get("ts"), datetime):
+                d["ts"] = d["ts"].isoformat()
+            result.append(d)
+        return result
+
+    @app.get("/api/energy/summary/{asset_id}", tags=["energy"])
+    def get_summary_asset(asset_id: int,
+                          _=Depends(get_utente_corrente),
+                          db=Depends(get_db)):
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id, nome, tipo, superficie_mq FROM assets WHERE id=%s",
+            (asset_id,)
+        )
+        asset = cur.fetchone()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset non trovato")
+
+        superficie = asset["superficie_mq"] or 1
+        now = datetime.now(timezone.utc)
+        oggi_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        sett_start = oggi_start - timedelta(days=7)
+        mese_start = oggi_start.replace(day=1)
+        sett_prec_start = sett_start - timedelta(days=7)
+
+        vettori = ["elettrico", "termico", "gas"]
+        result = {
+            "asset_id": asset_id,
+            "asset_nome": asset["nome"],
+            "superficie_mq": superficie,
+            "vettori": {},
+            "totale_kwh_oggi": 0.0,
+            "kwh_m2_oggi": 0.0,
+            "co2_kg_oggi": 0.0,
+            "costo_eur_oggi": 0.0,
+            "trend_vs_settimana_prec_pct": 0.0,
+        }
+
+        kwh_oggi_tot = 0.0
+        kwh_sett_tot = 0.0
+        kwh_sett_prec_tot = 0.0
+
+        for v in vettori:
+            kwh_oggi = _kwh_period(cur, asset_id, v, oggi_start, now)
+            kwh_sett = _kwh_period(cur, asset_id, v, sett_start, now)
+            kwh_mese = _kwh_period(cur, asset_id, v, mese_start, now)
+            kwh_sett_prec = _kwh_period(cur, asset_id, v, sett_prec_start, sett_start)
+
+            result["vettori"][v] = {
+                "kwh_oggi": kwh_oggi,
+                "kwh_settimana": kwh_sett,
+                "kwh_mese": kwh_mese,
+                "costo_eur_oggi": _cost_from_kwh(kwh_oggi, v),
+            }
+            kwh_oggi_tot += kwh_oggi
+            kwh_sett_tot += kwh_sett
+            kwh_sett_prec_tot += kwh_sett_prec
+
+        result["totale_kwh_oggi"] = round(kwh_oggi_tot, 2)
+        result["kwh_m2_oggi"] = round(kwh_oggi_tot / superficie, 4)
+        result["co2_kg_oggi"] = _co2_from_kwh(
+            result["vettori"].get("elettrico", {}).get("kwh_oggi", 0)
+        )
+        result["costo_eur_oggi"] = round(
+            sum(v["costo_eur_oggi"] for v in result["vettori"].values()), 2
+        )
+        if kwh_sett_prec_tot > 0:
+            trend = ((kwh_sett_tot - kwh_sett_prec_tot) / kwh_sett_prec_tot) * 100
+            result["trend_vs_settimana_prec_pct"] = round(trend, 1)
+
+        return result
+
+    @app.get("/api/energy/summary", tags=["energy"])
+    def get_summary_all(_=Depends(get_utente_corrente), db=Depends(get_db)):
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id FROM assets WHERE stato='attivo'")
+        assets = cur.fetchall()
+        results = []
+        for a in assets:
+            try:
+                summary = get_summary_asset(a["id"], _, db)
+                results.append(summary)
+            except Exception:
+                pass
+        results.sort(key=lambda x: x.get("kwh_m2_oggi", 0), reverse=True)
+        return results
+
+    @app.get("/api/energy/heatmap", tags=["energy"])
+    def get_heatmap(_=Depends(get_utente_corrente), db=Depends(get_db)):
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT id, nome, tipo, lat, lon, superficie_mq
+            FROM assets WHERE stato='attivo'
+        """)
+        assets = cur.fetchall()
+
+        now = datetime.now(timezone.utc)
+        oggi_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        result = []
+        kwh_m2_values = []
+
+        for a in assets:
+            superficie = a["superficie_mq"] or 1
+            kwh_tot = sum(
+                _kwh_period(cur, a["id"], v, oggi_start, now)
+                for v in ["elettrico", "termico", "gas"]
+            )
+            kwh_m2 = round(kwh_tot / superficie, 4)
+            kwh_m2_values.append(kwh_m2)
+            result.append({
+                "asset_id": a["id"],
+                "nome": a["nome"],
+                "tipo": a["tipo"],
+                "lat": a["lat"],
+                "lon": a["lon"],
+                "kwh_oggi": round(kwh_tot, 2),
+                "kwh_m2_oggi": kwh_m2,
+            })
+
+        if kwh_m2_values:
+            max_val = max(kwh_m2_values) or 1
+            min_val = min(kwh_m2_values)
+            for item in result:
+                if max_val > min_val:
+                    score = 100 - ((item["kwh_m2_oggi"] - min_val) / (max_val - min_val)) * 100
+                else:
+                    score = 100
+                item["efficiency_score"] = round(score, 1)
+                if score >= 70:
+                    item["color"] = "green"
+                elif score >= 40:
+                    item["color"] = "orange"
+                else:
+                    item["color"] = "red"
+
+        return result
+
+    @app.get("/api/energy/anomalies", tags=["energy"])
+    def get_anomalies(_=Depends(get_utente_corrente), db=Depends(get_db)):
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, nome, tipo, superficie_mq FROM assets WHERE stato='attivo'")
+        assets = cur.fetchall()
+
+        now = datetime.now(timezone.utc)
+        ts_2d = now - timedelta(days=2)
+        ts_14d = now - timedelta(days=14)
+
+        anomalies = []
+        for a in assets:
+            kwh_recenti = sum(
+                _kwh_period(cur, a["id"], v, ts_2d, now)
+                for v in ["elettrico", "termico", "gas"]
+            )
+            kwh_storici = sum(
+                _kwh_period(cur, a["id"], v, ts_14d, ts_2d)
+                for v in ["elettrico", "termico", "gas"]
+            )
+            media_giornaliera = kwh_storici / 12.0 if kwh_storici > 0 else 0
+            media_2gg = media_giornaliera * 2
+
+            if media_2gg > 0:
+                delta_pct = ((kwh_recenti - media_2gg) / media_2gg) * 100
+                if delta_pct > 30:
+                    anomalies.append({
+                        "asset_id": a["id"],
+                        "nome": a["nome"],
+                        "tipo": a["tipo"],
+                        "kwh_ultimi_2gg": round(kwh_recenti, 2),
+                        "media_2gg_storica": round(media_2gg, 2),
+                        "delta_pct": round(delta_pct, 1),
+                        "severita": "alta" if delta_pct > 60 else "media",
+                    })
+
+        anomalies.sort(key=lambda x: x["delta_pct"], reverse=True)
+        return anomalies
+
+
+    # ── BEMS: Piani, Zone, Impianti ───────────────────────────────────────────
+
+    @app.get("/api/bems/buildings/{asset_id}/floors", tags=["bems"])
+    def get_floors(asset_id: int,
+                   _=Depends(get_utente_corrente),
+                   db=Depends(get_db)):
+        """Lista piani dell'edificio."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT f.id, f.floor_id, f.nome, f.level, f.superficie_mq,
+                   f.svg_file, f.ifc_storey_guid
+            FROM floors f
+            WHERE f.asset_id = %s
+            ORDER BY f.level
+        """, (asset_id,))
+        return [dict(r) for r in cur.fetchall()]
+
+    @app.get("/api/bems/buildings/{asset_id}/zones", tags=["bems"])
+    def get_zones(asset_id: int,
+                  floor_id: Optional[str] = None,
+                  _=Depends(get_utente_corrente),
+                  db=Depends(get_db)):
+        """Lista zone energetiche dell'edificio, opzionalmente filtrate per piano."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if floor_id:
+            cur.execute("""
+                SELECT z.*, f.nome AS floor_nome
+                FROM zones z
+                LEFT JOIN floors f ON f.floor_id = z.floor_id AND f.asset_id = z.asset_id
+                WHERE z.asset_id = %s AND z.floor_id = %s
+                ORDER BY f.level, z.nome
+            """, (asset_id, floor_id))
+        else:
+            cur.execute("""
+                SELECT z.*, f.nome AS floor_nome
+                FROM zones z
+                LEFT JOIN floors f ON f.floor_id = z.floor_id AND f.asset_id = z.asset_id
+                WHERE z.asset_id = %s
+                ORDER BY f.level, z.nome
+            """, (asset_id,))
+        return [dict(r) for r in cur.fetchall()]
+
+    @app.get("/api/bems/buildings/{asset_id}/plants", tags=["bems"])
+    def get_plants(asset_id: int,
+                   floor_id: Optional[str] = None,
+                   zone_id: Optional[str] = None,
+                   _=Depends(get_utente_corrente),
+                   db=Depends(get_db)):
+        """Lista impianti con stato operativo e ultima lettura di potenza."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        query = """
+            SELECT p.*, f.nome AS floor_nome, z.nome AS zone_nome
+            FROM plants p
+            LEFT JOIN floors f ON f.floor_id = p.floor_id AND f.asset_id = p.asset_id
+            LEFT JOIN zones z ON z.zone_id = p.zone_id AND z.asset_id = p.asset_id
+            WHERE p.asset_id = %s
+        """
+        params: list = [asset_id]
+        if floor_id:
+            query += " AND p.floor_id = %s"
+            params.append(floor_id)
+        if zone_id:
+            query += " AND p.zone_id = %s"
+            params.append(zone_id)
+        query += " ORDER BY p.tipo, p.nome"
+        cur.execute(query, params)
+        rows = cur.fetchall()
+
+        result = []
+        for r in rows:
+            plant = dict(r)
+            # Ultima lettura di potenza dalla telemetria
+            cur2 = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur2.execute("""
+                SELECT power_kw, ts
+                FROM telemetry
+                WHERE plant_id = %s
+                ORDER BY ts DESC
+                LIMIT 1
+            """, (plant.get("plant_id"),))
+            latest = cur2.fetchone()
+            plant["current_power_kw"] = latest["power_kw"] if latest else None
+            plant["last_reading_at"] = latest["ts"].isoformat() if latest and latest.get("ts") else None
+            # Delta rispetto alla baseline
+            if latest and plant.get("energy_baseline_kw") and latest.get("power_kw") is not None:
+                baseline = plant["energy_baseline_kw"]
+                if baseline > 0:
+                    delta = ((latest["power_kw"] - baseline) / baseline) * 100
+                    plant["baseline_delta_pct"] = round(delta, 1)
+                else:
+                    plant["baseline_delta_pct"] = None
+            else:
+                plant["baseline_delta_pct"] = None
+            result.append(plant)
+        return result
+
+    @app.get("/api/bems/buildings/{asset_id}/telemetry/latest", tags=["bems"])
+    def get_telemetry_latest(asset_id: int,
+                             _=Depends(get_utente_corrente),
+                             db=Depends(get_db)):
+        """Ultima lettura di telemetria per ogni zona dell'edificio.
+        Restituisce un dict zone_id -> {power_kw, temp_c, humidity, co2_ppm, occupancy_pct, ts}."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # Ultima telemetria per zona (DISTINCT ON richiede ORDER BY)
+        cur.execute("""
+            SELECT DISTINCT ON (zone_id)
+                zone_id, power_kw, temp_c, humidity, co2_ppm, occupancy, ts
+            FROM telemetry
+            WHERE asset_id = %s AND zone_id IS NOT NULL
+            ORDER BY zone_id, ts DESC
+        """, (asset_id,))
+        rows = cur.fetchall()
+        result = {}
+        for r in rows:
+            zid = r["zone_id"]
+            result[zid] = {
+                "power_kw": float(r["power_kw"]) if r["power_kw"] is not None else None,
+                "temp_c": float(r["temp_c"]) if r["temp_c"] is not None else None,
+                "humidity": float(r["humidity"]) if r["humidity"] is not None else None,
+                "co2_ppm": float(r["co2_ppm"]) if r["co2_ppm"] is not None else None,
+                "occupancy": r["occupancy"],
+                "occupancy_pct": None,  # Calcolato dal simulatore
+                "ts": r["ts"].isoformat() if r.get("ts") else None
+            }
+        return result
+
+    @app.get("/api/bems/buildings/{asset_id}/telemetry/history", tags=["bems"])
+    def get_telemetry_history(asset_id: int,
+                              zone_id: Optional[str] = None,
+                              plant_id: Optional[str] = None,
+                              ore: int = 24,
+                              _=Depends(get_utente_corrente),
+                              db=Depends(get_db)):
+        """Storico telemetria per zona o impianto nelle ultime N ore."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        query = """
+            SELECT ts, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy
+            FROM telemetry
+            WHERE asset_id = %s
+              AND ts >= NOW() - INTERVAL '%s hours'
+        """
+        params: list = [asset_id, ore]
+        if zone_id:
+            query += " AND zone_id = %s"
+            params.append(zone_id)
+        if plant_id:
+            query += " AND plant_id = %s"
+            params.append(plant_id)
+        query += " ORDER BY ts DESC LIMIT 1000"
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "ts": r["ts"].isoformat() if r.get("ts") else None,
+                "zone_id": r["zone_id"],
+                "plant_id": r["plant_id"],
+                "power_kw": float(r["power_kw"]) if r["power_kw"] is not None else None,
+                "temp_c": float(r["temp_c"]) if r["temp_c"] is not None else None,
+                "humidity": float(r["humidity"]) if r["humidity"] is not None else None,
+                "co2_ppm": float(r["co2_ppm"]) if r["co2_ppm"] is not None else None,
+                "occupancy": r["occupancy"]
+            })
+        return result
+
+    @app.post("/api/bems/telemetry", tags=["bems"])
+    def post_telemetry(payload: Dict[str, Any],
+                       db=Depends(get_db)):
+        """Endpoint per il simulatore gateway: inserisce una lettura di telemetria.
+        Payload: {asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy}
+        Non richiede autenticazione (chiamato dal gateway interno)."""
+        cur = db.cursor()
+        cur.execute("""
+            INSERT INTO telemetry (asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            payload.get("asset_id"),
+            payload.get("floor_id"),
+            payload.get("zone_id"),
+            payload.get("plant_id"),
+            payload.get("power_kw"),
+            payload.get("temp_c"),
+            payload.get("humidity"),
+            payload.get("co2_ppm"),
+            payload.get("occupancy")
+        ))
+        db.commit()
+        return {"status": "ok"}
+
+    @app.post("/api/bems/telemetry/batch", tags=["bems"])
+    def post_telemetry_batch(payload: List[Dict[str, Any]],
+                             db=Depends(get_db)):
+        """Endpoint batch per il simulatore gateway: inserisce multiple letture.
+        Payload: lista di {asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy, ts (opzionale ISO8601)}"""
+        cur = db.cursor()
+        for item in payload:
+            ts_val = item.get("ts")
+            if ts_val:
+                cur.execute("""
+                    INSERT INTO telemetry (ts, asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    ts_val,
+                    item.get("asset_id"),
+                    item.get("floor_id"),
+                    item.get("zone_id"),
+                    item.get("plant_id"),
+                    item.get("power_kw"),
+                    item.get("temp_c"),
+                    item.get("humidity"),
+                    item.get("co2_ppm"),
+                    item.get("occupancy")
+                ))
+            else:
+                cur.execute("""
+                    INSERT INTO telemetry (asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    item.get("asset_id"),
+                    item.get("floor_id"),
+                    item.get("zone_id"),
+                    item.get("plant_id"),
+                    item.get("power_kw"),
+                    item.get("temp_c"),
+                    item.get("humidity"),
+                    item.get("co2_ppm"),
+                    item.get("occupancy")
+                ))
+        db.commit()
+        return {"status": "ok", "inserted": len(payload)}

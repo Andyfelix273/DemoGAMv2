@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Scadenze</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:16px 24px; }
+
+    /* KPI strip */
+    .kpi-strip { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+    .kpi-card {
+      flex:1; min-width:110px; background:var(--bg-secondary);
+      border:1px solid var(--border-color); border-radius:10px;
+      padding:14px 18px; text-align:center;
+    }
+    .kpi-val { font-size:26px; font-weight:700; line-height:1; }
+    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+    /* Tabs */
+    .tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:20px; }
+    .tab-btn {
+      padding:10px 18px; font-size:13px; font-weight:500;
+      background:none; border:none; border-bottom:2px solid transparent;
+      color:var(--text-secondary); cursor:pointer; transition:all 0.15s;
+      margin-bottom:-1px;
+    }
+    .tab-btn.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
+    .tab-btn:hover:not(.active) { color:var(--text-primary); }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    /* Filtri */
+    .filtri-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+    .filtri-bar select, .filtri-bar input {
+      padding:7px 10px; border-radius:7px;
+      background:var(--input-bg); border:1px solid var(--input-border);
+      color:var(--text-primary); font-size:13px;
+    }
+    .filtri-bar select:focus, .filtri-bar input:focus { outline:none; border-color:var(--accent-blue); }
+
+    /* Riga scadenza */
+    .dl-row {
+      display:flex; align-items:center; gap:12px;
+      padding:12px 16px; border-radius:8px; margin-bottom:8px;
+      border:1px solid var(--border-color);
+      background:var(--bg-secondary);
+      transition:border-color 0.15s;
+    }
+    .dl-row.scaduta  { border-left:3px solid var(--accent-red); }
+    .dl-row.urgente  { border-left:3px solid var(--accent-orange); }
+    .dl-row.normale  { border-left:3px solid var(--accent-blue); }
+    .dl-row.chiusa   { opacity:0.55; border-left:3px solid var(--text-muted); }
+    .dl-info { flex:1; min-width:0; }
+    .dl-titolo { font-size:13px; font-weight:600; }
+    .dl-asset  { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .dl-meta   { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .dl-actions { display:flex; gap:6px; flex-shrink:0; }
+
+    /* Calendario */
+    .cal-nav { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    .cal-nav h2 { font-size:16px; font-weight:600; flex:1; text-align:center; }
+    .cal-grid {
+      display:grid; grid-template-columns:repeat(7,1fr);
+      gap:4px; margin-bottom:8px;
+    }
+    .cal-header { text-align:center; font-size:11px; font-weight:700; color:var(--text-muted); padding:4px 0; text-transform:uppercase; }
+    .cal-day {
+      min-height:72px; border-radius:8px; padding:6px;
+      background:var(--bg-secondary); border:1px solid var(--border-color);
+      font-size:12px; position:relative; cursor:default;
+    }
+    .cal-day.other-month { opacity:0.35; }
+    .cal-day.today { border-color:var(--accent-blue); }
+    .cal-day-num { font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; }
+    .cal-event {
+      font-size:10px; padding:2px 5px; border-radius:4px;
+      margin-bottom:2px; cursor:pointer; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis;
+    }
+    .cal-event.critica  { background:var(--accent-red);    color:#fff; }
+    .cal-event.alta     { background:var(--accent-orange);  color:#fff; }
+    .cal-event.media    { background:var(--accent-blue);    color:#fff; }
+    .cal-event.bassa    { background:var(--text-muted);     color:#fff; }
+    .cal-event.scaduta  { background:#c0392b; color:#fff; }
+
+    /* Modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
+    .modal { background:var(--bg-primary); border-radius:12px; padding:0; width:100%; max-width:520px; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 24px 12px; border-bottom:1px solid var(--border-color); }
+    .modal-title { font-size:16px; font-weight:600; }
+    .modal-close { background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer; padding:0 4px; }
+    .modal-body { padding:20px 24px; }
+    .modal-footer { display:flex; justify-content:flex-end; gap:10px; padding:12px 24px 18px; border-top:1px solid var(--border-color); }
+    .form-group { margin-bottom:14px; }
+    .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width:100%; padding:8px 10px; border-radius:7px;
+      background:var(--input-bg); border:1px solid var(--input-border);
+      color:var(--text-primary); font-size:13px; box-sizing:border-box;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline:none; border-color:var(--accent-blue);
+    }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    /* ══ Responsive mobile ═══════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Calendario: scroll orizzontale */
+      .cal-grid {
+        overflow-x: auto;
+        display: grid;
+        grid-template-columns: repeat(7, minmax(44px, 1fr));
+        gap: 2px;
+      }
+      .cal-day { min-height: 52px; padding: 4px; }
+      .cal-event { font-size: 9px; }
+
+      /* Riga scadenza: stack verticale */
+      .dl-row { flex-wrap: wrap; }
+      .dl-actions { width: 100%; justify-content: flex-end; margin-top: 4px; }
+
+      /* Form modal: 1 colonna */
+      .form-row { grid-template-columns: 1fr; }
+
+      /* KPI strip: 2 per riga */
+      .kpi-strip { gap: 8px; }
+      .kpi-card { min-width: calc(50% - 8px); padding: 10px 12px; }
+      .kpi-val { font-size: 22px; }
+    }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fa fa-calendar"></i> Scadenze</h1>
+      <div style="display:flex;gap:8px" id="admin-actions">
+        <button class="btn btn-secondary" onclick="window.location.href='/api/export/deadlines/excel'" title="Esporta in Excel">
+          <i class="fa fa-file-excel-o"></i> Excel
+        </button>
+        <button class="btn btn-secondary" onclick="window.location.href='/api/export/report/pdf'" title="Report PDF completo">
+          <i class="fa fa-file-pdf-o"></i> Report PDF
+        </button>
+        <button class="btn btn-primary" id="btn-nuova-scadenza">
+          <i class="fa fa-plus"></i> Nuova scadenza
+        </button>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- KPI strip -->
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-val" id="kpi-aperte">–</div><div class="kpi-lbl">Aperte</div></div>
+        <div class="kpi-card"><div class="kpi-val" id="kpi-in-ritardo" style="color:var(--accent-red)">–</div><div class="kpi-lbl">In ritardo</div></div>
+        <div class="kpi-card"><div class="kpi-val" id="kpi-7gg" style="color:var(--accent-orange)">–</div><div class="kpi-lbl">Scadono in 7 gg</div></div>
+        <div class="kpi-card"><div class="kpi-val" id="kpi-urgenti" style="color:var(--accent-orange)">–</div><div class="kpi-lbl">Urgenti</div></div>
+        <div class="kpi-card"><div class="kpi-val" id="kpi-chiuse" style="color:var(--accent-green)">–</div><div class="kpi-lbl">Chiuse</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="lista"><i class="fa fa-list"></i> Lista</button>
+        <button class="tab-btn" data-tab="calendario"><i class="fa fa-calendar"></i> Calendario</button>
+      </div>
+
+      <!-- Tab: Lista -->
+      <div class="tab-content active" id="tab-lista">
+        <div class="filtri-bar">
+          <input type="text" id="search-input" placeholder="Cerca scadenza, asset..." style="flex:1;min-width:180px">
+          <select id="filter-stato">
+            <option value="">Tutti gli stati</option>
+            <option value="aperta">Aperta</option>
+            <option value="chiusa">Chiusa</option>
+            <option value="scaduta">Scaduta</option>
+          </select>
+          <select id="filter-tipo">
+            <option value="">Tutti i tipi</option>
+            <option value="normativa">Normativa</option>
+            <option value="manutenzione">Manutenzione</option>
+            <option value="collaudo">Collaudo</option>
+            <option value="contratto">Contratto</option>
+            <option value="scadenza">Scadenza</option>
+          </select>
+          <select id="filter-priorita">
+            <option value="">Tutte le priorità</option>
+            <option value="critica">Critica</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="bassa">Bassa</option>
+          </select>
+        </div>
+        <div id="dl-count" style="font-size:12px;color:var(--text-muted);margin-bottom:10px"></div>
+        <div id="dl-list">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+      </div>
+
+      <!-- Tab: Calendario -->
+      <div class="tab-content" id="tab-calendario">
+        <div class="cal-nav">
+          <button class="btn btn-secondary btn-sm" id="cal-prev"><i class="fa fa-chevron-left"></i></button>
+          <h2 id="cal-titolo"></h2>
+          <button class="btn btn-secondary btn-sm" id="cal-next"><i class="fa fa-chevron-right"></i></button>
+          <button class="btn btn-secondary btn-sm" id="cal-oggi">Oggi</button>
+        </div>
+        <div class="cal-grid" id="cal-headers"></div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <!-- Modal nuova/modifica scadenza -->
+  <div class="modal-overlay" id="modal-scadenza">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-scadenza-titolo">Nuova scadenza</span>
+        <button class="modal-close" id="modal-scadenza-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="form-dl-id">
+        <div class="form-group">
+          <label>Asset *</label>
+          <select id="form-asset-id"></select>
+        </div>
+        <div class="form-group">
+          <label>Titolo *</label>
+          <input type="text" id="form-titolo" placeholder="Titolo scadenza">
+        </div>
+        <div class="form-group">
+          <label>Descrizione</label>
+          <textarea id="form-descrizione" rows="2" placeholder="Descrizione opzionale"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="form-tipo">
+              <option value="scadenza">Scadenza</option>
+              <option value="normativa">Normativa</option>
+              <option value="manutenzione">Manutenzione</option>
+              <option value="collaudo">Collaudo</option>
+              <option value="contratto">Contratto</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priorità</label>
+            <select id="form-priorita">
+              <option value="bassa">Bassa</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Critica</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Data scadenza *</label>
+            <input type="date" id="form-data-scadenza">
+          </div>
+          <div class="form-group">
+            <label>Assegnatario</label>
+            <input type="text" id="form-assegnatario" placeholder="Nome / ente">
+          </div>
+        </div>
+        <div class="form-group" id="form-stato-wrap" style="display:none">
+          <label>Stato</label>
+          <select id="form-stato">
+            <option value="aperta">Aperta</option>
+            <option value="chiusa">Chiusa</option>
+            <option value="scaduta">Scaduta</option>
+          </select>
+        </div>
+        <div id="form-error" style="color:var(--accent-red);font-size:12px;margin-top:4px;display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-scadenza-annulla">Annulla</button>
+        <button class="btn btn-primary" id="modal-scadenza-salva">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/i18n.js?v=6"></script>
+  <script src="/static/js/api.js?v=6"></script>
+  <script src="/static/js/utils.js?v=6"></script>
+  <script>
+  /**
+   * deadlines.html - Scadenze GIS Asset Manager v2.0
+   * Autore: Felix / KeyBiz
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('scadenze', { filtri: false });
+  renderSidebar('scadenze');
+  initAlarmNotifications();
+  i18n.apply();
+
+  if (API.can('deadlines.create')) {
+    document.getElementById('admin-actions').style.display = 'flex';
+  }
+
+  let allDeadlines = [];
+  let calAnno = new Date().getFullYear();
+  let calMese = new Date().getMonth(); // 0-based
+
+  const PRIO_COLOR = { critica:'var(--accent-red)', alta:'var(--accent-orange)', media:'var(--accent-blue)', bassa:'var(--text-muted)' };
+  const STATO_COLOR = { aperta:'var(--accent-blue)', chiusa:'var(--accent-green)', scaduta:'var(--accent-red)' };
+  const TIPO_ICON = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-check-square-o', contratto:'fa-file-text-o', scadenza:'fa-clock-o' };
+
+  // ── Caricamento dati ────────────────────────────────────────────────────────
+  async function caricaTutto() {
+    try {
+      const [stats, lista] = await Promise.all([
+        API.getDeadlineStats(),
+        API.getDeadlines()
+      ]);
+      allDeadlines = lista;
+      aggiornaKPI(stats);
+      renderLista();
+      renderCalendario();
+    } catch(e) {
+      document.getElementById('dl-list').innerHTML =
+        `<p style="color:var(--accent-red)">Errore caricamento: ${e.message}</p>`;
+    }
+  }
+
+  function aggiornaKPI(s) {
+    document.getElementById('kpi-aperte').textContent    = s.aperte ?? '–';
+    document.getElementById('kpi-in-ritardo').textContent = s.in_ritardo ?? '–';
+    document.getElementById('kpi-7gg').textContent       = s.in_scadenza_7gg ?? '–';
+    document.getElementById('kpi-urgenti').textContent   = s.urgenti ?? '–';
+    document.getElementById('kpi-chiuse').textContent    = s.chiuse ?? '–';
+  }
+
+  // ── Lista ───────────────────────────────────────────────────────────────────
+  function renderLista() {
+    const search   = document.getElementById('search-input').value.toLowerCase();
+    const fStato   = document.getElementById('filter-stato').value;
+    const fTipo    = document.getElementById('filter-tipo').value;
+    const fPriorita= document.getElementById('filter-priorita').value;
+
+    let lista = allDeadlines.filter(d => {
+      if (fStato    && d.stato    !== fStato)    return false;
+      if (fTipo     && d.tipo     !== fTipo)     return false;
+      if (fPriorita && d.priorita !== fPriorita) return false;
+      if (search && !( (d.titolo||'').toLowerCase().includes(search) ||
+                       (d.asset_nome||'').toLowerCase().includes(search) ||
+                       (d.assegnatario||'').toLowerCase().includes(search) )) return false;
+      return true;
+    });
+
+    document.getElementById('dl-count').textContent = lista.length + ' scadenz' + (lista.length === 1 ? 'a' : 'e');
+
+    if (lista.length === 0) {
+      document.getElementById('dl-list').innerHTML =
+        '<p style="color:var(--text-muted);text-align:center;padding:32px"><i class="fa fa-calendar-check-o"></i> Nessuna scadenza trovata</p>';
+      return;
+    }
+
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    const html = lista.map(d => {
+      const scad = new Date(d.data_scadenza);
+      const diffGg = Math.ceil((scad - oggi) / 86400000);
+      const isScaduta = d.stato === 'scaduta' || (d.stato === 'aperta' && diffGg < 0);
+      const isUrgente = d.stato === 'aperta' && diffGg >= 0 && diffGg <= 7;
+      const rowClass  = d.stato === 'chiusa' ? 'chiusa' : isScaduta ? 'scaduta' : isUrgente ? 'urgente' : 'normale';
+
+      let dataLabel = '';
+      if (d.stato === 'chiusa') dataLabel = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
+      else if (isScaduta)       dataLabel = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
+      else if (diffGg === 0)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock-o"></i> Scade oggi</span>`;
+      else if (diffGg === 1)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock-o"></i> Scade domani</span>`;
+      else if (diffGg <= 7)     dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock-o"></i> Scade tra ${diffGg} gg</span>`;
+      else                      dataLabel = `<span style="color:var(--text-muted)"><i class="fa fa-calendar-o"></i> ${d.data_scadenza}</span>`;
+
+      const canEdit   = API.can('deadlines.update');
+      const canDelete = API.can('deadlines.delete');
+      const canClose  = API.can('deadlines.update') && d.stato === 'aperta';
+
+      return `<div class="dl-row ${rowClass}">
+        <i class="fa ${TIPO_ICON[d.tipo]||'fa-clock-o'}" style="color:${PRIO_COLOR[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
+        <div class="dl-info">
+          <div class="dl-titolo">${d.titolo}</div>
+          <div class="dl-asset"><i class="fa fa-map-marker"></i> ${d.asset_nome} &mdash; ${d.asset_citta||''}</div>
+          <div class="dl-meta">
+            ${dataLabel}
+            &nbsp;·&nbsp; <span style="font-weight:600;color:${PRIO_COLOR[d.priorita]||''}">${(d.priorita||'').toUpperCase()}</span>
+            &nbsp;·&nbsp; ${d.tipo||''}
+            ${d.assegnatario ? '&nbsp;·&nbsp; <i class="fa fa-user"></i> ' + d.assegnatario : ''}
+          </div>
+        </div>
+        <div class="dl-actions">
+          ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi scadenza" onclick="chiudiScadenza(${d.id})"><i class="fa fa-check"></i></button>` : ''}
+          ${canEdit  ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="apriModifica(${d.id})"><i class="fa fa-pencil"></i></button>` : ''}
+          ${canDelete? `<button class="btn btn-danger btn-sm" title="Elimina" onclick="eliminaScadenza(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    document.getElementById('dl-list').innerHTML = html;
+  }
+
+  // ── Calendario ──────────────────────────────────────────────────────────────
+  function renderCalendario() {
+    const GIORNI = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+    document.getElementById('cal-headers').innerHTML = GIORNI.map(g =>
+      `<div class="cal-header">${g}</div>`).join('');
+
+    const mesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                  'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    document.getElementById('cal-titolo').textContent = mesi[calMese] + ' ' + calAnno;
+
+    const primoGiorno = new Date(calAnno, calMese, 1);
+    // Lunedì = 0, domenica = 6
+    let startDow = primoGiorno.getDay(); // 0=domenica
+    startDow = startDow === 0 ? 6 : startDow - 1;
+    const giorniMese = new Date(calAnno, calMese + 1, 0).getDate();
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+
+    // Mappa data -> scadenze
+    const byDate = {};
+    allDeadlines.forEach(d => {
+      const k = d.data_scadenza ? d.data_scadenza.slice(0,10) : null;
+      if (k) { if (!byDate[k]) byDate[k] = []; byDate[k].push(d); }
+    });
+
+    let cells = '';
+    // Celle vuote prima del primo giorno
+    for (let i = 0; i < startDow; i++) {
+      cells += `<div class="cal-day other-month"></div>`;
+    }
+    for (let g = 1; g <= giorniMese; g++) {
+      const d = new Date(calAnno, calMese, g);
+      const isOggi = d.getTime() === oggi.getTime();
+      const key = d.toISOString().slice(0,10);
+      const events = byDate[key] || [];
+      const evHtml = events.slice(0,3).map(ev => {
+        const cls = ev.stato === 'scaduta' ? 'scaduta' : ev.priorita;
+        return `<div class="cal-event ${cls}" title="${ev.titolo}">${ev.titolo}</div>`;
+      }).join('') + (events.length > 3 ? `<div style="font-size:10px;color:var(--text-muted)">+${events.length-3} altri</div>` : '');
+      cells += `<div class="cal-day${isOggi ? ' today' : ''}">
+        <div class="cal-day-num">${g}</div>
+        ${evHtml}
+      </div>`;
+    }
+    document.getElementById('cal-grid').innerHTML = cells;
+  }
+
+  // ── Navigazione calendario ──────────────────────────────────────────────────
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    calMese--; if (calMese < 0) { calMese = 11; calAnno--; }
+    renderCalendario();
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    calMese++; if (calMese > 11) { calMese = 0; calAnno++; }
+    renderCalendario();
+  });
+  document.getElementById('cal-oggi').addEventListener('click', () => {
+    calAnno = new Date().getFullYear(); calMese = new Date().getMonth();
+    renderCalendario();
+  });
+
+  // ── Tab switching ───────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Filtri ──────────────────────────────────────────────────────────────────
+  ['search-input','filter-stato','filter-tipo','filter-priorita'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderLista);
+    document.getElementById(id).addEventListener('change', renderLista);
+  });
+
+  // ── Modal nuova/modifica scadenza ───────────────────────────────────────────
+  let assetsCache = [];
+
+  async function apriNuova() {
+    document.getElementById('modal-scadenza-titolo').textContent = 'Nuova scadenza';
+    document.getElementById('form-dl-id').value = '';
+    document.getElementById('form-titolo').value = '';
+    document.getElementById('form-descrizione').value = '';
+    document.getElementById('form-tipo').value = 'scadenza';
+    document.getElementById('form-priorita').value = 'media';
+    document.getElementById('form-data-scadenza').value = '';
+    document.getElementById('form-assegnatario').value = '';
+    document.getElementById('form-stato-wrap').style.display = 'none';
+    document.getElementById('form-error').style.display = 'none';
+    await caricaAssets();
+    document.getElementById('modal-scadenza').style.display = 'flex';
+  }
+
+  async function apriModifica(id) {
+    const d = allDeadlines.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('modal-scadenza-titolo').textContent = 'Modifica scadenza';
+    document.getElementById('form-dl-id').value = d.id;
+    document.getElementById('form-titolo').value = d.titolo || '';
+    document.getElementById('form-descrizione').value = d.descrizione || '';
+    document.getElementById('form-tipo').value = d.tipo || 'scadenza';
+    document.getElementById('form-priorita').value = d.priorita || 'media';
+    document.getElementById('form-data-scadenza').value = d.data_scadenza || '';
+    document.getElementById('form-assegnatario').value = d.assegnatario || '';
+    document.getElementById('form-stato').value = d.stato || 'aperta';
+    document.getElementById('form-stato-wrap').style.display = 'block';
+    document.getElementById('form-error').style.display = 'none';
+    await caricaAssets();
+    document.getElementById('form-asset-id').value = d.asset_id;
+    document.getElementById('modal-scadenza').style.display = 'flex';
+  }
+
+  async function caricaAssets() {
+    if (assetsCache.length === 0) {
+      const geo = await API.getAssets();
+      assetsCache = (geo.features || []).map(f => f.properties);
+    }
+    const sel = document.getElementById('form-asset-id');
+    sel.innerHTML = assetsCache.map(a =>
+      `<option value="${a.id}">${a.codice} – ${a.nome}</option>`
+    ).join('');
+  }
+
+  function chiudiModal() {
+    document.getElementById('modal-scadenza').style.display = 'none';
+  }
+
+  document.getElementById('modal-scadenza-close').addEventListener('click', chiudiModal);
+  document.getElementById('modal-scadenza-annulla').addEventListener('click', chiudiModal);
+
+  document.getElementById('modal-scadenza-salva').addEventListener('click', async () => {
+    const id       = document.getElementById('form-dl-id').value;
+    const titolo   = document.getElementById('form-titolo').value.trim();
+    const assetId  = parseInt(document.getElementById('form-asset-id').value);
+    const dataScad = document.getElementById('form-data-scadenza').value;
+    const errEl    = document.getElementById('form-error');
+
+    if (!titolo || !dataScad) {
+      errEl.textContent = 'Titolo e data scadenza sono obbligatori.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+
+    const payload = {
+      asset_id:      assetId,
+      titolo,
+      descrizione:   document.getElementById('form-descrizione').value.trim() || null,
+      tipo:          document.getElementById('form-tipo').value,
+      priorita:      document.getElementById('form-priorita').value,
+      data_scadenza: dataScad,
+      assegnatario:  document.getElementById('form-assegnatario').value.trim() || null,
+    };
+    if (id) payload.stato = document.getElementById('form-stato').value;
+
+    try {
+      if (id) {
+        await API.updateDeadline(parseInt(id), payload);
+      } else {
+        await API.createDeadline(payload);
+      }
+      chiudiModal();
+      await caricaTutto();
+    } catch(e) {
+      errEl.textContent = 'Errore: ' + e.message;
+      errEl.style.display = 'block';
+    }
+  });
+
+  // ── Azioni ──────────────────────────────────────────────────────────────────
+  async function chiudiScadenza(id) {
+    if (!confirm('Segnare la scadenza come chiusa?')) return;
+    try {
+      await API.updateDeadline(id, { stato: 'chiusa' });
+      await caricaTutto();
+    } catch(e) { alert('Errore: ' + e.message); }
+  }
+
+  async function eliminaScadenza(id) {
+    if (!confirm('Eliminare definitivamente questa scadenza?')) return;
+    try {
+      await API.deleteDeadline(id);
+      await caricaTutto();
+    } catch(e) { alert('Errore: ' + e.message); }
+  }
+
+  document.getElementById('btn-nuova-scadenza')?.addEventListener('click', apriNuova);
+
+  // ── Avvio ───────────────────────────────────────────────────────────────────
+  caricaTutto();
+  </script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Database locale (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Ambienti virtuali
+.venv/
+venv/
+env/
+.env
+
+# Variabili d'ambiente e segreti
+.env
+.env.*
+secrets.py
+config_local.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log
+*.log
+logs/
+
+# Docker volumes e dati locali
+data/
+volumes/
+pgdata/
+
+# File temporanei e di test
+test_*.py
+*_test.py
+patch_*.py
+prova
+*.tmp
+
+# File di build e cache
+node_modules/
+.cache/
+
+# Directory app (copia di lavoro estratta dal container)
+app/

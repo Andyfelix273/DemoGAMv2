@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Allarmi Energetici</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:16px 24px; }
+
+    /* Tab */
+    .tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:20px; }
+    .tab-btn {
+      padding:10px 18px; font-size:13px; font-weight:500;
+      background:none; border:none; border-bottom:2px solid transparent;
+      color:var(--text-secondary); cursor:pointer; transition:all 0.15s;
+      margin-bottom:-1px;
+    }
+    .tab-btn.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
+    .tab-btn:hover:not(.active) { color:var(--text-primary); }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    /* Allarmi energetici */
+    .alarm-row {
+      display:flex; align-items:center; gap:12px;
+      padding:12px 16px; border-radius:8px; margin-bottom:8px;
+      border:1px solid var(--border-color);
+      background:var(--bg-secondary);
+      transition:border-color 0.15s;
+    }
+    .alarm-row.alta   { border-left:3px solid var(--accent-red); }
+    .alarm-row.media  { border-left:3px solid #F39C12; }
+    .alarm-row.bassa  { border-left:3px solid var(--accent-yellow); }
+    .alarm-row.acked  { opacity:0.5; }
+    .alarm-icon { font-size:18px; flex-shrink:0; }
+    .alarm-icon.alta  { color:var(--accent-red); }
+    .alarm-icon.media { color:#F39C12; }
+    .alarm-icon.bassa { color:var(--accent-yellow); }
+    .alarm-info { flex:1; min-width:0; }
+    .alarm-asset { font-size:13px; font-weight:600; }
+    .alarm-campo { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .alarm-meta  { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .alarm-valore { font-size:16px; font-weight:700; text-align:right; white-space:nowrap; }
+    .alarm-valore.alta  { color:var(--accent-red); }
+    .alarm-valore.media { color:#F39C12; }
+    .alarm-valore.bassa { color:var(--accent-yellow); }
+
+    /* Soglie energetiche */
+    .threshold-group { margin-bottom:24px; }
+    .threshold-group-title {
+      font-size:12px; font-weight:700; letter-spacing:0.06em;
+      color:var(--text-muted); text-transform:uppercase;
+      margin-bottom:10px; padding-bottom:6px;
+      border-bottom:1px solid var(--border-color);
+    }
+    .threshold-row {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 0; border-bottom:1px solid var(--border-color);
+    }
+    .threshold-row:last-child { border-bottom:none; }
+    .threshold-label { flex:1; font-size:13px; }
+    .threshold-unit  { font-size:11px; color:var(--text-muted); width:60px; }
+    .threshold-input {
+      width:80px; padding:5px 8px;
+      background:var(--input-bg); border:1px solid var(--input-border);
+      border-radius:6px; color:var(--text-primary); font-size:13px; text-align:center;
+    }
+    .threshold-input:focus { outline:none; border-color:var(--accent-blue); }
+    .threshold-sep { font-size:11px; color:var(--text-muted); }
+
+    /* Storico */
+    .storico-empty { text-align:center; padding:40px; color:var(--text-muted); }
+
+    /* Contatore */
+    .alarm-counter {
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:12px; color:var(--text-secondary);
+    }
+
+    /* KPI summary */
+    .kpi-summary {
+      display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+      margin-bottom:20px;
+    }
+    .kpi-card {
+      background:var(--bg-secondary); border:1px solid var(--border-color);
+      border-radius:8px; padding:14px; text-align:center;
+    }
+    .kpi-val { font-size:24px; font-weight:700; color:var(--accent-blue); }
+    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fa fa-bolt" style="margin-right:8px;color:var(--accent-orange);"></i>Allarmi Energetici</h1>
+      <div class="alarm-counter">
+        <span id="counter-alta" class="badge badge-alarm" style="display:none"></span>
+        <span id="counter-media" class="badge badge-warning" style="display:none"></span>
+      </div>
+    </div>
+    <div class="page-body">
+      <!-- Tab -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="attivi">Anomalie attive</button>
+        <button class="tab-btn" data-tab="soglie">Soglie energetiche</button>
+        <button class="tab-btn" data-tab="storico">Storico</button>
+      </div>
+
+      <!-- Tab: Anomalie attive -->
+      <div class="tab-content active" id="tab-attivi">
+        <div id="kpi-summary" class="kpi-summary"></div>
+        <div id="allarmi-list">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+      </div>
+
+      <!-- Tab: Soglie energetiche -->
+      <div class="tab-content" id="tab-soglie">
+        <div id="soglie-content">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+        <div id="soglie-actions" style="display:none;margin-top:16px">
+          <button class="btn btn-primary" id="btn-salva-soglie">
+            <i class="fa fa-save"></i> Salva soglie
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: Storico -->
+      <div class="tab-content" id="tab-storico">
+        <div id="storico-list">
+          <div style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/i18n.js?v=6"></script>
+  <script src="/static/js/api.js?v=6"></script>
+  <script src="/static/js/utils.js?v=6"></script>
+  <script>
+  /**
+   * efficiency-alarms.html — Allarmi energetici del dimostratore Asset Efficiency
+   * Basato su alarms.html del GIS Asset Manager
+   * Usa endpoint /api/energy/anomalies e /api/energy/summary
+   */
+
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('efficiency-allarmi', { filtri: false, titolo: 'Asset Efficiency' });
+
+  // Sidebar autonoma del dimostratore efficiency
+  renderSidebar('efficiency-allarmi');
+  setTimeout(() => {
+    const sb = document.getElementById('sidebar');
+    if (!sb) return;
+    sb.innerHTML = `
+      <a href="/static/efficiency-map.html" class="sidebar-link" title="Mappa efficienza">
+        <i class="fa fa-map-marker"></i>
+        <span>Mappa</span>
+      </a>
+      <a href="/static/efficiency-assets.html" class="sidebar-link" title="Anagrafica asset">
+        <i class="fa fa-database"></i>
+        <span>Anagrafica</span>
+      </a>
+      <a href="/static/efficiency-alarms.html" class="sidebar-link active" title="Allarmi energetici">
+        <i class="fa fa-bell"></i>
+        <span>Allarmi</span>
+      </a>
+      <a href="/static/efficiency-settings.html" class="sidebar-link" title="Impostazioni">
+        <i class="fa fa-cog"></i>
+        <span>Impostazioni</span>
+      </a>
+      <div style="flex:1;"></div>
+      <button class="sidebar-link" onclick="API.logout(); window.location.href='/static/login.html';" title="Esci">
+        <i class="fa fa-sign-out"></i>
+        <span>Esci</span>
+      </button>`;
+  }, 50);
+
+  initAlarmNotifications();
+  i18n.apply();
+
+  const isAdmin = API.isAdmin();
+  let tutteAnomalie = [];
+  let energySummary = [];
+
+  // ── Gestione tab ─────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Caricamento anomalie energetiche ─────────────────────────
+  async function caricaAnomalie() {
+    try {
+      const [anomalie, summary] = await Promise.all([
+        fetch('/api/energy/anomalies', { headers: { 'Authorization': 'Bearer ' + API.getToken() } })
+          .then(r => r.ok ? r.json() : []),
+        fetch('/api/energy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } })
+          .then(r => r.ok ? r.json() : [])
+      ]);
+      tutteAnomalie = anomalie;
+      energySummary = summary;
+      renderKpiSummary();
+      renderAnomalie();
+      renderStorico();
+      aggiornaContatori();
+    } catch (e) {
+      showToast('Errore: ' + e.message, 'error');
+    }
+  }
+
+  function renderKpiSummary() {
+    const totale = energySummary.length;
+    const anomale = energySummary.filter(a => a.anomalia_rilevata).length;
+    const ratingA = energySummary.filter(a => a.rating_esg === 'A' || a.rating_esg === 'B').length;
+    const kwh = energySummary.reduce((s, a) => s + (a.kwh_giorno || 0), 0);
+    document.getElementById('kpi-summary').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-val" style="color:var(--accent-red)">${tutteAnomalie.length}</div>
+        <div class="kpi-lbl">Anomalie rilevate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" style="color:#F39C12">${anomale}</div>
+        <div class="kpi-lbl">Asset con anomalia</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" style="color:#27AE60">${ratingA}</div>
+        <div class="kpi-lbl">Asset rating A/B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">${kwh.toFixed(0)}</div>
+        <div class="kpi-lbl">kWh totali/giorno</div>
+      </div>`;
+  }
+
+  function renderAnomalie() {
+    const attive = tutteAnomalie.filter(a => !a.ack_at);
+    const el = document.getElementById('allarmi-list');
+    if (attive.length === 0) {
+      el.innerHTML = `
+        <div style="text-align:center;padding:48px;color:var(--text-muted)">
+          <i class="fa fa-check-circle" style="font-size:40px;color:var(--accent-green);display:block;margin-bottom:12px"></i>
+          <p>Nessuna anomalia energetica attiva</p>
+        </div>`;
+      return;
+    }
+    // Ordina: alta prima, poi media, poi bassa
+    const sevOrd = { alta: 0, media: 1, bassa: 2 };
+    const ordinati = [...attive].sort((a, b) => {
+      const sa = sevOrd[a.severita] ?? 1;
+      const sb = sevOrd[b.severita] ?? 1;
+      if (sa !== sb) return sa - sb;
+      return (b.delta_pct || 0) - (a.delta_pct || 0);
+    });
+    el.innerHTML = ordinati.map(a => {
+      const sev = a.severita || 'media';
+      const sevIcon = { alta: 'fa-bolt', media: 'fa-exclamation-triangle', bassa: 'fa-info-circle' };
+      const sevLabel = { alta: 'Alta', media: 'Media', bassa: 'Bassa' };
+      const delta = a.delta_pct ? '+' + a.delta_pct.toFixed(0) + '%' : '–';
+      const vettore = a.vettore || a.tipo || 'Energia';
+      return `
+      <div class="alarm-row ${sev}" id="anomalia-${a.id || Math.random()}">
+        <i class="fa ${sevIcon[sev]||'fa-bolt'} alarm-icon ${sev}"></i>
+        <div class="alarm-info">
+          <div class="alarm-asset">${a.nome || a.asset_nome || 'Asset'}</div>
+          <div class="alarm-campo">${vettore} · ${a.tipo_anomalia || a.tipo || 'Consumo anomalo'}</div>
+          <div class="alarm-meta">${formatData(a.ts || a.created_at)} · Severità: ${sevLabel[sev]}</div>
+        </div>
+        <div class="alarm-valore ${sev}">${delta}</div>
+        <span class="stato-badge" style="background:${sev==='alta'?'rgba(231,76,60,0.15)':sev==='media'?'rgba(243,156,18,0.15)':'rgba(243,156,18,0.1)'};color:${sev==='alta'?'#E74C3C':'#F39C12'};font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;">${sevLabel[sev]}</span>
+        ${isAdmin ? `
+          <a href="/static/efficiency-assets.html?asset_id=${a.asset_id||''}" class="btn btn-secondary btn-sm" title="Dettaglio asset">
+            <i class="fa fa-eye"></i>
+          </a>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function renderStorico() {
+    const acked = tutteAnomalie.filter(a => a.ack_at);
+    const el = document.getElementById('storico-list');
+    if (acked.length === 0) {
+      el.innerHTML = `<div class="storico-empty"><i class="fa fa-history" style="font-size:32px;margin-bottom:8px;display:block"></i><p>Nessuna anomalia nello storico</p></div>`;
+      return;
+    }
+    el.innerHTML = acked.map(a => `
+      <div class="alarm-row acked">
+        <i class="fa fa-check-circle" style="color:var(--accent-green);font-size:18px;flex-shrink:0"></i>
+        <div class="alarm-info">
+          <div class="alarm-asset">${a.nome || a.asset_nome || 'Asset'}</div>
+          <div class="alarm-campo">${a.vettore || a.tipo || 'Energia'} · ${a.tipo_anomalia || 'Consumo anomalo'}</div>
+          <div class="alarm-meta">Rilevato: ${formatData(a.ts || a.created_at)} · Confermato: ${formatData(a.ack_at)}</div>
+        </div>
+        <div class="alarm-valore" style="color:var(--text-muted)">${a.delta_pct ? '+' + a.delta_pct.toFixed(0) + '%' : '–'}</div>
+      </div>`).join('');
+  }
+
+  function aggiornaContatori() {
+    const attive = tutteAnomalie.filter(a => !a.ack_at);
+    const nAlta  = attive.filter(a => a.severita === 'alta').length;
+    const nMedia = attive.filter(a => a.severita === 'media' || a.severita === 'bassa').length;
+    const cA = document.getElementById('counter-alta');
+    const cM = document.getElementById('counter-media');
+    if (nAlta > 0)  { cA.textContent = nAlta + ' alta';  cA.style.display = 'inline-flex'; }
+    else cA.style.display = 'none';
+    if (nMedia > 0) { cM.textContent = nMedia + ' media'; cM.style.display = 'inline-flex'; }
+    else cM.style.display = 'none';
+  }
+
+  // ── Soglie energetiche ────────────────────────────────────────
+  // Soglie statiche per il dimostratore (configurabili in settings)
+  const SOGLIE_ENERGY = [
+    { id: 'kwh_ufficio',       label: 'Consumo elettrico ufficio',      unita: 'kWh/giorno', warning: 150, alarm: 250, tipo: 'ufficio' },
+    { id: 'kwh_stabilimento',  label: 'Consumo elettrico stabilimento', unita: 'kWh/giorno', warning: 800, alarm: 1200, tipo: 'stabilimento' },
+    { id: 'kwh_magazzino',     label: 'Consumo elettrico magazzino',    unita: 'kWh/giorno', warning: 300, alarm: 500, tipo: 'magazzino' },
+    { id: 'kwh_deposito',      label: 'Consumo elettrico deposito',     unita: 'kWh/giorno', warning: 200, alarm: 350, tipo: 'deposito' },
+    { id: 'co2_ufficio',       label: 'Emissioni CO₂ ufficio',         unita: 'kg/giorno',  warning: 60,  alarm: 100, tipo: 'ufficio' },
+    { id: 'co2_stabilimento',  label: 'Emissioni CO₂ stabilimento',    unita: 'kg/giorno',  warning: 320, alarm: 480, tipo: 'stabilimento' },
+    { id: 'kwh_mq_ufficio',    label: 'Intensità energetica ufficio',   unita: 'kWh/m²',     warning: 0.15, alarm: 0.25, tipo: 'ufficio' },
+    { id: 'kwh_mq_stabili',    label: 'Intensità energetica stabilim.', unita: 'kWh/m²',     warning: 0.40, alarm: 0.65, tipo: 'stabilimento' },
+  ];
+
+  function renderSoglie() {
+    const el = document.getElementById('soglie-content');
+    const readonly = !isAdmin ? 'readonly disabled' : '';
+    const gruppi = {};
+    SOGLIE_ENERGY.forEach(s => {
+      if (!gruppi[s.tipo]) gruppi[s.tipo] = [];
+      gruppi[s.tipo].push(s);
+    });
+    const tipoLabel = { stabilimento:'Stabilimento', ufficio:'Ufficio', magazzino:'Magazzino', deposito:'Deposito' };
+    el.innerHTML = Object.entries(gruppi).map(([tipo, soglie]) => `
+      <div class="threshold-group">
+        <div class="threshold-group-title">
+          <i class="fa ${iconaTipo(tipo)}"></i> ${tipoLabel[tipo]||tipo}
+        </div>
+        ${soglie.map(s => `
+          <div class="threshold-row">
+            <span class="threshold-label">${s.label}</span>
+            <span class="threshold-unit">${s.unita}</span>
+            <span class="threshold-sep">Warning</span>
+            <input class="threshold-input" type="number" step="0.1" id="thr-warn-${s.id}" value="${s.warning}" ${readonly}>
+            <span class="threshold-sep">Alarm</span>
+            <input class="threshold-input" type="number" step="0.1" id="thr-alarm-${s.id}" value="${s.alarm}" ${readonly}>
+          </div>`).join('')}
+      </div>`).join('');
+
+    if (isAdmin) {
+      document.getElementById('soglie-actions').style.display = 'block';
+    }
+  }
+
+  document.getElementById('btn-salva-soglie')?.addEventListener('click', () => {
+    // Salvataggio locale (localStorage) per il dimostratore
+    const saved = {};
+    SOGLIE_ENERGY.forEach(s => {
+      const w = parseFloat(document.getElementById('thr-warn-' + s.id)?.value);
+      const a = parseFloat(document.getElementById('thr-alarm-' + s.id)?.value);
+      if (!isNaN(w) && !isNaN(a)) saved[s.id] = { warning: w, alarm: a };
+    });
+    localStorage.setItem('efficiency_soglie', JSON.stringify(saved));
+    showToast('Soglie energetiche salvate', 'success');
+  });
+
+  // ── Utility ───────────────────────────────────────────────────
+  function formatData(iso) {
+    if (!iso) return '–';
+    try {
+      return new Date(iso).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch (_) { return iso; }
+  }
+
+  // ── Avvio ─────────────────────────────────────────────────────
+  caricaAnomalie();
+  renderSoglie();
+
+  // Auto-refresh ogni 60 secondi
+  setInterval(caricaAnomalie, 60000);
+  </script>
+</body>
+</html>

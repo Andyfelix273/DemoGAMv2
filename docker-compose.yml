@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: gam-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gamuser
+      POSTGRES_PASSWORD: gampassword
+      POSTGRES_DB: gamdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamuser -d gamdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: gam-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://gamuser:gampassword@db:5432/gamdb
+      SECRET_KEY: gis-asset-manager-secret-key-2026
+    ports:
+      - "8500:8500"
+    volumes:
+      - ./static:/app/static
+      - ./uploads:/app/uploads
+    command: >
+      sh -c "python3 init_db_pg.py && uvicorn main_pg:app --host 0.0.0.0 --port 8500"
+
+volumes:
+  pgdata:
