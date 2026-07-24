@@ -743,12 +743,21 @@ async function caricaSVGPiano(floorId, tabEl) {
     svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svgDoc = svgEl;
 
+    // Disabilita pointer-events su tutti gli elementi decorativi (senza data-zone-id)
+    // in modo che hover e click passino sempre all'elemento zona sottostante
+    svgEl.querySelectorAll('*').forEach(el => {
+      if (!el.getAttribute('data-zone-id')) {
+        el.style.pointerEvents = 'none';
+      }
+    });
+
     // Aggiungi interattività a tutti gli elementi con data-zone-id
     const zoneEls = svgEl.querySelectorAll('[data-zone-id]');
     zoneEls.forEach(el => {
       const zid = el.getAttribute('data-zone-id');
       el.style.cursor = 'pointer';
       el.style.transition = 'opacity .15s';
+      el.style.pointerEvents = 'all'; // Override esplicito
 
       // Click: toggle selezione
       el.addEventListener('click', (e) => {
@@ -756,20 +765,13 @@ async function caricaSVGPiano(floorId, tabEl) {
         toggleZona(zid);
       });
 
-      // Hover: tooltip
+      // Hover: tooltip — aggiorna zid corrente
       el.addEventListener('mouseenter', (e) => {
-        const z = zoneMap[zid] || {};
-        const hasSensor = existingPlants.some(p => p.zone_id === zid);
-        const tip = document.getElementById('svg-tooltip');
-        tip.innerHTML = `
-          <div style="font-weight:700;margin-bottom:4px;">${z.nome || zid}</div>
-          <div style="color:var(--muted);font-size:10px;">${z.tipo || '—'} · ${z.superficie_mq || '—'} m²</div>
-          ${hasSensor ? '<div style="color:var(--blue);font-size:10px;margin-top:3px;"><i class="fa fa-microchip"></i> Sensore presente</div>' : ''}
-          <div style="color:var(--muted);font-size:10px;margin-top:2px;">Clicca per ${selectedZones.has(zid) ? 'deselezionare' : 'selezionare'}</div>`;
-        tip.style.display = 'block';
+        mostraTooltip(zid, e);
+      });
+      el.addEventListener('mousemove', (e) => {
         posizionaTooltip(e);
       });
-      el.addEventListener('mousemove', posizionaTooltip);
       el.addEventListener('mouseleave', () => {
         document.getElementById('svg-tooltip').style.display = 'none';
       });
@@ -784,14 +786,29 @@ async function caricaSVGPiano(floorId, tabEl) {
   }
 }
 
+function mostraTooltip(zid, e) {
+  const z = zoneMap[zid] || {};
+  const hasSensor = existingPlants.some(p => p.zone_id === zid);
+  const tip = document.getElementById('svg-tooltip');
+  tip.innerHTML = `
+    <div style="font-weight:700;margin-bottom:4px;">${z.nome || zid}</div>
+    <div style="color:var(--muted);font-size:10px;">${z.tipo || '—'} · ${z.superficie_mq || '—'} m²</div>
+    ${hasSensor ? '<div style="color:var(--blue);font-size:10px;margin-top:3px;"><i class="fa fa-microchip"></i> Sensore presente</div>' : ''}
+    <div style="color:var(--muted);font-size:10px;margin-top:2px;">Clicca per ${selectedZones.has(zid) ? 'deselezionare' : 'selezionare'}</div>`;
+  tip.style.display = 'block';
+  posizionaTooltip(e);
+}
+
 function posizionaTooltip(e) {
   const tip = document.getElementById('svg-tooltip');
   const cont = document.getElementById('svg-container');
   const rect = cont.getBoundingClientRect();
-  let x = e.clientX - rect.left + 12;
-  let y = e.clientY - rect.top + 12;
+  let x = e.clientX - rect.left + 14;
+  let y = e.clientY - rect.top + 14;
   // Evita uscita a destra
-  if (x + 210 > rect.width) x = e.clientX - rect.left - 220;
+  if (x + 220 > rect.width) x = e.clientX - rect.left - 230;
+  // Evita uscita in basso
+  if (y + 100 > rect.height) y = e.clientY - rect.top - 110;
   tip.style.left = x + 'px';
   tip.style.top  = y + 'px';
 }
