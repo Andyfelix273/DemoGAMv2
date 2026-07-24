@@ -867,6 +867,18 @@
     if (e.target === document.getElementById('map-modal-overlay')) chiudiModaleAsset();
   });
 
+  // Listener click sui tab della modale (map-stats.js non è caricato in questa pagina)
+  document.querySelectorAll('.map-modal-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const panel = tab.dataset.mmpanel;
+      document.querySelectorAll('.map-modal-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.map-modal-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const panelEl = document.getElementById('mm-panel-' + panel);
+      if (panelEl) panelEl.classList.add('active');
+    });
+  });
+
   // Avvio
   caricaAssets();
   </script>
