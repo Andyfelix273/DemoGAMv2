@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GIS Asset Manager – Anagrafica</title>
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/map.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   <style>
     body { min-height: 100vh; display: flex; flex-direction: row; }
@@ -55,31 +56,7 @@
     .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
     .form-grid .full { grid-column:1/-1; }
 
-    /* Modal dettaglio asset */
-    .detail-tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:16px; }
-    .detail-tab {
-      padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer;
-      border-bottom:2px solid transparent; color:var(--text-secondary);
-      transition:all 0.15s; background:none; border-top:none; border-left:none; border-right:none;
-    }
-    .detail-tab:hover { color:var(--text-primary); }
-    .detail-tab.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
-    .detail-panel { display:none; }
-    .detail-panel.active { display:block; }
-    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; }
-    .detail-row { display:flex; flex-direction:column; gap:2px; }
-    .detail-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
-    .detail-value { font-size:14px; color:var(--text-primary); }
-    .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
-    .kpi-card { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center; }
-    .kpi-val { font-size:22px; font-weight:700; color:var(--accent-blue); }
-    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
-    .alarm-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:13px; }
-    .alarm-row:last-child { border-bottom:none; }
-    .esg-bar-wrap { margin-bottom:10px; }
-    .esg-bar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
-    .esg-bar { height:8px; border-radius:4px; background:var(--border-color); overflow:hidden; }
-    .esg-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+    /* Stili modale dettaglio: usa map.css (map-modal-*) */
 
     /* Import Excel */
     .import-zone {
@@ -276,58 +253,43 @@
     </div>
   </div>
 
-  <!-- Modal: Dettaglio asset -->
-  <div class="modal-overlay" id="modal-dettaglio" style="display:none">
-    <div class="modal" style="max-width:680px">
-      <div class="modal-header">
-        <span class="modal-title" id="dettaglio-titolo">Dettaglio asset</span>
-        <button class="modal-close" id="dettaglio-close">&times;</button>
+  <!-- Modal: Dettaglio asset (condivisa con map.html tramite map-modal.js) -->
+  <div class="map-modal-overlay" id="map-modal-overlay">
+    <div class="map-modal">
+      <div class="map-modal-header">
+        <div>
+          <div class="map-modal-title" id="mm-title">Dettaglio asset</div>
+          <div class="map-modal-subtitle" id="mm-subtitle"></div>
+        </div>
+        <button class="map-modal-close" id="mm-close" title="Chiudi">&times;</button>
       </div>
-      <div style="padding:0 24px 8px">
-        <div class="detail-tabs">
-          <button class="detail-tab active" data-tab="anagrafica"><i class="fa fa-info-circle"></i> Anagrafica</button>
-          <button class="detail-tab" data-tab="monitoraggio"><i class="fa fa-bar-chart"></i> Monitoraggio</button>
-          <button class="detail-tab" data-tab="esg"><i class="fa fa-leaf"></i> ESG</button>
-          <button class="detail-tab" data-tab="allarmi"><i class="fa fa-bell"></i> Allarmi <span id="det-alarm-badge"></span></button>
-          <button class="detail-tab" data-tab="workorders"><i class="fa fa-wrench"></i> Work Order <span id="det-wo-badge"></span></button>
-          <button class="detail-tab" data-tab="documenti"><i class="fa fa-file"></i> Documenti <span id="det-doc-badge"></span></button>
-        </div>
-
-        <!-- Tab: Anagrafica -->
-        <div class="detail-panel active" id="panel-anagrafica">
-          <div class="detail-grid" id="det-anagrafica-grid"></div>
-        </div>
-
-        <!-- Tab: Monitoraggio -->
-        <div class="detail-panel" id="panel-monitoraggio">
-          <div id="det-monitoraggio-content"></div>
-        </div>
-
-        <!-- Tab: ESG -->
-        <div class="detail-panel" id="panel-esg">
-          <div id="det-esg-content"></div>
-        </div>
-
-        <!-- Tab: Allarmi -->
-        <div class="detail-panel" id="panel-allarmi">
-          <div id="det-allarmi-content"></div>
-        </div>
-
-        <!-- Tab: Work Order -->
-        <div class="detail-panel" id="panel-workorders">
-          <div id="det-wo-content"></div>
-        </div>
-
-        <!-- Tab: Documenti -->
-        <div class="detail-panel" id="panel-documenti">
-          <div id="det-doc-content"></div>
+      <div class="map-modal-tabs">
+        <button class="map-modal-tab active" data-mmpanel="anagrafica"><i class="fa fa-info-circle"></i> Anagrafica</button>
+        <button class="map-modal-tab" data-mmpanel="monitoraggio"><i class="fa fa-bar-chart"></i> Monitoraggio</button>
+        <button class="map-modal-tab" data-mmpanel="esg"><i class="fa fa-leaf"></i> ESG</button>
+        <button class="map-modal-tab" data-mmpanel="allarmi"><i class="fa fa-bell"></i> Allarmi <span id="mm-alarm-badge"></span></button>
+        <button class="map-modal-tab" data-mmpanel="workorders"><i class="fa fa-wrench"></i> Work Order <span id="mm-wo-badge"></span></button>
+        <button class="map-modal-tab" data-mmpanel="documenti"><i class="fa fa-file"></i> Documenti <span id="mm-doc-badge"></span></button>
+        <button class="map-modal-tab mm-tab-planimetria" data-mmpanel="planimetria" style="display:none"><i class="fa fa-map"></i> Planimetria</button>
+        <button class="map-modal-tab mm-tab-bim" data-mmpanel="bim" style="display:none"><i class="fa fa-building"></i> BIM</button>
+        <button class="map-modal-tab mm-tab-viewer3d" data-mmpanel="viewer3d" style="display:none"><i class="fa fa-cube"></i> Modello 3D</button>
+      </div>
+      <div class="map-modal-body">
+        <div class="map-modal-panel active" id="mm-panel-anagrafica"><div class="spinner" style="margin:24px auto"></div></div>
+        <div class="map-modal-panel" id="mm-panel-monitoraggio"></div>
+        <div class="map-modal-panel" id="mm-panel-esg"></div>
+        <div class="map-modal-panel" id="mm-panel-allarmi"></div>
+        <div class="map-modal-panel" id="mm-panel-workorders"></div>
+        <div class="map-modal-panel" id="mm-panel-documenti"></div>
+        <div class="map-modal-panel" id="mm-panel-planimetria"></div>
+        <div class="map-modal-panel" id="mm-panel-bim"></div>
+        <div class="map-modal-panel" id="mm-panel-viewer3d" style="padding:0;overflow:hidden">
+          <iframe id="ifc-viewer-iframe" src="" style="width:100%;height:100%;border:none;display:block;" title="Viewer IFC 3D"></iframe>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="dettaglio-chiudi-btn">Chiudi</button>
-        <button class="btn btn-primary" id="dettaglio-mappa-btn" style="display:none">
-          <i class="fa fa-map-marker"></i> Vedi su mappa
-        </button>
+      <div class="map-modal-footer">
+        <button class="btn btn-secondary" id="mm-btn-chiudi">Chiudi</button>
+        <a class="btn btn-primary" id="mm-btn-mappa" href="/static/map.html"><i class="fa fa-map-marker"></i> Vedi su mappa</a>
       </div>
     </div>
   </div>
@@ -335,6 +297,17 @@
   <script src="/static/js/i18n.js?v=6"></script>
   <script src="/static/js/api.js?v=6"></script>
   <script src="/static/js/utils.js?v=6"></script>
+  <script src="/static/js/config.js"></script>
+  <!-- Stub per map-modal.js: variabili e funzioni richieste che non dipendono da Leaflet -->
+  <script>
+    // _assetAperto è dichiarato in map-stats.js (non caricato qui)
+    let _assetAperto = null;
+    // mmCaricaPlanimetria e mmCaricaBIM sono in map-bim.js (non caricato qui)
+    // In assets.html le tab Planimetria/BIM sono nascoste, quindi non vengono chiamate
+    function mmCaricaPlanimetria(id) {}
+    function mmCaricaBIM(id) {}
+  </script>
+  <script src="/static/js/map-modal.js"></script>
   <script>
   /**
    * assets.html - Anagrafica asset GIS Asset Manager v2.0
@@ -549,19 +522,22 @@
   function chiudiModal() {
     document.getElementById('modal-asset').style.display = 'none';
     document.getElementById('modal-import').style.display = 'none';
-    document.getElementById('modal-dettaglio').style.display = 'none';
+    // La modale dettaglio è gestita da chiudiModaleAsset() di map-modal.js
   }
 
-  // ── Dettaglio asset ──────────────────────────────────────────
-  async function apriDettaglio(id) {
-    const overlay = document.getElementById('modal-dettaglio');
+  // ── Dettaglio asset — usa la modale condivisa map-modal.js ──
+  function apriDettaglio(id) {
+    // Aggiorna il link "Vedi su mappa" con l'asset_id corretto
+    const btnMappa = document.getElementById('mm-btn-mappa');
+    if (btnMappa) btnMappa.href = '/static/map.html?asset_id=' + id;
+    apriModaleAsset(id);
+  }
+
+  // Funzione stub non più usata (tenuta per compatibilità con vecchi riferimenti)
+  async function _apriDettaglio_legacy(id) {
+    const overlay = document.getElementById('modal-dettaglio-REMOVED');
+    if (!overlay) return;
     overlay.style.display = 'flex';
-    // Reset tab
-    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('active'));
-    document.querySelector('.detail-tab[data-tab="anagrafica"]').classList.add('active');
-    document.getElementById('panel-anagrafica').classList.add('active');
-    document.getElementById('det-anagrafica-grid').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
 
     try {
       const d = await API.getAsset(id);
@@ -816,18 +792,7 @@
     }
   }
 
-  // Tab switching dettaglio
-  document.querySelectorAll('.detail-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-    });
-  });
-
-  document.getElementById('dettaglio-close').addEventListener('click', chiudiModal);
-  document.getElementById('dettaglio-chiudi-btn').addEventListener('click', chiudiModal);
+  // Tab switching: gestito da map-modal.js per la modale dettaglio
 
   // ── Import Excel ────────────────────────────────────────────
   async function importaFile(file) {
@@ -892,6 +857,13 @@
   document.getElementById('search-input').addEventListener('input', applicaFiltri);
   document.getElementById('filter-tipo').addEventListener('change', applicaFiltri);
   document.getElementById('filter-stato').addEventListener('change', applicaFiltri);
+
+  // Listener modale dettaglio (map-modal.js)
+  document.getElementById('mm-close').addEventListener('click', chiudiModaleAsset);
+  document.getElementById('mm-btn-chiudi').addEventListener('click', chiudiModaleAsset);
+  document.getElementById('map-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('map-modal-overlay')) chiudiModaleAsset();
+  });
 
   // Avvio
   caricaAssets();
