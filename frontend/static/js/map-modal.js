@@ -259,6 +259,40 @@ async function apriModaleAsset(id) {
       document.getElementById('mm-panel-documenti').innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-exclamation-circle" style="margin-right:5px"></i>Documenti non disponibili</p>';
     }
 
+    // Tab Scadenze
+    try {
+      const deadlines = await API.getAssetDeadlines(id);
+      const aperte = deadlines.filter(d => d.stato !== 'completata');
+      if (aperte.length > 0) {
+        const dlBadge = document.getElementById('mm-dl-badge');
+        if (dlBadge) dlBadge.innerHTML = ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperte.length}</span>`;
+      }
+      const coloreStato = { 'aperta': 'var(--stato-man)', 'in_corso': '#3498DB', 'completata': 'var(--stato-ok)', 'scaduta': 'var(--stato-inattivo)' };
+      const iconaStato  = { 'aperta': 'fa-clock-o', 'in_corso': 'fa-spinner', 'completata': 'fa-check-circle', 'scaduta': 'fa-exclamation-circle' };
+      let dlHtml = deadlines.length === 0
+        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-calendar-check-o"></i> Nessuna scadenza registrata</p>'
+        : deadlines.map(d => {
+            const oggi = new Date();
+            const scad = new Date(d.data_scadenza);
+            const giorni = Math.ceil((scad - oggi) / 86400000);
+            const statoEff = d.stato !== 'completata' && scad < oggi ? 'scaduta' : d.stato;
+            const giorniLabel = d.stato === 'completata' ? '' : giorni < 0 ? `<span style="color:var(--stato-inattivo);font-size:11px">${Math.abs(giorni)}gg scaduta</span>` : `<span style="color:var(--stato-man);font-size:11px">${giorni}gg</span>`;
+            return `<div class="mm-alarm-row">
+              <i class="fa ${iconaStato[statoEff] || 'fa-calendar'} " style="color:${coloreStato[statoEff] || '#aaa'};font-size:16px;min-width:20px"></i>
+              <span style="flex:1;font-size:13px">${d.titolo}</span>
+              <span style="font-size:11px;color:var(--text-secondary);margin-right:8px">${d.tipo || ''}</span>
+              <span style="font-size:11px;color:var(--text-secondary)">${d.data_scadenza || ''}</span>
+              ${giorniLabel}
+            </div>`;
+          }).join('');
+      const dlPanel = document.getElementById('mm-panel-scadenze');
+      if (dlPanel) dlPanel.innerHTML = dlHtml;
+    } catch(dlErr) {
+      console.warn('[apriModaleAsset] Impossibile caricare le scadenze per asset', id, ':', dlErr.message);
+      const dlPanel = document.getElementById('mm-panel-scadenze');
+      if (dlPanel) dlPanel.innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-exclamation-circle" style="margin-right:5px"></i>Scadenze non disponibili</p>';
+    }
+
   } catch(e) {
     console.error('[apriModaleAsset] Errore nel caricamento dell\'asset', id, ':', e.message, e.stack);
     document.getElementById('mm-panel-anagrafica').innerHTML =

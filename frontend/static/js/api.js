@@ -167,6 +167,7 @@ const API = (() => {
   async function createDeadline(data)       { return request('POST', '/api/deadlines', data); }
   async function updateDeadline(id, data)   { return request('PUT', `/api/deadlines/${id}`, data); }
   async function deleteDeadline(id)         { return request('DELETE', `/api/deadlines/${id}`); }
+  async function getAssetDeadlines(assetId)  { return request('GET', `/api/assets/${assetId}/deadlines`); }
 
   // ── Polling allarmi globale ─────────────────────────────────
   // Stato interno: IDs degli allarmi già noti (per rilevare i nuovi)
@@ -232,7 +233,7 @@ const API = (() => {
     getConfig, updateConfig,
     getWorkOrders, getWorkOrder, getWorkOrderStats, createWorkOrder, updateWorkOrder, deleteWorkOrder, getAssetWorkOrders,
     getAssetDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl,
-    getDeadlines, getDeadlineStats, getDeadline, createDeadline, updateDeadline, deleteDeadline,
+    getDeadlines, getDeadlineStats, getDeadline, createDeadline, updateDeadline, deleteDeadline, getAssetDeadlines,
     startAlarmPolling, stopAlarmPolling, onAlarmUpdate
   };
 

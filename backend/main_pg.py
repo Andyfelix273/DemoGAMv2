@@ -1002,6 +1002,33 @@ def _wo_row_to_dict(row) -> dict:
     return d
 
 
+@app.get("/api/assets/{asset_id}/work-orders")
+def work_orders_per_asset(asset_id: int, db=Depends(get_db), _=Depends(richiedi_permesso("work_orders.read"))):
+    """Restituisce i work order di un singolo asset, ordinati per data apertura decrescente."""
+    rows = db.execute("""
+        SELECT wo.*,
+               a.nome   AS asset_nome,
+               a.tipo   AS asset_tipo,
+               a.citta  AS asset_citta
+        FROM work_orders wo
+        JOIN assets a ON a.id = wo.asset_id
+        WHERE wo.asset_id = %s
+        ORDER BY wo.data_apertura DESC
+    """, (asset_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/assets/{asset_id}/deadlines")
+def deadlines_per_asset(asset_id: int, db=Depends(get_db), _=Depends(richiedi_permesso("deadlines.read"))):
+    """Restituisce le scadenze di un singolo asset, ordinate per data scadenza."""
+    rows = db.execute("""
+        SELECT * FROM deadlines
+        WHERE asset_id = %s
+        ORDER BY data_scadenza ASC
+    """, (asset_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/api/work-orders")
 def lista_work_orders(
     stato: Optional[str] = None,
