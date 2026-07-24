@@ -40,8 +40,8 @@
       gap: 12px;
       flex-shrink: 0;
     }
-    .header h1 { font-size: 14px; font-weight: 700; color: var(--accent-blue); }
-    .header .subtitle { font-size: 11px; color: var(--text-muted); }
+    .header-title { font-size: 14px; font-weight: 700; color: var(--accent-blue); }
+    .header-sub { font-size: 11px; color: var(--text-muted); }
     .header-spacer { flex: 1; }
     .floor-btn {
       background: var(--bg-card);
@@ -155,13 +155,15 @@
       cursor: default;
     }
 
-    /* ── Overlay zona ── */
-    .zone-overlay {
-      position: absolute;
-      pointer-events: none;
-      transition: opacity 0.3s;
-      opacity: 0.35;
-      border-radius: 3px;
+    /* ── Stili zone BIM ── */
+    /* Le zone BIM-ready hanno classe .bems-space — coloriamo via fill/opacity */
+    .bems-space {
+      transition: fill 0.4s, opacity 0.4s, stroke 0.3s, stroke-width 0.3s;
+    }
+    .bems-space.zone-highlighted {
+      stroke: #ffffff !important;
+      stroke-width: 2 !important;
+      opacity: 0.85 !important;
     }
 
     /* ── Tooltip ── */
@@ -231,10 +233,8 @@
 <!-- Header -->
 <div class="header">
   <div>
-    <div class="header h1" style="font-size:14px;font-weight:700;color:#3498DB;">
-      <i class="fa fa-building" style="margin-right:6px;"></i>BEMS Floorplan Viewer
-    </div>
-    <div class="subtitle">GAM Platform — Sede Centrale Roma</div>
+    <div class="header-title"><i class="fa fa-building" style="margin-right:6px;"></i>BEMS Floorplan Viewer</div>
+    <div class="header-sub">GAM Platform — Sede Centrale Roma</div>
   </div>
   <div class="header-spacer"></div>
   <button class="floor-btn active" id="btn-p4" onclick="caricaPiano('P4')">Piano 4</button>
@@ -254,7 +254,6 @@
 
   <!-- Sidebar KPI -->
   <div class="sidebar">
-    <!-- KPI globali -->
     <div class="sidebar-section">
       <div class="sidebar-title">KPI Piano</div>
       <div class="kpi-row">
@@ -275,7 +274,6 @@
       </div>
     </div>
 
-    <!-- Lista zone -->
     <div class="sidebar-section" style="flex:1;">
       <div class="sidebar-title">Zone</div>
       <div id="zone-list"></div>
@@ -293,7 +291,7 @@
     <div class="legend-bar" id="legend-bar">
       <div class="legend-title" id="legend-title">Occupancy</div>
       <div class="legend-gradient" id="legend-gradient"
-           style="background: linear-gradient(to right, #95A5A6, #27AE60, #F39C12, #E74C3C);"></div>
+           style="background: linear-gradient(to right, #95A5A6, #27AE60);"></div>
       <div class="legend-labels">
         <span id="legend-min">Libera</span>
         <span id="legend-max">Piena</span>
@@ -315,37 +313,10 @@
 const ASSET_ID = 6;
 let currentFloor = 'P4';
 let currentMode = 'occupancy';
-let telData = {};
-let zonesData = [];
+let telData = {};       // { zone_id: { power_kw, temp_c, co2_ppm, occupancy, humidity, ts } }
+let zonesData = [];     // zone dal DB per il piano corrente
 let selectedZone = null;
 let autoRefreshTimer = null;
-
-// Mapping zone SVG → zone_id BEMS (Piano 4)
-// Coordinate lette da piano4_clean_opt.svg (viewBox 0 0 1460 900)
-const ZONE_MAP_P4 = {
-  'Z-P4-01': { label: 'Ufficio 1',      rect: { x: 60,   y: 60,  w: 160, h: 270 } },
-  'Z-P4-02': { label: 'Ufficio 2',      rect: { x: 220,  y: 60,  w: 160, h: 270 } },
-  'Z-P4-03': { label: 'Ufficio 3',      rect: { x: 380,  y: 60,  w: 160, h: 270 } },
-  'Z-P4-04': { label: 'Ufficio 4',      rect: { x: 540,  y: 60,  w: 160, h: 270 } },
-  'Z-P4-05': { label: 'Dir. Generale',  rect: { x: 990,  y: 60,  w: 170, h: 270 } },
-  'Z-P4-06': { label: 'Sala Riunioni',  rect: { x: 1160, y: 60,  w: 240, h: 270 } },
-  'Z-P4-07': { label: 'Lab IoT',        rect: { x: 430,  y: 390, w: 270, h: 430 } },
-  'Z-P4-08': { label: 'Open Space A',   rect: { x: 60,   y: 390, w: 370, h: 430 } },
-  'Z-P4-09': { label: 'Open Space B',   rect: { x: 700,  y: 390, w: 360, h: 430 } },
-  'Z-P4-10': { label: 'Sala Break',     rect: { x: 1110, y: 390, w: 290, h: 180 } },
-};
-
-// Mapping zone SVG → zone_id BEMS (Piano 5)
-// Coordinate lette da piano5_final_opt.svg (viewBox 0 0 1800 1200)
-const ZONE_MAP_P5 = {
-  'Z-P5-01': { label: 'Sala Flip 1',  rect: { x: 40,   y: 45,  w: 240, h: 245 } },
-  'Z-P5-02': { label: 'Sala Flip 2',  rect: { x: 460,  y: 45,  w: 240, h: 245 } },
-  'Z-P5-03': { label: 'Sales',        rect: { x: 700,  y: 45,  w: 200, h: 245 } },
-  'Z-P5-04': { label: 'CEO + CFO',    rect: { x: 900,  y: 45,  w: 300, h: 305 } },
-  'Z-P5-05': { label: 'CTO',          rect: { x: 40,   y: 420, w: 240, h: 260 } },
-  'Z-P5-06': { label: 'AMM.',         rect: { x: 280,  y: 45,  w: 180, h: 155 } },
-  'Z-P5-07': { label: 'Open Space',   rect: { x: 40,   y: 680, w: 460, h: 480 } },
-};
 
 // ── Autenticazione ──────────────────────────────────────────────
 let authToken = null;
@@ -362,7 +333,6 @@ async function login() {
     authToken = d.access_token;
     return true;
   } catch(e) {
-    // Prova a leggere il token dal localStorage (se già loggato)
     authToken = localStorage.getItem('gam_token');
     return !!authToken;
   }
@@ -396,6 +366,7 @@ async function caricaZone() {
     zonesData = await r.json();
     return true;
   } catch(e) {
+    zonesData = [];
     return false;
   }
 }
@@ -432,96 +403,107 @@ function getColor(zoneId, mode) {
 
 function getOpacity(zoneId, mode) {
   const tel = telData[zoneId];
-  if (!tel) return 0.1;
-  if (mode === 'occupancy') return tel.occupancy ? 0.45 : 0.15;
-  return 0.40;
+  if (!tel) return 0.08;
+  if (mode === 'occupancy') return tel.occupancy ? 0.50 : 0.18;
+  return 0.45;
 }
 
-// ── Aggiornamento overlay ───────────────────────────────────────
+// ── Aggiornamento colori SVG BIM-ready ─────────────────────────
+// Invece di overlay rettangolari, coloriamo direttamente gli elementi
+// SVG che hanno data-zone-id iniettato dalla pipeline BIM.
 function aggiornaColori() {
-  const zoneMap = currentFloor === 'P4' ? ZONE_MAP_P4 : ZONE_MAP_P5;
   const svg = document.querySelector('#svg-container svg');
   if (!svg) return;
-
-  // Rimuovi overlay esistenti
-  svg.querySelectorAll('.bems-overlay').forEach(el => el.remove());
-
-  // Calcola viewBox per scaling
-  const vb = svg.viewBox.baseVal;
-  const svgW = svg.clientWidth || svg.getBoundingClientRect().width;
-  const svgH = svg.clientHeight || svg.getBoundingClientRect().height;
-  const scaleX = svgW / vb.width;
-  const scaleY = svgH / vb.height;
 
   let totalPower = 0, countOcc = 0, countZones = 0;
   let temps = [], co2s = [];
 
-  for (const [zoneId, info] of Object.entries(zoneMap)) {
+  // Seleziona tutti gli elementi BIM con data-zone-id
+  const bemsEls = svg.querySelectorAll('[data-zone-id]');
+
+  bemsEls.forEach(el => {
+    const zoneId = el.getAttribute('data-zone-id');
     const tel = telData[zoneId];
-    if (!tel) continue;
-    countZones++;
+
+    if (!tel) {
+      // Zona non monitorata: mantieni fill originale, opacity bassa
+      el.style.opacity = '0.08';
+      el.style.stroke = '';
+      el.style.strokeWidth = '';
+      return;
+    }
 
     const color = getColor(zoneId, currentMode);
-    if (!color) continue;
-
     const opacity = getOpacity(zoneId, currentMode);
-    const r = info.rect;
 
-    // Crea overlay rect SVG
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', r.x);
-    rect.setAttribute('y', r.y);
-    rect.setAttribute('width', r.w);
-    rect.setAttribute('height', r.h);
-    rect.setAttribute('fill', color);
-    rect.setAttribute('opacity', opacity);
-    rect.setAttribute('class', 'bems-overlay');
-    rect.setAttribute('data-zone-id', zoneId);
-    rect.style.cursor = 'pointer';
-    rect.style.transition = 'opacity 0.3s';
+    if (color) {
+      el.style.fill = color;
+      el.style.opacity = String(opacity);
+    } else {
+      el.style.opacity = '0.08';
+    }
 
-    // Tooltip
-    rect.addEventListener('mouseenter', (e) => mostraTooltip(e, zoneId, info.label));
-    rect.addEventListener('mousemove', (e) => muoviTooltip(e));
-    rect.addEventListener('mouseleave', () => nascondiTooltip());
-    rect.addEventListener('click', () => selezionaZona(zoneId));
-
-    svg.appendChild(rect);
+    // Evidenziazione selezione
+    if (selectedZone === zoneId) {
+      el.style.stroke = '#ffffff';
+      el.style.strokeWidth = '2';
+      el.style.opacity = '0.85';
+    } else {
+      el.style.stroke = '';
+      el.style.strokeWidth = '';
+    }
 
     // Accumula KPI
+    countZones++;
     if (tel.power_kw) totalPower += tel.power_kw;
     if (tel.occupancy) countOcc++;
     if (tel.temp_c != null) temps.push(tel.temp_c);
     if (tel.co2_ppm != null) co2s.push(tel.co2_ppm);
-  }
+  });
 
   // Aggiorna KPI sidebar
   document.getElementById('kpi-power').textContent = totalPower.toFixed(1) + ' kW';
   document.getElementById('kpi-occ').textContent = countOcc + '/' + countZones;
-  document.getElementById('kpi-temp').textContent = temps.length > 0 ? (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1) + ' °C' : '—';
-  document.getElementById('kpi-co2').textContent = co2s.length > 0 ? (co2s.reduce((a,b)=>a+b,0)/co2s.length).toFixed(0) + ' ppm' : '—';
+  document.getElementById('kpi-temp').textContent = temps.length > 0
+    ? (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1) + ' °C' : '—';
+  document.getElementById('kpi-co2').textContent = co2s.length > 0
+    ? (co2s.reduce((a,b)=>a+b,0)/co2s.length).toFixed(0) + ' ppm' : '—';
   document.getElementById('status-count').textContent = countZones + ' zone monitorate';
 
   // Aggiorna lista zone sidebar
-  aggiornaListaZone(zoneMap);
+  aggiornaListaZone();
 }
 
-function aggiornaListaZone(zoneMap) {
+function aggiornaListaZone() {
   const el = document.getElementById('zone-list');
+  const svg = document.querySelector('#svg-container svg');
+  if (!svg) { el.innerHTML = ''; return; }
+
+  // Prendi le zone dall'SVG BIM-ready (data-zone-id)
+  const bemsEls = svg.querySelectorAll('[data-zone-id]');
+  const seen = new Set();
   let html = '';
-  for (const [zoneId, info] of Object.entries(zoneMap)) {
+
+  bemsEls.forEach(svgEl => {
+    const zoneId = svgEl.getAttribute('data-zone-id');
+    if (seen.has(zoneId)) return;
+    seen.add(zoneId);
+
+    const name = svgEl.getAttribute('data-name') || zoneId;
     const tel = telData[zoneId];
     const color = tel ? (getColor(zoneId, currentMode) || '#95A5A6') : '#374151';
     const isSelected = selectedZone === zoneId;
     const tempStr = tel && tel.temp_c != null ? tel.temp_c.toFixed(1) + '°C' : '';
+
     html += `
       <div class="zone-list-item ${isSelected ? 'selected' : ''}" onclick="selezionaZona('${zoneId}')">
         <div class="zone-dot" style="background:${color};"></div>
-        <span class="zone-name">${info.label}</span>
+        <span class="zone-name">${name}</span>
         ${tempStr ? `<span style="font-size:9px;color:var(--text-muted);">${tempStr}</span>` : ''}
         ${tel ? `<span class="zone-badge" style="background:${color}20;color:${color};">${tel.occupancy ? 'OCC' : 'LIB'}</span>` : ''}
       </div>`;
-  }
+  });
+
   el.innerHTML = html;
 }
 
@@ -530,7 +512,9 @@ function mostraTooltip(e, zoneId, label) {
   const tel = telData[zoneId];
   if (!tel) return;
   const tt = document.getElementById('tooltip');
-  const occStr = tel.occupancy ? '<span style="color:#27AE60">Occupata</span>' : '<span style="color:#95A5A6">Libera</span>';
+  const occStr = tel.occupancy
+    ? '<span style="color:#27AE60">Occupata</span>'
+    : '<span style="color:#95A5A6">Libera</span>';
   tt.innerHTML = `
     <div class="tt-title">${label}</div>
     <div class="tt-row"><span class="tt-label">Stato</span><span class="tt-value">${occStr}</span></div>
@@ -562,19 +546,22 @@ function nascondiTooltip() {
 // ── Selezione zona ───────────────────────────────────────────────
 function selezionaZona(zoneId) {
   selectedZone = selectedZone === zoneId ? null : zoneId;
-  const zoneMap = currentFloor === 'P4' ? ZONE_MAP_P4 : ZONE_MAP_P5;
-  aggiornaListaZone(zoneMap);
-  // Evidenzia overlay
-  document.querySelectorAll('.bems-overlay').forEach(el => {
-    if (el.getAttribute('data-zone-id') === selectedZone) {
-      el.setAttribute('opacity', '0.7');
-      el.setAttribute('stroke', '#fff');
-      el.setAttribute('stroke-width', '2');
-    } else {
-      el.removeAttribute('stroke');
-      el.removeAttribute('stroke-width');
-      el.setAttribute('opacity', getOpacity(el.getAttribute('data-zone-id'), currentMode));
-    }
+  aggiornaColori();
+}
+
+// ── Collegamento eventi tooltip agli elementi SVG BIM ───────────
+function collegaEventiSVG() {
+  const svg = document.querySelector('#svg-container svg');
+  if (!svg) return;
+
+  svg.querySelectorAll('[data-zone-id]').forEach(el => {
+    const zoneId = el.getAttribute('data-zone-id');
+    const name = el.getAttribute('data-name') || zoneId;
+
+    el.addEventListener('mouseenter', (e) => mostraTooltip(e, zoneId, name));
+    el.addEventListener('mousemove', (e) => muoviTooltip(e));
+    el.addEventListener('mouseleave', () => nascondiTooltip());
+    el.addEventListener('click', () => selezionaZona(zoneId));
   });
 }
 
@@ -589,9 +576,10 @@ async function caricaPiano(floor) {
   container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Caricamento planimetria...</div>';
 
   try {
-    const svgFile = floor === 'P4' ? 'piano4_clean_opt.svg' : 'piano5_final_opt.svg';
+    // Usa gli SVG BIM-ready con data-zone-id iniettati dalla pipeline
+    const svgFile = floor === 'P4' ? 'svg/bim/piano4_bim.svg' : 'svg/bim/piano5_bim.svg';
     const r = await fetch('/static/' + svgFile);
-    if (!r.ok) throw new Error('SVG non trovato');
+    if (!r.ok) throw new Error('SVG BIM non trovato: ' + svgFile);
     const svgText = await r.text();
     container.innerHTML = svgText;
 
@@ -603,6 +591,9 @@ async function caricaPiano(floor) {
       svg.style.maxWidth = '100%';
       svg.style.maxHeight = '100%';
     }
+
+    // Collega eventi tooltip/click agli elementi BIM
+    collegaEventiSVG();
 
     await caricaZone();
     aggiornaColori();
@@ -623,10 +614,14 @@ function setMode(mode) {
 
   // Aggiorna legenda
   const legends = {
-    occupancy: { title: 'Occupancy', min: 'Libera', max: 'Piena', gradient: 'linear-gradient(to right, #95A5A6, #27AE60)' },
-    energy:    { title: 'Potenza (kW)', min: '0 kW', max: '> 3 kW', gradient: 'linear-gradient(to right, #27AE60, #F39C12, #E74C3C)' },
-    temp:      { title: 'Temperatura', min: '< 19°C', max: '> 24°C', gradient: 'linear-gradient(to right, #3498DB, #27AE60, #F39C12, #E74C3C)' },
-    co2:       { title: 'CO₂ (ppm)', min: '< 600', max: '> 900', gradient: 'linear-gradient(to right, #27AE60, #F39C12, #E74C3C)' },
+    occupancy: { title: 'Occupancy', min: 'Libera', max: 'Piena',
+                 gradient: 'linear-gradient(to right, #95A5A6, #27AE60)' },
+    energy:    { title: 'Potenza (kW)', min: '0 kW', max: '> 3 kW',
+                 gradient: 'linear-gradient(to right, #27AE60, #F39C12, #E74C3C)' },
+    temp:      { title: 'Temperatura', min: '< 19°C', max: '> 24°C',
+                 gradient: 'linear-gradient(to right, #3498DB, #27AE60, #F39C12, #E74C3C)' },
+    co2:       { title: 'CO₂ (ppm)', min: '< 600', max: '> 900',
+                 gradient: 'linear-gradient(to right, #27AE60, #F39C12, #E74C3C)' },
   };
   const l = legends[mode];
   document.getElementById('legend-title').textContent = l.title;
@@ -645,7 +640,6 @@ async function aggiornaLoop() {
 
 // ── Init ─────────────────────────────────────────────────────────
 async function init() {
-  // Prova a leggere il token dal localStorage (sessione GAM)
   authToken = localStorage.getItem('gam_token');
   if (!authToken) {
     await login();
