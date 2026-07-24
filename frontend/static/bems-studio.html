@@ -713,13 +713,12 @@ async function caricaSVGPiano(floorId, tabEl) {
 
   const floor = allFloors.find(f => f.floor_id === floorId);
   // Mappa floor_id -> file SVG BIM-ready
+  // Usa sempre gli SVG BIM-ready con data-zone-id iniettati dalla pipeline
   const svgFileMap = {
     'P4': '/static/svg/bim/piano4_bim.svg',
     'P5': '/static/svg/bim/piano5_bim.svg',
   };
-  const svgFile = (floor && floor.svg_file)
-    ? `/static/svg/bim/${floor.svg_file}`
-    : (svgFileMap[floorId] || `/static/svg/bim/${floorId.toLowerCase()}_bim.svg`);
+  const svgFile = svgFileMap[floorId] || `/static/svg/bim/${floorId.toLowerCase()}_bim.svg`;
 
   const loading = document.getElementById('svg-loading');
   const wrapper = document.getElementById('svg-wrapper');
