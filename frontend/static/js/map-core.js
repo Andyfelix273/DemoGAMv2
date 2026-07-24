@@ -187,15 +187,20 @@ async function caricaHUD() {
         opKpi('fa-wrench',             d.wo_aperti,          'WO Aperti',       'Work order non completati',     woApertiClr, '/static/workorders.html') +
         opKpi('fa-check-circle',       d.wo_completati_mese, 'Completati/mese', 'WO chiusi nel mese corrente',   compClr,     '/static/workorders.html');
 
+      const scadTotClr  = d.scadenze_totali_aperte > 0 ? 'var(--accent)' : 'var(--text-secondary)';
+      const inattClr    = d.asset_inattivi > 0 ? 'var(--text-secondary)' : '#27AE60';
+
       // Gruppo Scadenze
       if (scadEl) scadEl.innerHTML =
-        opKpi('fa-calendar-times',     d.scadenze_7gg,       'Scadenze 7 gg',   'In scadenza nei prossimi 7 gg', scad7Clr,    '/static/deadlines.html') +
-        opKpi('fa-clock',              d.scadenze_ritardo,   'In Ritardo',      'Scadenze superate non chiuse',  scadRitClr,  '/static/deadlines.html');
+        opKpi('fa-calendar-times',     d.scadenze_7gg,            'Scad. 7 gg',      'In scadenza nei prossimi 7 gg', scad7Clr,    '/static/deadlines.html') +
+        opKpi('fa-clock',              d.scadenze_ritardo,        'In Ritardo',      'Scadenze superate non chiuse',  scadRitClr,  '/static/deadlines.html') +
+        opKpi('fa-list-alt',           d.scadenze_totali_aperte ?? '-', 'Tot. Aperte', 'Scadenze non ancora chiuse',  scadTotClr,  '/static/deadlines.html');
 
       // Gruppo Asset
       if (assetEl) assetEl.innerHTML =
-        opKpi('fa-bell',               d.asset_con_allarmi,  'Con Allarmi',     'Asset con allarmi attivi',      allarmiClr,  '/static/alarms.html') +
-        opKpi('fa-tools',              d.asset_manutenzione, 'In Manutenzione', 'Asset con stato manutenzione',  manClr,      '/static/assets.html');
+        opKpi('fa-bell',               d.asset_con_allarmi,       'Con Allarmi',     'Asset con allarmi attivi',      allarmiClr,  '/static/alarms.html') +
+        opKpi('fa-tools',              d.asset_manutenzione,      'In Manutenzione', 'Asset con stato manutenzione',  manClr,      '/static/assets.html') +
+        opKpi('fa-power-off',          d.asset_inattivi ?? '-',   'Inattivi',        'Asset con stato inattivo',      inattClr,    '/static/assets.html');
     }
     // Compatibilità: aggiorna anche op-kpi-grid se presente (vecchio layout)
     const opKpiEl = document.getElementById('op-kpi-grid');

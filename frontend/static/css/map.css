@@ -313,9 +313,11 @@
       color: var(--text-primary);
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
       letter-spacing: 0.3px;
       text-transform: uppercase;
+      text-align: center;
     }
     .panel-header-title i {
       color: var(--accent);
@@ -324,6 +326,7 @@
     .panel-header-meta {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
       margin-top: 5px;
       font-size: 10px;
@@ -384,33 +387,33 @@
     .kpi-group-header {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 6px;
-      font-size: 9px;
+      gap: 8px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-secondary);
-      margin: 6px 0 6px 0;
-      position: relative;
+      letter-spacing: 0.9px;
+      color: var(--text-primary);
+      margin: 10px 0 6px 0;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.04);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 4px 4px 0;
     }
     .kpi-group-header::before,
-    .kpi-group-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+    .kpi-group-header::after { display: none; }
+    .kpi-group-header i {
+      display: inline-block;
+      color: var(--accent);
+      font-size: 11px;
+      flex-shrink: 0;
     }
-    .kpi-group-header i { display: none; }
     .kpi-group .op-kpi-grid {
       margin: 0 0 0 0;
     }
-    /* Griglia scadenze: solo 2 card → 2 colonne */
-    #op-kpi-scad { grid-template-columns: 1fr 1fr; }
-    /* Griglia WO: 3 card → 3 colonne */
+    /* Tutte le griglie KPI: 3 colonne */
+    #op-kpi-scad { grid-template-columns: 1fr 1fr 1fr; }
     #op-kpi-wo   { grid-template-columns: 1fr 1fr 1fr; }
-    /* Griglia asset: 2 card → 2 colonne */
-    #op-kpi-asset{ grid-template-columns: 1fr 1fr; }
+    #op-kpi-asset{ grid-template-columns: 1fr 1fr 1fr; }
     /* ── Griglia tachimetri ─────────────────────────────── */
     .gauges-grid {
       display: grid;

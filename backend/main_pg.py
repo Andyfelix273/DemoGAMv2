@@ -1916,6 +1916,16 @@ def get_stats_operational(db=Depends(get_db), _=Depends(richiedi_permesso("asset
         (questo_mese_inizio,)
     ).fetchone()[0]
 
+    # Scadenze totali aperte (non ancora chiuse)
+    scadenze_totali_aperte = db.execute(
+        "SELECT COUNT(*) FROM deadlines WHERE stato='aperta'"
+    ).fetchone()[0]
+
+    # Asset inattivi (dismessi)
+    asset_inattivi = db.execute(
+        "SELECT COUNT(*) FROM assets WHERE stato='inattivo'"
+    ).fetchone()[0]
+
     # Stato operativo per asset (per colorare i marker)
     # Logica: basata esclusivamente su WO + allarmi (eventi operativi reali)
     # Lo stato anagrafico (attivo/manutenzione/inattivo) è separato e non influenza il colore,
@@ -1972,8 +1982,10 @@ def get_stats_operational(db=Depends(get_db), _=Depends(richiedi_permesso("asset
         "wo_aperti": wo_aperti,
         "scadenze_7gg": scadenze_7gg,
         "scadenze_ritardo": scadenze_ritardo,
+        "scadenze_totali_aperte": scadenze_totali_aperte,
         "asset_con_allarmi": asset_con_allarmi,
         "asset_manutenzione": asset_manutenzione,
+        "asset_inattivi": asset_inattivi,
         "wo_completati_mese": wo_completati_mese,
         "asset_stati": asset_stati
     }
