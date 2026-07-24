@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BEMS Studio — Configurazione Integratori | GAM Platform</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    :root {
+      --bg:        #060d1a;
+      --bg2:       #0d1829;
+      --bg3:       #0f1e3d;
+      --border:    #1e3a5f;
+      --blue:      #3498DB;
+      --green:     #27AE60;
+      --yellow:    #F39C12;
+      --red:       #E74C3C;
+      --purple:    #8B5CF6;
+      --text:      #e2e8f0;
+      --muted:     #7BAFC4;
+      --radius:    8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI',sans-serif; font-size: 13px; min-height: 100vh; }
+
+    /* ── Header ── */
+    .header {
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 10px 20px; display: flex; align-items: center; gap: 14px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-logo { font-size: 15px; font-weight: 800; color: var(--blue); letter-spacing: -0.5px; }
+    .header-sub { font-size: 11px; color: var(--muted); }
+    .header-spacer { flex: 1; }
+    .header-badge {
+      background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.4);
+      color: #a78bfa; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
+    }
+    .btn-save-session {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
+      padding: 5px 12px; border-radius: var(--radius); cursor: pointer; font-size: 11px;
+      transition: all .2s;
+    }
+    .btn-save-session:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── Stepper ── */
+    .stepper {
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 0 20px; display: flex; gap: 0;
+    }
+    .step {
+      display: flex; align-items: center; gap: 8px; padding: 12px 18px;
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s;
+      font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap;
+    }
+    .step:hover { color: var(--text); }
+    .step.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .step.done { color: var(--green); }
+    .step-num {
+      width: 20px; height: 20px; border-radius: 50%; background: var(--bg3);
+      border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; flex-shrink: 0;
+    }
+    .step.active .step-num { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .step.done .step-num { background: var(--green); border-color: var(--green); color: #fff; }
+
+    /* ── Layout ── */
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 20px; overflow: hidden;
+    }
+    .panel-header {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .panel-header i { color: var(--blue); }
+    .panel-body { padding: 16px; }
+
+    /* ── Form ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-control {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      padding: 7px 10px; border-radius: 6px; font-size: 12px; width: 100%;
+      transition: border-color .2s;
+    }
+    .form-control:focus { outline: none; border-color: var(--blue); }
+    .form-control:disabled { opacity: 0.5; cursor: not-allowed; }
+    select.form-control option { background: var(--bg3); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 8px 18px; border-radius: var(--radius); border: none; cursor: pointer;
+      font-size: 12px; font-weight: 700; transition: all .2s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: #2980b9; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover { background: #219a52; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-outline:hover { border-color: var(--blue); color: var(--blue); }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+    /* ── Cards edificio ── */
+    .building-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 12px; }
+    .building-card {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; cursor: pointer; transition: all .2s;
+    }
+    .building-card:hover { border-color: var(--blue); transform: translateY(-1px); }
+    .building-card.selected { border-color: var(--blue); background: rgba(52,152,219,0.1); }
+    .building-card .bc-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .building-card .bc-meta { font-size: 10px; color: var(--muted); }
+    .building-card .bc-badge {
+      display: inline-block; margin-top: 8px; font-size: 9px; padding: 2px 8px;
+      border-radius: 10px; background: rgba(52,152,219,0.15); color: var(--blue);
+    }
+
+    /* ── Planimetria zone ── */
+    .floor-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .floor-tab {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
+      padding: 5px 14px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600;
+      transition: all .2s;
+    }
+    .floor-tab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    .zone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 8px; }
+    .zone-card {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 12px; cursor: pointer; transition: all .2s; position: relative;
+    }
+    .zone-card:hover { border-color: var(--blue); }
+    .zone-card.selected { border-color: var(--green); background: rgba(39,174,96,0.08); }
+    .zone-card.has-sensor { border-color: rgba(52,152,219,0.4); }
+    .zone-card .zc-name { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+    .zone-card .zc-meta { font-size: 10px; color: var(--muted); }
+    .zone-card .zc-check {
+      position: absolute; top: 8px; right: 8px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--green); color: #fff; font-size: 9px;
+      display: none; align-items: center; justify-content: center;
+    }
+    .zone-card.selected .zc-check { display: flex; }
+    .zone-card .zc-sensor-badge {
+      font-size: 9px; padding: 1px 6px; border-radius: 8px;
+      background: rgba(52,152,219,0.15); color: var(--blue); margin-top: 4px; display: inline-block;
+    }
+
+    /* ── Tabella sensori ── */
+    .sensor-table { width: 100%; border-collapse: collapse; }
+    .sensor-table th {
+      font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left;
+    }
+    .sensor-table td { padding: 10px; border-bottom: 1px solid rgba(30,58,95,0.5); vertical-align: top; }
+    .sensor-table tr:last-child td { border-bottom: none; }
+    .sensor-table tr:hover td { background: rgba(52,152,219,0.04); }
+
+    .sensor-type-badge {
+      display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 8px; font-weight: 700;
+    }
+    .type-iaq     { background: rgba(52,152,219,0.15); color: var(--blue); }
+    .type-occupancy { background: rgba(39,174,96,0.15); color: var(--green); }
+    .type-power_meter { background: rgba(243,156,18,0.15); color: var(--yellow); }
+    .type-hvac    { background: rgba(139,92,246,0.15); color: #a78bfa; }
+    .type-multi   { background: rgba(231,76,60,0.15); color: var(--red); }
+    .type-contatore { background: rgba(243,156,18,0.15); color: var(--yellow); }
+    .type-illuminazione { background: rgba(52,152,219,0.15); color: var(--blue); }
+    .type-sensore { background: rgba(127,191,196,0.15); color: var(--muted); }
+
+    /* ── MQTT Editor ── */
+    .mqtt-editor {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; margin-top: 8px;
+    }
+    .mqtt-editor .mqtt-title {
+      font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .mqtt-status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 4px;
+    }
+    .mqtt-status-dot.configured { background: var(--green); }
+    .mqtt-status-dot.default { background: var(--yellow); }
+    .mqtt-status-dot.none { background: var(--muted); }
+
+    .topic-preview {
+      background: #0a1520; border: 1px solid var(--border); border-radius: 4px;
+      padding: 6px 10px; font-family: 'Courier New', monospace; font-size: 11px;
+      color: #4ade80; margin-top: 4px; word-break: break-all;
+    }
+
+    /* ── Catalogo sensori ── */
+    .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 10px; }
+    .catalog-card {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px; cursor: pointer; transition: all .2s;
+    }
+    .catalog-card:hover { border-color: var(--blue); }
+    .catalog-card .cc-name { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+    .catalog-card .cc-brand { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+    .catalog-card .cc-misure { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .cc-misura-tag { font-size: 9px; padding: 1px 6px; border-radius: 8px; background: rgba(52,152,219,0.1); color: var(--blue); }
+    .catalog-card .cc-proto { font-size: 10px; color: var(--muted); }
+    .catalog-card .cc-note { font-size: 10px; color: var(--muted); margin-top: 6px; font-style: italic; }
+
+    /* ── Export ── */
+    .export-preview {
+      background: #fff; color: #1a1a2e; border-radius: var(--radius);
+      padding: 32px; font-family: 'Segoe UI', sans-serif; font-size: 12px;
+      max-height: 600px; overflow-y: auto;
+    }
+    .export-preview h1 { font-size: 18px; color: #1a3a5c; border-bottom: 2px solid #3498DB; padding-bottom: 8px; margin-bottom: 16px; }
+    .export-preview h2 { font-size: 14px; color: #1a3a5c; margin: 16px 0 8px; }
+    .export-preview h3 { font-size: 12px; color: #2c3e50; margin: 12px 0 6px; }
+    .export-preview table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .export-preview th { background: #1a3a5c; color: #fff; padding: 6px 8px; font-size: 11px; text-align: left; }
+    .export-preview td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; font-size: 11px; }
+    .export-preview tr:nth-child(even) td { background: #f5f8fc; }
+    .export-preview .kbz-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .export-preview .kbz-logo { font-size: 20px; font-weight: 900; color: #1a3a5c; }
+    .export-preview .kbz-meta { font-size: 10px; color: #666; text-align: right; }
+    .export-preview code { background: #f0f4f8; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 10px; color: #c0392b; }
+
+    /* ── Notifiche ── */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+      background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 16px; font-size: 12px; display: none; align-items: center; gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5); max-width: 320px;
+    }
+    .toast.show { display: flex; }
+    .toast.success { border-color: var(--green); }
+    .toast.error { border-color: var(--red); }
+
+    /* ── Step nav ── */
+    .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .step-nav-info { font-size: 11px; color: var(--muted); }
+
+    /* ── Misc ── */
+    .section-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text); }
+    .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 12px; }
+    .empty-state i { font-size: 32px; margin-bottom: 10px; display: block; }
+    .tag { display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 8px; font-weight: 700; }
+    .tag-ok { background: rgba(39,174,96,0.15); color: var(--green); }
+    .tag-warn { background: rgba(243,156,18,0.15); color: var(--yellow); }
+    .tag-info { background: rgba(52,152,219,0.15); color: var(--blue); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .text-muted { color: var(--muted); }
+    .text-sm { font-size: 11px; }
+    .mono { font-family: 'Courier New', monospace; font-size: 11px; color: #4ade80; }
+    .row { display: flex; gap: 12px; align-items: flex-start; }
+    .col { flex: 1; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header-logo"><i class="fa fa-cogs" style="margin-right:6px;color:#8B5CF6;"></i>BEMS Studio</div>
+    <div class="header-sub">Configurazione Integratori — GAM Platform</div>
+  </div>
+  <div class="header-spacer"></div>
+  <span class="header-badge"><i class="fa fa-plug"></i> Modalità Integratore</span>
+  <button class="btn-save-session" onclick="salvaSessione()"><i class="fa fa-save"></i> Salva sessione</button>
+  <a href="/static/index.html" style="color:var(--muted);font-size:11px;text-decoration:none;margin-left:8px;"><i class="fa fa-arrow-left"></i> Dashboard</a>
+</div>
+
+<!-- Stepper -->
+<div class="stepper">
+  <div class="step active" id="step-tab-1" onclick="vaiStep(1)">
+    <div class="step-num">1</div> Edificio
+  </div>
+  <div class="step" id="step-tab-2" onclick="vaiStep(2)">
+    <div class="step-num">2</div> Zone & Planimetria
+  </div>
+  <div class="step" id="step-tab-3" onclick="vaiStep(3)">
+    <div class="step-num">3</div> Sensori & MQTT
+  </div>
+  <div class="step" id="step-tab-4" onclick="vaiStep(4)">
+    <div class="step-num">4</div> Export Documento
+  </div>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- ── STEP 1: Selezione edificio ── -->
+  <div id="step-1">
+    <div class="panel">
+      <div class="panel-header"><i class="fa fa-building"></i> Seleziona l'edificio da configurare</div>
+      <div class="panel-body">
+        <div class="form-grid" style="margin-bottom:16px;">
+          <div class="form-group">
+            <label>Nome sessione</label>
+            <input type="text" class="form-control" id="session-name" placeholder="es. Configurazione BEMS Sede Roma — 2026" value="Configurazione BEMS — Sede Centrale Roma">
+          </div>
+          <div class="form-group">
+            <label>Integratore / Tecnico</label>
+            <input type="text" class="form-control" id="session-integrator" placeholder="Nome tecnico o azienda">
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="section-title">Edifici disponibili</div>
+        <div id="building-grid" class="building-grid">
+          <div class="empty-state"><span class="spinner"></span><br>Caricamento edifici...</div>
+        </div>
+      </div>
+    </div>
+    <div class="step-nav">
+      <span class="step-nav-info" id="step1-info">Seleziona un edificio per continuare</span>
+      <button class="btn btn-primary" onclick="vaiStep(2)" id="btn-step1-next" disabled>
+        Avanti: Zone & Planimetria <i class="fa fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Zone & Planimetria ── -->
+  <div id="step-2" style="display:none;">
+    <div class="panel">
+      <div class="panel-header"><i class="fa fa-map"></i> Seleziona le zone da monitorare</div>
+      <div class="panel-body">
+        <div class="row" style="margin-bottom:12px;align-items:center;">
+          <div class="floor-tabs" id="floor-tabs"></div>
+          <div style="flex:1;"></div>
+          <span class="text-sm text-muted" id="zone-selection-count">0 zone selezionate</span>
+        </div>
+        <div id="zone-grid" class="zone-grid">
+          <div class="empty-state"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="step-nav">
+      <button class="btn btn-outline" onclick="vaiStep(1)"><i class="fa fa-arrow-left"></i> Indietro</button>
+      <button class="btn btn-primary" onclick="vaiStep(3)" id="btn-step2-next" disabled>
+        Avanti: Sensori & MQTT <i class="fa fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Sensori & MQTT ── -->
+  <div id="step-3" style="display:none;">
+
+    <!-- Sensori esistenti (dall'anagrafica) -->
+    <div class="panel" id="panel-existing-sensors">
+      <div class="panel-header"><i class="fa fa-database"></i> Sensori esistenti — Importati dall'anagrafica</div>
+      <div class="panel-body">
+        <p class="text-sm text-muted" style="margin-bottom:12px;">
+          I seguenti sensori/impianti sono già censiti nel sistema GAM per questo edificio.
+          Verifica e modifica la configurazione MQTT per ciascuno.
+        </p>
+        <div id="existing-sensors-table">
+          <div class="empty-state"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nuovi sensori da catalogo -->
+    <div class="panel">
+      <div class="panel-header"><i class="fa fa-plus-circle"></i> Aggiungi nuovi sensori — Catalogo</div>
+      <div class="panel-body">
+        <p class="text-sm text-muted" style="margin-bottom:12px;">
+          Seleziona i sensori dal catalogo e assegnali alle zone monitorate.
+        </p>
+
+        <!-- Filtri zona -->
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div class="form-group">
+            <label>Zona di destinazione</label>
+            <select class="form-control" id="new-sensor-zone">
+              <option value="">— Seleziona zona —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tipo sensore</label>
+            <select class="form-control" id="catalog-filter-type">
+              <option value="">Tutti i tipi</option>
+              <option value="iaq">IAQ (Temp/CO₂/Umidità)</option>
+              <option value="occupancy">Occupancy</option>
+              <option value="power_meter">Contatore Energia</option>
+              <option value="hvac">Controller HVAC</option>
+              <option value="multi">Multifunzione</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="catalog-grid" class="catalog-grid">
+          <div class="empty-state"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riepilogo configurazione MQTT globale -->
+    <div class="panel">
+      <div class="panel-header"><i class="fa fa-wifi"></i> Configurazione Broker MQTT Globale</div>
+      <div class="panel-body">
+        <p class="text-sm text-muted" style="margin-bottom:12px;">
+          Questi parametri vengono applicati come default a tutti i sensori. Ogni sensore può sovrascriverli individualmente.
+        </p>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label>Broker Host</label>
+            <input type="text" class="form-control" id="mqtt-broker-host" value="mqtt.keybiz.local" placeholder="es. 192.168.1.100">
+          </div>
+          <div class="form-group">
+            <label>Porta</label>
+            <input type="number" class="form-control" id="mqtt-broker-port" value="1883">
+          </div>
+          <div class="form-group">
+            <label>QoS</label>
+            <select class="form-control" id="mqtt-qos">
+              <option value="0">0 — At most once</option>
+              <option value="1" selected>1 — At least once</option>
+              <option value="2">2 — Exactly once</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" class="form-control" id="mqtt-username" value="bems_gw" placeholder="bems_gw">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" class="form-control" id="mqtt-password" placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label>Topic Prefix</label>
+            <input type="text" class="form-control" id="mqtt-prefix" value="bems" placeholder="bems">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label class="form-group" style="display:block;">
+            <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Topic pattern di esempio</span>
+            <div class="topic-preview" id="mqtt-topic-preview">bems/{asset_id}/{floor_id}/{zone_id}/telemetry</div>
+          </label>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-outline btn-sm" onclick="applicaMQTTGlobale()">
+            <i class="fa fa-refresh"></i> Applica a tutti i sensori
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-nav">
+      <button class="btn btn-outline" onclick="vaiStep(2)"><i class="fa fa-arrow-left"></i> Indietro</button>
+      <button class="btn btn-success" onclick="salvaMQTTeSensori()">
+        <i class="fa fa-save"></i> Salva configurazione MQTT
+      </button>
+      <button class="btn btn-primary" onclick="vaiStep(4)">
+        Avanti: Export Documento <i class="fa fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: Export documento ── -->
+  <div id="step-4" style="display:none;">
+    <div class="panel">
+      <div class="panel-header"><i class="fa fa-file-text"></i> Documento di Progettazione BEMS</div>
+      <div class="panel-body">
+        <div class="row" style="margin-bottom:16px;gap:8px;">
+          <button class="btn btn-primary" onclick="generaExport()"><i class="fa fa-refresh"></i> Genera anteprima</button>
+          <button class="btn btn-success" onclick="stampaDocumento()"><i class="fa fa-print"></i> Stampa / Salva PDF</button>
+          <button class="btn btn-outline" onclick="esportaJSON()"><i class="fa fa-download"></i> Esporta JSON configurazione</button>
+        </div>
+        <div id="export-preview" class="export-preview">
+          <div class="empty-state" style="color:#666;"><i class="fa fa-file-text-o"></i>Clicca "Genera anteprima" per visualizzare il documento</div>
+        </div>
+      </div>
+    </div>
+    <div class="step-nav">
+      <button class="btn btn-outline" onclick="vaiStep(3)"><i class="fa fa-arrow-left"></i> Indietro</button>
+      <button class="btn btn-success" onclick="salvaSessione()"><i class="fa fa-check"></i> Completa e salva sessione</button>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Stato globale ────────────────────────────────────────────────────────────
+let authToken = null;
+let currentStep = 1;
+let selectedBuilding = null;   // {id, nome, tipo, citta, ...}
+let allFloors = [];            // [{floor_id, nome, level, ...}]
+let allZones = [];             // [{zone_id, nome, tipo, floor_id, ...}]
+let selectedZones = new Set(); // Set di zone_id selezionate
+let currentFloorFilter = null;
+let existingPlants = [];       // sensori dall'anagrafica (con mqtt_config)
+let sensorCatalog = [];        // catalogo sensori
+let newSensors = [];           // nuovi sensori aggiunti dal catalogo
+let mqttEdits = {};            // {plant_id: {mqtt_config, sensori_config, note}}
+let sessionId = null;
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function login() {
+  try {
+    const r = await fetch('/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'username=admin&password=demo2026'
+    });
+    if (!r.ok) throw new Error('Login fallito');
+    const d = await r.json();
+    authToken = d.access_token;
+    localStorage.setItem('gam_token', authToken);
+  } catch(e) {
+    authToken = localStorage.getItem('gam_token');
+  }
+}
+
+function apiHeaders() {
+  return {'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json'};
+}
+
+async function apiGet(url) {
+  const r = await fetch(url, {headers: apiHeaders()});
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url);
+  return r.json();
+}
+
+async function apiPost(url, body) {
+  const r = await fetch(url, {method:'POST', headers: apiHeaders(), body: JSON.stringify(body)});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function apiPatch(url, body) {
+  const r = await fetch(url, {method:'PATCH', headers: apiHeaders(), body: JSON.stringify(body)});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function apiPut(url, body) {
+  const r = await fetch(url, {method:'PUT', headers: apiHeaders(), body: JSON.stringify(body)});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  const icons = {info:'fa-info-circle', success:'fa-check-circle', error:'fa-times-circle'};
+  const colors = {info:'var(--blue)', success:'var(--green)', error:'var(--red)'};
+  t.innerHTML = `<i class="fa ${icons[type]}" style="color:${colors[type]};"></i> ${msg}`;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── Navigazione step ─────────────────────────────────────────────────────────
+function vaiStep(n) {
+  // Validazioni
+  if (n >= 2 && !selectedBuilding) { showToast('Seleziona un edificio prima di continuare', 'error'); return; }
+  if (n >= 3 && selectedZones.size === 0) { showToast('Seleziona almeno una zona da monitorare', 'error'); return; }
+
+  // Nascondi tutti gli step
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('step-' + i);
+    if (el) el.style.display = 'none';
+    const tab = document.getElementById('step-tab-' + i);
+    if (tab) tab.classList.remove('active', 'done');
+  }
+
+  // Mostra step corrente
+  document.getElementById('step-' + n).style.display = 'block';
+  document.getElementById('step-tab-' + n).classList.add('active');
+
+  // Marca step completati
+  for (let i = 1; i < n; i++) {
+    document.getElementById('step-tab-' + i).classList.add('done');
+  }
+
+  currentStep = n;
+
+  // Carica dati per lo step
+  if (n === 2) caricaZone();
+  if (n === 3) caricaSensoriStep3();
+  if (n === 4) generaExport();
+}
+
+// ── STEP 1: Edifici ──────────────────────────────────────────────────────────
+async function caricaEdifici() {
+  try {
+    const assets = await apiGet('/api/assets');
+    const features = assets.features || assets;
+    const grid = document.getElementById('building-grid');
+    if (!features.length) {
+      grid.innerHTML = '<div class="empty-state"><i class="fa fa-building-o"></i>Nessun edificio disponibile</div>';
+      return;
+    }
+    grid.innerHTML = features.map(f => {
+      const p = f.properties || f;
+      const id = p.id || f.id;
+      return `
+        <div class="building-card" id="bc-${id}" onclick="selezionaEdificio(${id}, ${JSON.stringify(p).replace(/"/g,'&quot;')})">
+          <div class="bc-name">${p.nome || p.name || 'Edificio ' + id}</div>
+          <div class="bc-meta"><i class="fa fa-map-marker"></i> ${p.citta || p.indirizzo || '—'}</div>
+          <div class="bc-meta"><i class="fa fa-expand"></i> ${p.superficie_mq || '—'} m²</div>
+          <div class="bc-badge">${p.tipo || 'ufficio'}</div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('building-grid').innerHTML =
+      `<div class="empty-state" style="color:var(--red)"><i class="fa fa-exclamation-triangle"></i><br>${e.message}</div>`;
+  }
+}
+
+function selezionaEdificio(id, props) {
+  // Deseleziona tutti
+  document.querySelectorAll('.building-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('bc-' + id)?.classList.add('selected');
+
+  selectedBuilding = {id, ...props};
+  selectedZones.clear();
+  allFloors = [];
+  allZones = [];
+  existingPlants = [];
+  newSensors = [];
+  mqttEdits = {};
+
+  document.getElementById('btn-step1-next').disabled = false;
+  document.getElementById('step1-info').textContent = `Edificio selezionato: ${props.nome || 'ID ' + id}`;
+
+  // Aggiorna topic preview
+  aggiornaTopicPreview();
+}
+
+// ── STEP 2: Zone ─────────────────────────────────────────────────────────────
+async function caricaZone() {
+  if (!selectedBuilding) return;
+  try {
+    // Carica piani
+    allFloors = await apiGet(`/api/bems/buildings/${selectedBuilding.id}/floors`);
+    // Carica zone
+    allZones = await apiGet(`/api/bems/buildings/${selectedBuilding.id}/zones`);
+
+    // Tabs piani
+    const tabsEl = document.getElementById('floor-tabs');
+    tabsEl.innerHTML = `<div class="floor-tab active" onclick="filtraFloor(null, this)">Tutti</div>` +
+      allFloors.map(f => `<div class="floor-tab" onclick="filtraFloor('${f.floor_id}', this)">${f.nome || f.floor_id}</div>`).join('');
+
+    currentFloorFilter = null;
+    renderZoneGrid();
+  } catch(e) {
+    document.getElementById('zone-grid').innerHTML =
+      `<div class="empty-state" style="color:var(--red)"><i class="fa fa-exclamation-triangle"></i><br>${e.message}</div>`;
+  }
+}
+
+function filtraFloor(floorId, el) {
+  document.querySelectorAll('.floor-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentFloorFilter = floorId;
+  renderZoneGrid();
+}
+
+function renderZoneGrid() {
+  const zones = currentFloorFilter
+    ? allZones.filter(z => z.floor_id === currentFloorFilter)
+    : allZones;
+
+  const grid = document.getElementById('zone-grid');
+  if (!zones.length) {
+    grid.innerHTML = '<div class="empty-state"><i class="fa fa-map-o"></i><br>Nessuna zona trovata</div>';
+    return;
+  }
+
+  grid.innerHTML = zones.map(z => {
+    const sel = selectedZones.has(z.zone_id);
+    const hasSensor = existingPlants.some(p => p.zone_id === z.zone_id);
+    return `
+      <div class="zone-card ${sel ? 'selected' : ''} ${hasSensor ? 'has-sensor' : ''}"
+           id="zc-${z.zone_id}" onclick="toggleZona('${z.zone_id}')">
+        <div class="zc-check"><i class="fa fa-check"></i></div>
+        <div class="zc-name">${z.nome}</div>
+        <div class="zc-meta">${z.tipo} · ${z.superficie_mq || '—'} m²</div>
+        <div class="zc-meta text-muted">${z.floor_nome || z.floor_id}</div>
+        ${hasSensor ? '<span class="zc-sensor-badge"><i class="fa fa-microchip"></i> Sensore presente</span>' : ''}
+      </div>`;
+  }).join('');
+
+  aggiornaContatoreZone();
+}
+
+function toggleZona(zoneId) {
+  if (selectedZones.has(zoneId)) {
+    selectedZones.delete(zoneId);
+    document.getElementById('zc-' + zoneId)?.classList.remove('selected');
+  } else {
+    selectedZones.add(zoneId);
+    document.getElementById('zc-' + zoneId)?.classList.add('selected');
+  }
+  aggiornaContatoreZone();
+}
+
+function aggiornaContatoreZone() {
+  const n = selectedZones.size;
+  document.getElementById('zone-selection-count').textContent = n + ' zone selezionate';
+  document.getElementById('btn-step2-next').disabled = n === 0;
+}
+
+// ── STEP 3: Sensori & MQTT ───────────────────────────────────────────────────
+async function caricaSensoriStep3() {
+  if (!selectedBuilding) return;
+
+  // Carica sensori esistenti dall'anagrafica
+  try {
+    existingPlants = await apiGet(`/api/bems/buildings/${selectedBuilding.id}/plants/studio`);
+    renderExistingSensors();
+  } catch(e) {
+    document.getElementById('existing-sensors-table').innerHTML =
+      `<div class="empty-state" style="color:var(--red)">${e.message}</div>`;
+  }
+
+  // Carica catalogo sensori
+  try {
+    sensorCatalog = await apiGet('/api/bems/studio/sensor-catalog');
+    renderCatalog();
+  } catch(e) {
+    document.getElementById('catalog-grid').innerHTML =
+      `<div class="empty-state" style="color:var(--red)">${e.message}</div>`;
+  }
+
+  // Popola select zone per nuovi sensori
+  const sel = document.getElementById('new-sensor-zone');
+  sel.innerHTML = '<option value="">— Seleziona zona —</option>' +
+    Array.from(selectedZones).map(zid => {
+      const z = allZones.find(z => z.zone_id === zid);
+      return `<option value="${zid}">${z ? z.nome + ' (' + zid + ')' : zid}</option>`;
+    }).join('');
+
+  // Aggiorna topic preview
+  aggiornaTopicPreview();
+}
+
+function renderExistingSensors() {
+  const el = document.getElementById('existing-sensors-table');
+  if (!existingPlants.length) {
+    el.innerHTML = '<div class="empty-state"><i class="fa fa-database"></i><br>Nessun sensore censito per questo edificio</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="sensor-table">
+      <thead>
+        <tr>
+          <th>ID Impianto</th>
+          <th>Nome / Tipo</th>
+          <th>Zona</th>
+          <th>Piano</th>
+          <th>Stato MQTT</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${existingPlants.map(p => {
+          const mqttCfg = mqttEdits[p.plant_id]?.mqtt_config || p.mqtt_config;
+          const mqttDefault = p.mqtt_config_default;
+          const statoMqtt = mqttCfg ? 'configured' : (mqttDefault ? 'default' : 'none');
+          const statoLabel = mqttCfg ? 'Configurato' : (mqttDefault ? 'Default (da salvare)' : 'Non configurato');
+          const typeClass = 'type-' + (p.tipo || 'sensore').replace(/[^a-z_]/g,'');
+          return `
+            <tr>
+              <td><code class="mono">${p.plant_id}</code></td>
+              <td>
+                <div style="font-weight:700;">${p.nome}</div>
+                <span class="sensor-type-badge ${typeClass}">${p.tipo}</span>
+                ${p.marca ? `<div class="text-sm text-muted">${p.marca} ${p.modello || ''}</div>` : ''}
+              </td>
+              <td>${p.zone_nome || p.zone_id || '<span class="text-muted">—</span>'}</td>
+              <td>${p.floor_id || '—'}</td>
+              <td>
+                <span class="mqtt-status-dot ${statoMqtt}"></span>
+                <span class="text-sm">${statoLabel}</span>
+              </td>
+              <td>
+                <button class="btn btn-outline btn-sm" onclick="apriMQTTEditor('${p.plant_id}')">
+                  <i class="fa fa-edit"></i> Modifica MQTT
+                </button>
+              </td>
+            </tr>
+            <tr id="mqtt-editor-row-${p.plant_id}" style="display:none;">
+              <td colspan="6">
+                ${renderMQTTEditor(p)}
+              </td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderMQTTEditor(plant) {
+  const edit = mqttEdits[plant.plant_id] || {};
+  const cfg = edit.mqtt_config || plant.mqtt_config || plant.mqtt_config_default || {};
+  const floor = plant.floor_id || 'XX';
+  const zone = plant.zone_id || 'XX';
+  const defaultTopic = `bems/${selectedBuilding?.id || 'X'}/${floor}/${zone}/telemetry`;
+
+  return `
+    <div class="mqtt-editor">
+      <div class="mqtt-title"><i class="fa fa-wifi"></i> Configurazione MQTT — ${plant.nome}</div>
+      <div class="form-grid-3" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>Broker Host</label>
+          <input type="text" class="form-control" id="me-host-${plant.plant_id}"
+                 value="${cfg.broker_host || document.getElementById('mqtt-broker-host')?.value || 'mqtt.keybiz.local'}">
+        </div>
+        <div class="form-group">
+          <label>Porta</label>
+          <input type="number" class="form-control" id="me-port-${plant.plant_id}"
+                 value="${cfg.broker_port || 1883}">
+        </div>
+        <div class="form-group">
+          <label>QoS</label>
+          <select class="form-control" id="me-qos-${plant.plant_id}">
+            <option value="0" ${(cfg.qos||1)==0?'selected':''}>0 — At most once</option>
+            <option value="1" ${(cfg.qos||1)==1?'selected':''}>1 — At least once</option>
+            <option value="2" ${(cfg.qos||1)==2?'selected':''}>2 — Exactly once</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-control" id="me-user-${plant.plant_id}"
+                 value="${cfg.username || 'bems_gw'}">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" class="form-control" id="me-pass-${plant.plant_id}"
+                 value="${cfg.password || ''}">
+        </div>
+        <div class="form-group">
+          <label>Frequenza (sec)</label>
+          <input type="number" class="form-control" id="me-freq-${plant.plant_id}"
+                 value="${cfg.frequenza_sec || 60}">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Topic Telemetria</label>
+        <input type="text" class="form-control" id="me-topic-${plant.plant_id}"
+               value="${cfg.topic_telemetry || defaultTopic}">
+        <div class="topic-preview">${cfg.topic_telemetry || defaultTopic}</div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Note integratore</label>
+        <input type="text" class="form-control" id="me-note-${plant.plant_id}"
+               value="${plant.note_integratore || edit.note_integratore || ''}"
+               placeholder="Note tecniche per l'installazione...">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-success btn-sm" onclick="salvaMQTTSingolo('${plant.plant_id}')">
+          <i class="fa fa-save"></i> Salva
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="chiudiMQTTEditor('${plant.plant_id}')">
+          Annulla
+        </button>
+      </div>
+    </div>`;
+}
+
+function apriMQTTEditor(plantId) {
+  const row = document.getElementById('mqtt-editor-row-' + plantId);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function chiudiMQTTEditor(plantId) {
+  const row = document.getElementById('mqtt-editor-row-' + plantId);
+  if (row) row.style.display = 'none';
+}
+
+async function salvaMQTTSingolo(plantId) {
+  const cfg = {
+    broker_host: document.getElementById('me-host-' + plantId)?.value,
+    broker_port: parseInt(document.getElementById('me-port-' + plantId)?.value) || 1883,
+    qos: parseInt(document.getElementById('me-qos-' + plantId)?.value) || 1,
+    username: document.getElementById('me-user-' + plantId)?.value,
+    password: document.getElementById('me-pass-' + plantId)?.value,
+    frequenza_sec: parseInt(document.getElementById('me-freq-' + plantId)?.value) || 60,
+    topic_telemetry: document.getElementById('me-topic-' + plantId)?.value,
+    payload_format: 'json'
+  };
+  const note = document.getElementById('me-note-' + plantId)?.value;
+
+  // Salva in memoria
+  mqttEdits[plantId] = { mqtt_config: cfg, note_integratore: note };
+
+  // Salva nel DB via API
+  try {
+    await apiPatch(`/api/bems/buildings/${selectedBuilding.id}/plants/${plantId}/mqtt`, {
+      mqtt_config: cfg,
+      note_integratore: note
+    });
+    showToast('Configurazione MQTT salvata per ' + plantId, 'success');
+    chiudiMQTTEditor(plantId);
+    // Aggiorna la riga nella tabella
+    const plant = existingPlants.find(p => p.plant_id === plantId);
+    if (plant) plant.mqtt_config = cfg;
+    renderExistingSensors();
+  } catch(e) {
+    showToast('Errore salvataggio: ' + e.message, 'error');
+  }
+}
+
+async function salvaMQTTeSensori() {
+  // Salva tutti gli edit pendenti
+  let ok = 0, err = 0;
+  for (const [plantId, edit] of Object.entries(mqttEdits)) {
+    try {
+      await apiPatch(`/api/bems/buildings/${selectedBuilding.id}/plants/${plantId}/mqtt`, {
+        mqtt_config: edit.mqtt_config,
+        note_integratore: edit.note_integratore
+      });
+      ok++;
+    } catch(e) { err++; }
+  }
+
+  // Salva nuovi sensori
+  for (const ns of newSensors) {
+    try {
+      await apiPost(`/api/bems/buildings/${selectedBuilding.id}/plants/studio`, ns);
+      ok++;
+    } catch(e) { err++; }
+  }
+
+  if (err === 0) showToast(`${ok} configurazioni MQTT salvate con successo`, 'success');
+  else showToast(`${ok} salvate, ${err} errori`, err > 0 ? 'error' : 'success');
+}
+
+function applicaMQTTGlobale() {
+  const host = document.getElementById('mqtt-broker-host').value;
+  const port = parseInt(document.getElementById('mqtt-broker-port').value) || 1883;
+  const qos = parseInt(document.getElementById('mqtt-qos').value) || 1;
+  const user = document.getElementById('mqtt-username').value;
+  const pass = document.getElementById('mqtt-password').value;
+  const prefix = document.getElementById('mqtt-prefix').value || 'bems';
+
+  existingPlants.forEach(p => {
+    const floor = p.floor_id || 'XX';
+    const zone = p.zone_id || 'XX';
+    mqttEdits[p.plant_id] = {
+      mqtt_config: {
+        broker_host: host, broker_port: port, qos, username: user, password: pass,
+        topic_telemetry: `${prefix}/${selectedBuilding.id}/${floor}/${zone}/telemetry`,
+        topic_status: `${prefix}/${selectedBuilding.id}/${floor}/${zone}/status`,
+        frequenza_sec: 60, payload_format: 'json'
+      }
+    };
+  });
+
+  renderExistingSensors();
+  showToast('Configurazione MQTT globale applicata a ' + existingPlants.length + ' sensori', 'success');
+}
+
+function aggiornaTopicPreview() {
+  const prefix = document.getElementById('mqtt-prefix')?.value || 'bems';
+  const assetId = selectedBuilding?.id || '{asset_id}';
+  document.getElementById('mqtt-topic-preview').textContent =
+    `${prefix}/${assetId}/{floor_id}/{zone_id}/telemetry`;
+}
+
+// ── Catalogo sensori ─────────────────────────────────────────────────────────
+function renderCatalog() {
+  const filterType = document.getElementById('catalog-filter-type')?.value || '';
+  const filtered = filterType ? sensorCatalog.filter(s => s.tipo === filterType) : sensorCatalog;
+  const grid = document.getElementById('catalog-grid');
+
+  grid.innerHTML = filtered.map(s => `
+    <div class="catalog-card" onclick="aggiungiSensoreDaCatalogo('${s.id}')">
+      <div class="cc-name">${s.nome}</div>
+      <div class="cc-brand">${s.marca} — ${s.modello}</div>
+      <div class="cc-misure">
+        ${s.misure.map(m => `<span class="cc-misura-tag">${m}</span>`).join('')}
+      </div>
+      <div class="cc-proto"><i class="fa fa-wifi"></i> ${s.protocollo} · QoS ${s.qos} · ${s.frequenza_sec}s</div>
+      <div class="cc-note">${s.note}</div>
+      <div style="margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();aggiungiSensoreDaCatalogo('${s.id}')">
+          <i class="fa fa-plus"></i> Aggiungi
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function aggiungiSensoreDaCatalogo(sensorId) {
+  const zoneId = document.getElementById('new-sensor-zone')?.value;
+  if (!zoneId) { showToast('Seleziona prima una zona di destinazione', 'error'); return; }
+
+  const sensor = sensorCatalog.find(s => s.id === sensorId);
+  if (!sensor) return;
+
+  const zone = allZones.find(z => z.zone_id === zoneId);
+  const floor = zone?.floor_id || 'XX';
+  const plantId = `${sensorId}-${zoneId}-${Date.now()}`;
+  const prefix = document.getElementById('mqtt-prefix')?.value || 'bems';
+
+  const newSensor = {
+    plant_id: plantId,
+    nome: sensor.nome,
+    tipo: sensor.tipo,
+    marca: sensor.marca,
+    modello: sensor.modello,
+    floor_id: floor,
+    zone_id: zoneId,
+    mqtt_config: {
+      broker_host: document.getElementById('mqtt-broker-host')?.value || 'mqtt.keybiz.local',
+      broker_port: parseInt(document.getElementById('mqtt-broker-port')?.value) || 1883,
+      qos: sensor.qos,
+      username: document.getElementById('mqtt-username')?.value || 'bems_gw',
+      password: document.getElementById('mqtt-password')?.value || '',
+      topic_telemetry: sensor.topic_pattern
+        .replace('{asset_id}', selectedBuilding.id)
+        .replace('{floor_id}', floor)
+        .replace('{zone_id}', zoneId),
+      frequenza_sec: sensor.frequenza_sec,
+      payload_format: 'json'
+    },
+    sensori_config: {
+      catalog_id: sensorId,
+      misure: sensor.misure,
+      payload_schema: sensor.payload_schema,
+      registri_modbus: sensor.registri_modbus,
+      protocollo: sensor.protocollo
+    },
+    note_integratore: sensor.note
+  };
+
+  newSensors.push(newSensor);
+  showToast(`${sensor.nome} aggiunto alla zona ${zone?.nome || zoneId}`, 'success');
+}
+
+// ── STEP 4: Export documento ─────────────────────────────────────────────────
+function generaExport() {
+  const nome = document.getElementById('session-name')?.value || 'Configurazione BEMS';
+  const integr = document.getElementById('session-integrator')?.value || '—';
+  const oggi = new Date().toLocaleDateString('it-IT', {day:'2-digit',month:'long',year:'numeric'});
+  const edificio = selectedBuilding;
+
+  // Zone selezionate con dettagli
+  const zoneDetails = Array.from(selectedZones).map(zid => {
+    const z = allZones.find(z => z.zone_id === zid);
+    const plants = existingPlants.filter(p => p.zone_id === zid);
+    const newP = newSensors.filter(p => p.zone_id === zid);
+    return {zone: z, plants: [...plants, ...newP]};
+  });
+
+  // Tutti i sensori con configurazione MQTT
+  const allSensors = [
+    ...existingPlants.map(p => ({
+      ...p,
+      mqtt_config: mqttEdits[p.plant_id]?.mqtt_config || p.mqtt_config || p.mqtt_config_default,
+      is_new: false
+    })),
+    ...newSensors.map(p => ({...p, is_new: true}))
+  ];
+
+  const html = `
+    <div class="kbz-header">
+      <div>
+        <div class="kbz-logo">KeyBiz</div>
+        <div style="font-size:11px;color:#666;">GAM Platform — BEMS Studio</div>
+      </div>
+      <div class="kbz-meta">
+        <div><strong>Documento:</strong> Progettazione BEMS</div>
+        <div><strong>Data:</strong> ${oggi}</div>
+        <div><strong>Integratore:</strong> ${integr}</div>
+        <div><strong>Versione:</strong> 1.0</div>
+      </div>
+    </div>
+
+    <h1>${nome}</h1>
+
+    <h2>1. Edificio</h2>
+    <table>
+      <tr><th>Campo</th><th>Valore</th></tr>
+      <tr><td>Nome</td><td>${edificio?.nome || '—'}</td></tr>
+      <tr><td>Città</td><td>${edificio?.citta || '—'}</td></tr>
+      <tr><td>Tipo</td><td>${edificio?.tipo || '—'}</td></tr>
+      <tr><td>Superficie</td><td>${edificio?.superficie_mq || '—'} m²</td></tr>
+      <tr><td>ID Asset</td><td>${edificio?.id || '—'}</td></tr>
+    </table>
+
+    <h2>2. Zone monitorate (${selectedZones.size})</h2>
+    <table>
+      <thead><tr><th>Zone ID</th><th>Nome</th><th>Piano</th><th>Tipo</th><th>Superficie</th><th>Sensori</th></tr></thead>
+      <tbody>
+        ${zoneDetails.map(({zone: z, plants}) => `
+          <tr>
+            <td><code>${z?.zone_id || '—'}</code></td>
+            <td>${z?.nome || '—'}</td>
+            <td>${z?.floor_id || '—'}</td>
+            <td>${z?.tipo || '—'}</td>
+            <td>${z?.superficie_mq || '—'} m²</td>
+            <td>${plants.length > 0 ? plants.map(p => p.nome).join(', ') : '<em>Nessuno</em>'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <h2>3. Anagrafica sensori e configurazione MQTT (${allSensors.length})</h2>
+    ${allSensors.map(p => {
+      const mqtt = p.mqtt_config || {};
+      return `
+        <h3>${p.nome} <code>${p.plant_id}</code> ${p.is_new ? '<span style="color:#27AE60;font-size:10px;">[NUOVO]</span>' : ''}</h3>
+        <table>
+          <tr><th colspan="2">Dati impianto</th></tr>
+          <tr><td>Tipo</td><td>${p.tipo}</td></tr>
+          <tr><td>Marca / Modello</td><td>${p.marca || '—'} ${p.modello || ''}</td></tr>
+          <tr><td>Piano</td><td>${p.floor_id || '—'}</td></tr>
+          <tr><td>Zona</td><td>${p.zone_nome || p.zone_id || '—'}</td></tr>
+          ${p.note_integratore ? `<tr><td>Note</td><td>${p.note_integratore}</td></tr>` : ''}
+          <tr><th colspan="2">Configurazione MQTT</th></tr>
+          <tr><td>Broker</td><td><code>${mqtt.broker_host || '—'}:${mqtt.broker_port || 1883}</code></td></tr>
+          <tr><td>Username</td><td><code>${mqtt.username || '—'}</code></td></tr>
+          <tr><td>QoS</td><td>${mqtt.qos ?? 1}</td></tr>
+          <tr><td>Topic telemetria</td><td><code>${mqtt.topic_telemetry || '—'}</code></td></tr>
+          <tr><td>Frequenza campionamento</td><td>${mqtt.frequenza_sec || 60} sec</td></tr>
+          ${p.sensori_config?.registri_modbus?.length ? `
+          <tr><th colspan="2">Registri Modbus</th></tr>
+          ${p.sensori_config.registri_modbus.map(r => `<tr><td>Reg. ${r.reg}</td><td>${r.desc}</td></tr>`).join('')}` : ''}
+        </table>`;
+    }).join('')}
+
+    <h2>4. Configurazione broker MQTT globale</h2>
+    <table>
+      <tr><td>Host</td><td><code>${document.getElementById('mqtt-broker-host')?.value || '—'}</code></td></tr>
+      <tr><td>Porta</td><td><code>${document.getElementById('mqtt-broker-port')?.value || 1883}</code></td></tr>
+      <tr><td>QoS default</td><td>${document.getElementById('mqtt-qos')?.value || 1}</td></tr>
+      <tr><td>Username</td><td><code>${document.getElementById('mqtt-username')?.value || '—'}</code></td></tr>
+      <tr><td>Topic prefix</td><td><code>${document.getElementById('mqtt-prefix')?.value || 'bems'}</code></td></tr>
+    </table>
+
+    <div style="margin-top:24px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:10px;color:#999;">
+      Documento generato da GAM Platform — BEMS Studio · KeyBiz S.r.l. · ${oggi}
+    </div>`;
+
+  document.getElementById('export-preview').innerHTML = html;
+}
+
+function stampaDocumento() {
+  const content = document.getElementById('export-preview').innerHTML;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>BEMS Studio — Documento di Progettazione</title>
+    <style>
+      body { font-family: 'Segoe UI', sans-serif; font-size: 12px; color: #1a1a2e; padding: 32px; }
+      h1 { font-size: 18px; color: #1a3a5c; border-bottom: 2px solid #3498DB; padding-bottom: 8px; margin-bottom: 16px; }
+      h2 { font-size: 14px; color: #1a3a5c; margin: 16px 0 8px; }
+      h3 { font-size: 12px; color: #2c3e50; margin: 12px 0 6px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+      th { background: #1a3a5c; color: #fff; padding: 6px 8px; font-size: 11px; text-align: left; }
+      td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; font-size: 11px; }
+      tr:nth-child(even) td { background: #f5f8fc; }
+      code { background: #f0f4f8; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 10px; color: #c0392b; }
+      .kbz-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+      .kbz-logo { font-size: 20px; font-weight: 900; color: #1a3a5c; }
+      .kbz-meta { font-size: 10px; color: #666; text-align: right; }
+      @media print { body { padding: 0; } }
+    </style>
+  </head><body>${content}</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+}
+
+function esportaJSON() {
+  const config = {
+    sessione: {
+      nome: document.getElementById('session-name')?.value,
+      integratore: document.getElementById('session-integrator')?.value,
+      data: new Date().toISOString(),
+      asset_id: selectedBuilding?.id
+    },
+    edificio: selectedBuilding,
+    zone_monitorate: Array.from(selectedZones).map(zid => allZones.find(z => z.zone_id === zid)),
+    sensori_esistenti: existingPlants.map(p => ({
+      ...p,
+      mqtt_config: mqttEdits[p.plant_id]?.mqtt_config || p.mqtt_config
+    })),
+    nuovi_sensori: newSensors,
+    broker_globale: {
+      host: document.getElementById('mqtt-broker-host')?.value,
+      port: parseInt(document.getElementById('mqtt-broker-port')?.value),
+      qos: parseInt(document.getElementById('mqtt-qos')?.value),
+      username: document.getElementById('mqtt-username')?.value,
+      prefix: document.getElementById('mqtt-prefix')?.value
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bems-config-${selectedBuilding?.id || 'X'}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Salva sessione ────────────────────────────────────────────────────────────
+async function salvaSessione() {
+  if (!selectedBuilding) { showToast('Seleziona un edificio prima di salvare', 'error'); return; }
+
+  const config = {
+    zone_selezionate: Array.from(selectedZones),
+    mqtt_edits: mqttEdits,
+    nuovi_sensori: newSensors,
+    broker_globale: {
+      host: document.getElementById('mqtt-broker-host')?.value,
+      port: parseInt(document.getElementById('mqtt-broker-port')?.value),
+      qos: parseInt(document.getElementById('mqtt-qos')?.value),
+      username: document.getElementById('mqtt-username')?.value,
+      prefix: document.getElementById('mqtt-prefix')?.value
+    }
+  };
+
+  try {
+    if (sessionId) {
+      await apiPut(`/api/bems/studio/sessions/${sessionId}`, {
+        nome: document.getElementById('session-name')?.value,
+        integratore: document.getElementById('session-integrator')?.value,
+        stato: 'in_corso',
+        config_json: config
+      });
+    } else {
+      const res = await apiPost('/api/bems/studio/sessions', {
+        asset_id: selectedBuilding.id,
+        nome: document.getElementById('session-name')?.value,
+        integratore: document.getElementById('session-integrator')?.value,
+        stato: 'in_corso',
+        config_json: config
+      });
+      sessionId = res.id;
+    }
+    showToast('Sessione salvata (ID: ' + sessionId + ')', 'success');
+  } catch(e) {
+    showToast('Errore salvataggio sessione: ' + e.message, 'error');
+  }
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+document.getElementById('catalog-filter-type')?.addEventListener('change', renderCatalog);
+document.getElementById('mqtt-prefix')?.addEventListener('input', aggiornaTopicPreview);
+document.getElementById('mqtt-broker-host')?.addEventListener('input', aggiornaTopicPreview);
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  authToken = localStorage.getItem('gam_token');
+  if (!authToken) await login();
+  await caricaEdifici();
+}
+
+init();
+</script>
+</body>
+</html>

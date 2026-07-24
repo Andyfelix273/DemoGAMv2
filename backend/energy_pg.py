@@ -34,6 +34,43 @@ def _get_pg_conn():
 
 # ── Schema DB ─────────────────────────────────────────────────────────────────
 
+def migrate_bems_studio_schema(database_url: str = None):
+    """Migrazione BEMS Studio: aggiunge colonne mqtt_config/sensori_config a plants
+    e crea la tabella bems_studio_sessions."""
+    url = database_url or DATABASE_URL
+    conn = psycopg2.connect(url)
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            ALTER TABLE plants
+                ADD COLUMN IF NOT EXISTS mqtt_config     JSONB DEFAULT NULL;
+            ALTER TABLE plants
+                ADD COLUMN IF NOT EXISTS sensori_config  JSONB DEFAULT NULL;
+            ALTER TABLE plants
+                ADD COLUMN IF NOT EXISTS note_integratore TEXT DEFAULT NULL;
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS bems_studio_sessions (
+                id          SERIAL PRIMARY KEY,
+                asset_id    INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+                nome        TEXT NOT NULL,
+                integratore TEXT,
+                stato       TEXT NOT NULL DEFAULT 'bozza',
+                config_json JSONB NOT NULL DEFAULT '{}',
+                created_at  TIMESTAMPTZ DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
+        conn.commit()
+        print("[bems_studio] Schema migrato OK (mqtt_config, sensori_config, bems_studio_sessions)")
+    except Exception as e:
+        conn.rollback()
+        print(f"[bems_studio] Errore migrazione schema: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+
 def migrate_energy_schema(database_url: str = None):
     """Applica lo schema energy al DB PostgreSQL. Crea hypertable TimescaleDB."""
     url = database_url or DATABASE_URL
@@ -765,3 +802,291 @@ def register_energy_routes(app, get_db, get_utente_corrente):
                 ))
         db.commit()
         return {"status": "ok", "inserted": len(payload)}
+
+
+    # ── BEMS Studio: Catalogo sensori ────────────────────────────────────────
+    SENSOR_CATALOG = [
+        {
+            "id": "SENS-IAQ-01",
+            "nome": "Sensore Temp/CO₂/Umidità",
+            "tipo": "iaq",
+            "marca": "Schneider Electric",
+            "modello": "SpaceLogic SE8650",
+            "misure": ["temp_c", "co2_ppm", "humidity"],
+            "frequenza_sec": 60,
+            "protocollo": "MQTT + Modbus RTU",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/{floor_id}/{zone_id}/iaq",
+            "payload_schema": {"temp_c": "float", "co2_ppm": "int", "humidity": "float", "ts": "ISO8601"},
+            "registri_modbus": [
+                {"reg": 40001, "desc": "Temperatura (×10, °C)"},
+                {"reg": 40002, "desc": "CO₂ (ppm)"},
+                {"reg": 40003, "desc": "Umidità relativa (%)"}
+            ],
+            "note": "Installare a 1.5m dal pavimento, lontano da finestre e bocchette HVAC"
+        },
+        {
+            "id": "SENS-OCC-01",
+            "nome": "Sensore Occupancy PIR",
+            "tipo": "occupancy",
+            "marca": "Distech Controls",
+            "modello": "ECB-PTU-24",
+            "misure": ["occupancy"],
+            "frequenza_sec": 10,
+            "protocollo": "MQTT",
+            "qos": 0,
+            "topic_pattern": "bems/{asset_id}/{floor_id}/{zone_id}/occupancy",
+            "payload_schema": {"occupancy": "bool", "ts": "ISO8601"},
+            "registri_modbus": [],
+            "note": "Copertura fino a 12m, angolo 90°. Montaggio a soffitto"
+        },
+        {
+            "id": "SENS-PWR-01",
+            "nome": "Contatore Energia Zona",
+            "tipo": "power_meter",
+            "marca": "Carlo Gavazzi",
+            "modello": "EM24-DIN",
+            "misure": ["power_kw"],
+            "frequenza_sec": 30,
+            "protocollo": "MQTT + Modbus TCP",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/{floor_id}/{zone_id}/power",
+            "payload_schema": {"power_kw": "float", "energy_kwh": "float", "ts": "ISO8601"},
+            "registri_modbus": [
+                {"reg": 40001, "desc": "Potenza attiva (W)"},
+                {"reg": 40003, "desc": "Energia attiva (Wh)"}
+            ],
+            "note": "Installare sul quadro elettrico di zona. Richiede CT clamp"
+        },
+        {
+            "id": "SENS-HVAC-01",
+            "nome": "Controller HVAC Zona",
+            "tipo": "hvac",
+            "marca": "Siemens",
+            "modello": "RXB21.1/FC-10",
+            "misure": ["temp_c", "power_kw"],
+            "frequenza_sec": 60,
+            "protocollo": "BACnet/IP + MQTT bridge",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/{floor_id}/{zone_id}/hvac",
+            "payload_schema": {"temp_setpoint": "float", "temp_actual": "float", "mode": "string", "power_kw": "float", "ts": "ISO8601"},
+            "registri_modbus": [],
+            "note": "Richiede gateway BACnet→MQTT (es. Tosibox Node)"
+        },
+        {
+            "id": "SENS-MULTI-01",
+            "nome": "Sensore Multifunzione IAQ+Occ",
+            "tipo": "multi",
+            "marca": "Pressac",
+            "modello": "Sense360",
+            "misure": ["temp_c", "co2_ppm", "humidity", "occupancy"],
+            "frequenza_sec": 30,
+            "protocollo": "MQTT (LoRaWAN o Wi-Fi)",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/{floor_id}/{zone_id}/multi",
+            "payload_schema": {"temp_c": "float", "co2_ppm": "int", "humidity": "float", "occupancy": "bool", "ts": "ISO8601"},
+            "registri_modbus": [],
+            "note": "Soluzione all-in-one. Alimentazione USB-C o PoE"
+        }
+    ]
+
+    @app.get("/api/bems/studio/sensor-catalog", tags=["bems-studio"])
+    def get_sensor_catalog(_=Depends(get_utente_corrente)):
+        """Catalogo sensori disponibili per BEMS Studio."""
+        return SENSOR_CATALOG
+
+    @app.get("/api/bems/buildings/{asset_id}/plants/studio", tags=["bems-studio"])
+    def get_plants_studio(asset_id: int,
+                          floor_id: Optional[str] = None,
+                          zone_id: Optional[str] = None,
+                          _=Depends(get_utente_corrente),
+                          db=Depends(get_db)):
+        """Lista sensori/impianti con configurazione MQTT per BEMS Studio.
+        Restituisce mqtt_config e sensori_config se già presenti, altrimenti genera i default."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        query = """
+            SELECT p.id, p.asset_id, p.floor_id, p.zone_id, p.plant_id,
+                   p.nome, p.tipo, p.marca, p.modello, p.anno_installazione,
+                   p.stato, p.energy_baseline_kw,
+                   p.mqtt_config, p.sensori_config, p.note_integratore,
+                   f.nome AS floor_nome, z.nome AS zone_nome
+            FROM plants p
+            LEFT JOIN floors f ON f.floor_id = p.floor_id AND f.asset_id = p.asset_id
+            LEFT JOIN zones z ON z.zone_id = p.zone_id AND z.asset_id = p.asset_id
+            WHERE p.asset_id = %s
+        """
+        params: list = [asset_id]
+        if floor_id:
+            query += " AND p.floor_id = %s"
+            params.append(floor_id)
+        if zone_id:
+            query += " AND p.zone_id = %s"
+            params.append(zone_id)
+        query += " ORDER BY p.floor_id, p.zone_id, p.plant_id"
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            plant = dict(r)
+            floor = plant.get("floor_id") or "XX"
+            zone = plant.get("zone_id") or "XX"
+            # Genera configurazione MQTT di default se non ancora impostata
+            if not plant.get("mqtt_config"):
+                plant["mqtt_config_default"] = {
+                    "broker_host": "mqtt.keybiz.local",
+                    "broker_port": 1883,
+                    "username": "bems_gw",
+                    "password": "",
+                    "qos": 1,
+                    "topic_telemetry": f"bems/{asset_id}/{floor}/{zone}/telemetry",
+                    "topic_status": f"bems/{asset_id}/{floor}/{zone}/status",
+                    "frequenza_sec": 60,
+                    "payload_format": "json"
+                }
+            else:
+                plant["mqtt_config_default"] = None
+            result.append(plant)
+        return result
+
+    @app.patch("/api/bems/buildings/{asset_id}/plants/{plant_id}/mqtt", tags=["bems-studio"])
+    def patch_plant_mqtt(asset_id: int,
+                         plant_id: str,
+                         payload: Dict[str, Any],
+                         _=Depends(get_utente_corrente),
+                         db=Depends(get_db)):
+        """Aggiorna la configurazione MQTT di un sensore/impianto esistente.
+        Payload: {mqtt_config: {...}, sensori_config: {...}, note_integratore: '...'}"""
+        import json as _json
+        cur = db.cursor()
+        updates = []
+        params = []
+        if "mqtt_config" in payload:
+            updates.append("mqtt_config = %s")
+            params.append(_json.dumps(payload["mqtt_config"]))
+        if "sensori_config" in payload:
+            updates.append("sensori_config = %s")
+            params.append(_json.dumps(payload["sensori_config"]))
+        if "note_integratore" in payload:
+            updates.append("note_integratore = %s")
+            params.append(payload["note_integratore"])
+        if not updates:
+            raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
+        params.extend([asset_id, plant_id])
+        cur.execute(
+            f"UPDATE plants SET {', '.join(updates)} WHERE asset_id = %s AND plant_id = %s",
+            params
+        )
+        if cur.rowcount == 0:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Sensore non trovato")
+        db.commit()
+        return {"status": "ok", "plant_id": plant_id, "updated": cur.rowcount}
+
+    @app.post("/api/bems/buildings/{asset_id}/plants/studio", tags=["bems-studio"])
+    def create_plant_studio(asset_id: int,
+                            payload: Dict[str, Any],
+                            _=Depends(get_utente_corrente),
+                            db=Depends(get_db)):
+        """Crea un nuovo sensore/impianto da BEMS Studio (nuova installazione).
+        Payload: {plant_id, nome, tipo, marca, modello, floor_id, zone_id, mqtt_config, sensori_config, note_integratore}"""
+        import json as _json
+        cur = db.cursor()
+        cur.execute("""
+            INSERT INTO plants
+                (asset_id, floor_id, zone_id, plant_id, nome, tipo, marca, modello,
+                 stato, mqtt_config, sensori_config, note_integratore)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'operativo', %s, %s, %s)
+            ON CONFLICT (asset_id, plant_id) DO UPDATE SET
+                mqtt_config = EXCLUDED.mqtt_config,
+                sensori_config = EXCLUDED.sensori_config,
+                note_integratore = EXCLUDED.note_integratore,
+                stato = 'operativo'
+            RETURNING id, plant_id
+        """, (
+            asset_id,
+            payload.get("floor_id"),
+            payload.get("zone_id"),
+            payload.get("plant_id"),
+            payload.get("nome"),
+            payload.get("tipo", "sensore"),
+            payload.get("marca"),
+            payload.get("modello"),
+            _json.dumps(payload["mqtt_config"]) if payload.get("mqtt_config") else None,
+            _json.dumps(payload["sensori_config"]) if payload.get("sensori_config") else None,
+            payload.get("note_integratore")
+        ))
+        row = cur.fetchone()
+        db.commit()
+        return {"status": "ok", "id": row[0], "plant_id": row[1]}
+
+    # ── BEMS Studio: Sessioni di configurazione ───────────────────────────────
+    @app.get("/api/bems/studio/sessions", tags=["bems-studio"])
+    def get_studio_sessions(asset_id: Optional[int] = None,
+                            _=Depends(get_utente_corrente),
+                            db=Depends(get_db)):
+        """Lista sessioni BEMS Studio salvate."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if asset_id:
+            cur.execute(
+                "SELECT * FROM bems_studio_sessions WHERE asset_id=%s ORDER BY updated_at DESC",
+                (asset_id,)
+            )
+        else:
+            cur.execute("SELECT * FROM bems_studio_sessions ORDER BY updated_at DESC")
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            for k in ("created_at", "updated_at"):
+                if d.get(k):
+                    d[k] = d[k].isoformat()
+            result.append(d)
+        return result
+
+    @app.post("/api/bems/studio/sessions", tags=["bems-studio"])
+    def create_studio_session(payload: Dict[str, Any],
+                              _=Depends(get_utente_corrente),
+                              db=Depends(get_db)):
+        """Crea una nuova sessione BEMS Studio.
+        Payload: {asset_id, nome, integratore, stato, config_json}"""
+        import json as _json
+        cur = db.cursor()
+        cur.execute("""
+            INSERT INTO bems_studio_sessions (asset_id, nome, integratore, stato, config_json)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            payload["asset_id"],
+            payload.get("nome", "Sessione BEMS Studio"),
+            payload.get("integratore"),
+            payload.get("stato", "bozza"),
+            _json.dumps(payload.get("config_json", {}))
+        ))
+        row = cur.fetchone()
+        db.commit()
+        return {"status": "ok", "id": row[0]}
+
+    @app.put("/api/bems/studio/sessions/{session_id}", tags=["bems-studio"])
+    def update_studio_session(session_id: int,
+                              payload: Dict[str, Any],
+                              _=Depends(get_utente_corrente),
+                              db=Depends(get_db)):
+        """Aggiorna una sessione BEMS Studio esistente."""
+        import json as _json
+        cur = db.cursor()
+        cur.execute("""
+            UPDATE bems_studio_sessions
+            SET nome=%s, integratore=%s, stato=%s, config_json=%s, updated_at=NOW()
+            WHERE id=%s
+        """, (
+            payload.get("nome"),
+            payload.get("integratore"),
+            payload.get("stato", "bozza"),
+            _json.dumps(payload.get("config_json", {})),
+            session_id
+        ))
+        if cur.rowcount == 0:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Sessione non trovata")
+        db.commit()
+        return {"status": "ok", "id": session_id}

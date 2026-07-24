@@ -60,6 +60,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 # ── Moduli Asset Efficiency (energy + occupancy) ─────────────────────────────
 from energy_pg import (
+    migrate_bems_studio_schema,
     migrate_energy_schema,
     seed_energy_meters,
     seed_energy_history,
@@ -413,6 +414,7 @@ def richiedi_admin(utente=Depends(get_utente_corrente)):
 # ── Asset Efficiency: migrazione schema, seed dati, registrazione endpoint ────
 # IMPORTANTE: deve essere a livello di modulo (non dentro startup event)
 # perche FastAPI registra le route prima di avviare l'app.
+migrate_bems_studio_schema(DATABASE_URL)
 migrate_energy_schema(DATABASE_URL)
 migrate_occupancy_schema(DATABASE_URL)
 seed_energy_meters(DATABASE_URL)
