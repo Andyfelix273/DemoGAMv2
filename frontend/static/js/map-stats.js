@@ -820,32 +820,4 @@ setTimeout(() => map.invalidateSize(), 300);
 })();
 
   // ── Sidebar navigazione ──────────────────────────────────────
-  (function() {
-    const sb = document.getElementById('map-sidebar');
-    if (!sb) return;
-    sb.innerHTML = `
-      <a href="/static/map.html" class="sb-btn active" title="Mappa">
-        <i class="fa fa-map-marker"></i>
-      </a>
-      <a href="/static/assets.html" class="sb-btn" title="Anagrafica asset">
-        <i class="fa fa-database"></i>
-      </a>
-      <a href="/static/alarms.html" class="sb-btn" title="Allarmi" id="sb-allarmi">
-        <i class="fa fa-bell"></i>
-        <span class="sb-dot" id="sb-alarm-dot"></span>
-      </a>
-      <a href="/static/workorders.html" class="sb-btn" title="Work Order">
-        <i class="fa fa-wrench"></i>
-      </a>
-      <a href="/static/deadlines.html" class="sb-btn" title="Scadenze">
-        <i class="fa fa-calendar"></i>
-      </a>
-      <a href="/static/settings.html" class="sb-btn" title="Impostazioni">
-        <i class="fa fa-cog"></i>
-      </a>
-      <div class="sb-spacer"></div>
-      <button class="sb-btn" onclick="API.logout()" title="Esci">
-        <i class="fa fa-sign-out"></i>
-      </button>
-    `;
-  })();
+  renderSidebar('mappa', 'gam', 'map-sidebar');

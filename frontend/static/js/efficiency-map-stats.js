@@ -324,30 +324,8 @@ setTimeout(() => map.invalidateSize(), 300);
   aggiornaTasto();
 })();
 
-// Sidebar navigazione (stesso pattern di map-stats.js)
-(function() {
-  const sb = document.getElementById('map-sidebar');
-  if (!sb) return;
-  sb.innerHTML = `
-    <a href="/static/efficiency-map.html" class="sb-btn active" title="Mappa efficienza">
-      <i class="fa fa-map-marker"></i>
-    </a>
-    <a href="/static/efficiency-assets.html" class="sb-btn" title="Anagrafica asset">
-      <i class="fa fa-database"></i>
-    </a>
-    <a href="/static/efficiency-alarms.html" class="sb-btn" title="Allarmi energetici" id="sb-allarmi">
-      <i class="fa fa-bell"></i>
-      <span class="sb-dot" id="sb-alarm-dot"></span>
-    </a>
-    <a href="/static/efficiency-settings.html" class="sb-btn" title="Impostazioni">
-      <i class="fa fa-cog"></i>
-    </a>
-    <div class="sb-spacer"></div>
-    <button class="sb-btn" onclick="API.logout()" title="Esci">
-      <i class="fa fa-sign-out"></i>
-    </button>
-  `;
-})();
+// Sidebar navigazione — centralizzata in utils.js renderSidebar()
+renderSidebar('eff-mappa', 'efficiency', 'map-sidebar');
 
 // Plotly (caricamento lazy)
 (function() {

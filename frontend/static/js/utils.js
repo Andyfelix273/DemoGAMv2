@@ -83,69 +83,81 @@ const Tema = (() => {
 })();
 
 // ── Sidebar verticale ────────────────────────────────────────────────────────
-// Inietta la sidebar nell'elemento <nav id="sidebar"> se presente.
-// paginaAttiva: 'mappa' | 'anagrafica' | 'allarmi' | 'impostazioni'
-function renderSidebar(paginaAttiva) {
-  const sidebar = document.getElementById('sidebar');
+/**
+ * Inietta la sidebar di navigazione.
+ *
+ * @param {string} paginaAttiva  - Chiave della pagina corrente per evidenziare la voce attiva.
+ *                                 Valori GAM: 'mappa' | 'anagrafica' | 'allarmi' | 'workorders' |
+ *                                             'scadenze' | 'efficiency' | 'documenti' | 'impostazioni'
+ *                                 Valori Efficiency: 'eff-mappa' | 'eff-anagrafica' | 'eff-allarmi' | 'eff-impostazioni'
+ * @param {string} [modulo]      - 'gam' (default) oppure 'efficiency' per il dimostratore energetico.
+ * @param {string} [elementId]   - ID dell'elemento target. Default: 'sidebar'.
+ *                                 Usare 'map-sidebar' per le pagine mappa che non usano il layout standard.
+ */
+function renderSidebar(paginaAttiva, modulo, elementId) {
+  modulo   = modulo   || 'gam';
+  elementId = elementId || 'sidebar';
+
+  // Supporta sia la sidebar standard che quella della mappa (map-sidebar)
+  const sidebar = document.getElementById(elementId)
+               || document.getElementById('sidebar')
+               || document.getElementById('map-sidebar');
   if (!sidebar) return;
 
-  sidebar.innerHTML = `
-    <a href="/static/map.html"
-       class="sidebar-btn ${paginaAttiva === 'mappa' ? 'active' : ''}"
-       title="Mappa">
-      <i class="fa fa-map-marker"></i>
-    </a>
+  // Classe base dei pulsanti: sidebar-btn per layout standard, sb-btn per layout mappa
+  const isMappa = sidebar.id === 'map-sidebar';
+  const cls     = isMappa ? 'sb-btn' : 'sidebar-btn';
+  const dotCls  = isMappa ? 'sb-dot'  : 'sidebar-dot';
+  const dotId   = isMappa ? 'sb-alarm-dot' : 'sidebar-alarm-dot';
+  const alrId   = isMappa ? 'sb-allarmi'   : 'sidebar-allarmi';
+  const spacer  = isMappa ? 'sb-spacer'    : 'sidebar-spacer';
 
+  const a = (href, key, icon, title, extra) =>
+    `<a href="${href}" class="${cls} ${paginaAttiva === key ? 'active' : ''}" title="${title}"${extra ? ' ' + extra : ''}>
+      <i class="fa ${icon}"></i>
+    </a>`;
 
-    <a href="/static/assets.html"
-       class="sidebar-btn ${paginaAttiva === 'anagrafica' ? 'active' : ''}"
-       title="Anagrafica asset">
-      <i class="fa fa-database"></i>
-    </a>
+  let html = '';
 
-    <a href="/static/alarms.html"
-       class="sidebar-btn ${paginaAttiva === 'allarmi' ? 'active' : ''}"
-       title="Allarmi" id="sidebar-allarmi">
-      <i class="fa fa-bell"></i>
-      <span class="sidebar-dot" id="sidebar-alarm-dot"></span>
-    </a>
+  if (modulo === 'efficiency') {
+    // ── Dimostratore Energy Efficiency ──────────────────────────
+    html = `
+      ${a('/static/efficiency-map.html',    'eff-mappa',      'fa-map-marker', 'Mappa efficienza')}
+      ${a('/static/efficiency-assets.html', 'eff-anagrafica', 'fa-database',   'Anagrafica asset')}
+      <a href="/static/efficiency-alarms.html"
+         class="${cls} ${paginaAttiva === 'eff-allarmi' ? 'active' : ''}"
+         title="Allarmi energetici" id="${alrId}">
+        <i class="fa fa-bell"></i>
+        <span class="${dotCls}" id="${dotId}"></span>
+      </a>
+      ${a('/static/efficiency-settings.html', 'eff-impostazioni', 'fa-cog', 'Impostazioni')}
+      <div class="${spacer}"></div>
+      <button class="${cls}" onclick="API.logout()" title="Esci">
+        <i class="fa fa-sign-out"></i>
+      </button>`;
+  } else {
+    // ── GIS Asset Manager (default) ──────────────────────────────
+    html = `
+      ${a('/static/map.html',              'mappa',        'fa-map-marker',  'Mappa')}
+      ${a('/static/assets.html',           'anagrafica',   'fa-database',    'Anagrafica asset')}
+      <a href="/static/alarms.html"
+         class="${cls} ${paginaAttiva === 'allarmi' ? 'active' : ''}"
+         title="Allarmi" id="${alrId}">
+        <i class="fa fa-bell"></i>
+        <span class="${dotCls}" id="${dotId}"></span>
+      </a>
+      ${a('/static/workorders.html',       'workorders',   'fa-wrench',      'Work Order')}
+      ${a('/static/deadlines.html',        'scadenze',     'fa-calendar',    'Scadenze')}
+      ${a('/static/asset-efficiency.html', 'efficiency',   'fa-bolt',        'Asset Efficiency')}
+      ${a('/static/documents.html',        'documenti',    'fa-file-text-o', 'Documenti')}
+      ${a('/static/settings.html',         'impostazioni', 'fa-cog',         'Impostazioni')}
+      <div class="${spacer}"></div>
+      <button class="${cls}" onclick="API.logout()" title="Esci">
+        <i class="fa fa-sign-out"></i>
+      </button>`;
+  }
 
-    <a href="/static/workorders.html"
-       class="sidebar-btn ${paginaAttiva === 'workorders' ? 'active' : ''}"
-       title="Work Order">
-      <i class="fa fa-wrench"></i>
-    </a>
-
-    <a href="/static/deadlines.html"
-       class="sidebar-btn ${paginaAttiva === 'scadenze' ? 'active' : ''}"
-       title="Scadenze">
-      <i class="fa fa-calendar"></i>
-    </a>
-
-    <a href="/static/asset-efficiency.html"
-       class="sidebar-btn ${paginaAttiva === 'efficiency' ? 'active' : ''}"
-       title="Asset Efficiency">
-      <i class="fa fa-bolt"></i>
-    </a>
-
-    <a href="/static/documents.html"
-       class="sidebar-btn ${paginaAttiva === 'documenti' ? 'active' : ''}"
-       title="Documenti">
-      <i class="fa fa-file-text-o"></i>
-    </a>
-
-    <a href="/static/settings.html"
-       class="sidebar-btn ${paginaAttiva === 'impostazioni' ? 'active' : ''}"
-       title="Impostazioni">
-      <i class="fa fa-cog"></i>
-    </a>
-
-    <div class="sidebar-spacer"></div>
-
-    <button class="sidebar-btn" onclick="API.logout()" title="Esci">
-      <i class="fa fa-sign-out"></i>
-    </button>
-  `;
+  sidebar.innerHTML = html;
 
   // Carica badge allarmi (pallino rosso)
   aggiornaAlarmDot();
