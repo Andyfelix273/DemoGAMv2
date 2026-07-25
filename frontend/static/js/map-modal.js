@@ -257,8 +257,8 @@ async function apriModaleAsset(id) {
 
     // Tab Documenti
     // ── Helper: renderizza la lista documenti nel pannello ──
-    const iconMap2 = { 'application/pdf': 'fa-file-pdf-o', 'image/': 'fa-file-image-o', 'application/vnd': 'fa-file-excel-o', 'text/': 'fa-file-text-o' };
-    function icona2(mime) { if (!mime) return 'fa-file-o'; for (const [k,v] of Object.entries(iconMap2)) { if (mime.startsWith(k)) return v; } return 'fa-file-o'; }
+    const iconMap2 = { 'application/pdf': 'fa-file-pdf', 'image/': 'fa-file-image', 'application/vnd': 'fa-file-excel', 'text/': 'fa-file-lines' };
+    function icona2(mime) { if (!mime) return 'fa-file'; for (const [k,v] of Object.entries(iconMap2)) { if (mime.startsWith(k)) return v; } return 'fa-file'; }
     function fmtSize(b) { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
 
     function _renderListaDocumenti(docs) {
@@ -269,7 +269,7 @@ async function apriModaleAsset(id) {
         ? ` <span style="background:#3498DB;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${docs.length}</span>`
         : '';
       const lista = docs.length === 0
-        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-folder-open-o"></i> Nessun documento allegato</p>'
+        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-folder-open"></i> Nessun documento allegato</p>'
         : docs.map(d => {
             const isPdf = (d.tipo_mime === 'application/pdf') || d.nome_file.toLowerCase().endsWith('.pdf');
             const viewBtn = isPdf
@@ -345,9 +345,9 @@ async function apriModaleAsset(id) {
         if (dlBadge) dlBadge.innerHTML = ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperte.length}</span>`;
       }
       const coloreStato = { 'aperta': 'var(--stato-man)', 'in_corso': '#3498DB', 'completata': 'var(--stato-ok)', 'scaduta': 'var(--stato-inattivo)' };
-      const iconaStato  = { 'aperta': 'fa-clock-o', 'in_corso': 'fa-spinner', 'completata': 'fa-check-circle', 'scaduta': 'fa-exclamation-circle' };
+      const iconaStato  = { 'aperta': 'fa-clock', 'in_corso': 'fa-spinner', 'completata': 'fa-check-circle', 'scaduta': 'fa-exclamation-circle' };
       let dlHtml = deadlines.length === 0
-        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-calendar-check-o"></i> Nessuna scadenza registrata</p>'
+        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-calendar-check"></i> Nessuna scadenza registrata</p>'
         : deadlines.map(d => {
             const oggi = new Date();
             const scad = new Date(d.data_scadenza);
@@ -436,7 +436,7 @@ async function _mmApriViewerPdf(docId, nomeFile) {
       <div style="display:flex;align-items:center;justify-content:space-between;
                   padding:12px 18px;border-bottom:1px solid #1E3A5F;flex-shrink:0;background:#0D1B2A;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <i class="fa fa-file-pdf-o" style="color:#E74C3C;font-size:16px;"></i>
+          <i class="fa fa-file-pdf" style="color:#E74C3C;font-size:16px;"></i>
           <span style="font-size:13px;font-weight:600;color:#E0F0FF;">${nomeFile}</span>
         </div>
         <div style="display:flex;gap:8px;">

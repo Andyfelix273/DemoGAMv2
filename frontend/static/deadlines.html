@@ -146,10 +146,10 @@
       <h1 class="page-title"><i class="fa fa-calendar"></i> Scadenze</h1>
       <div style="display:flex;gap:8px" id="admin-actions">
         <button class="btn btn-secondary" onclick="window.location.href='/api/export/deadlines/excel'" title="Esporta in Excel">
-          <i class="fa fa-file-excel-o"></i> Excel
+          <i class="fa fa-file-excel"></i> Excel
         </button>
         <button class="btn btn-secondary" onclick="window.location.href='/api/export/report/pdf'" title="Report PDF completo">
-          <i class="fa fa-file-pdf-o"></i> Report PDF
+          <i class="fa fa-file-pdf"></i> Report PDF
         </button>
         <button class="btn btn-primary" id="btn-nuova-scadenza">
           <i class="fa fa-plus"></i> Nuova scadenza
@@ -316,7 +316,7 @@
 
   const PRIO_COLOR = { critica:'var(--accent-red)', alta:'var(--accent-orange)', media:'var(--accent-blue)', bassa:'var(--text-muted)' };
   const STATO_COLOR = { aperta:'var(--accent-blue)', chiusa:'var(--accent-green)', scaduta:'var(--accent-red)' };
-  const TIPO_ICON = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-check-square-o', contratto:'fa-file-text-o', scadenza:'fa-clock-o' };
+  const TIPO_ICON = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-square-check', contratto:'fa-file-lines', scadenza:'fa-clock' };
 
   // ── Caricamento dati ────────────────────────────────────────────────────────
   async function caricaTutto() {
@@ -364,7 +364,7 @@
 
     if (lista.length === 0) {
       document.getElementById('dl-list').innerHTML =
-        '<p style="color:var(--text-muted);text-align:center;padding:32px"><i class="fa fa-calendar-check-o"></i> Nessuna scadenza trovata</p>';
+        '<p style="color:var(--text-muted);text-align:center;padding:32px"><i class="fa fa-calendar-check"></i> Nessuna scadenza trovata</p>';
       return;
     }
 
@@ -379,17 +379,17 @@
       let dataLabel = '';
       if (d.stato === 'chiusa') dataLabel = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
       else if (isScaduta)       dataLabel = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
-      else if (diffGg === 0)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock-o"></i> Scade oggi</span>`;
-      else if (diffGg === 1)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock-o"></i> Scade domani</span>`;
-      else if (diffGg <= 7)     dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock-o"></i> Scade tra ${diffGg} gg</span>`;
-      else                      dataLabel = `<span style="color:var(--text-muted)"><i class="fa fa-calendar-o"></i> ${d.data_scadenza}</span>`;
+      else if (diffGg === 0)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade oggi</span>`;
+      else if (diffGg === 1)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade domani</span>`;
+      else if (diffGg <= 7)     dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
+      else                      dataLabel = `<span style="color:var(--text-muted)"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
 
       const canEdit   = API.can('deadlines.update');
       const canDelete = API.can('deadlines.delete');
       const canClose  = API.can('deadlines.update') && d.stato === 'aperta';
 
       return `<div class="dl-row ${rowClass}">
-        <i class="fa ${TIPO_ICON[d.tipo]||'fa-clock-o'}" style="color:${PRIO_COLOR[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
+        <i class="fa ${TIPO_ICON[d.tipo]||'fa-clock'}" style="color:${PRIO_COLOR[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
         <div class="dl-info">
           <div class="dl-titolo">${d.titolo}</div>
           <div class="dl-asset"><i class="fa fa-map-marker"></i> ${d.asset_nome} &mdash; ${d.asset_citta||''}</div>

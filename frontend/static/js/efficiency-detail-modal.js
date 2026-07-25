@@ -525,7 +525,7 @@ async function _edmCaricaImpianti(assetId) {
       return;
     }
     const statoColor = { attivo:'#27AE60', manutenzione:'#F39C12', fermo:'#E74C3C', inattivo:'#95A5A6' };
-    const tipoIcon   = { hvac:'fa-snowflake-o', illuminazione:'fa-lightbulb-o', contatore:'fa-tachometer',
+    const tipoIcon   = { hvac:'fa-snowflake', illuminazione:'fa-lightbulb', contatore:'fa-tachometer',
                          sub_meter:'fa-plug', ups:'fa-battery-full', generatore:'fa-bolt', altro:'fa-cog' };
     el.innerHTML = `
       <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary,#7BAFC4);">${plants.length} impianti registrati</div>

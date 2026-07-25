@@ -78,7 +78,7 @@
       <h1 class="page-title" data-i18n="ana.titolo">Anagrafica asset</h1>
       <div class="page-actions" id="admin-actions" style="display:none">
         <button class="btn btn-secondary btn-sm" id="btn-export-excel" title="Esporta in Excel">
-          <i class="fa fa-file-excel-o"></i> Export Excel
+          <i class="fa fa-file-excel"></i> Export Excel
         </button>
         <button class="btn btn-secondary btn-sm" id="btn-import" title="Importa da Excel">
           <i class="fa fa-upload"></i> <span data-i18n="ana.importa">Importa Excel</span>
@@ -238,7 +238,7 @@
         <button class="modal-close" id="import-close">&times;</button>
       </div>
       <div class="import-zone" id="import-zone">
-        <i class="fa fa-file-excel-o" style="font-size:32px;color:var(--accent-green);margin-bottom:8px"></i>
+        <i class="fa fa-file-excel" style="font-size:32px;color:var(--accent-green);margin-bottom:8px"></i>
         <p style="font-size:14px;margin-bottom:4px">Trascina il file .xlsx qui</p>
         <p style="font-size:12px;color:var(--text-muted)">oppure clicca per selezionare</p>
         <input type="file" id="import-file" accept=".xlsx" style="display:none">
@@ -720,18 +720,18 @@
     const canUpload = API.can('documents.upload');
     const canDelete = API.can('documents.delete');
     const iconMap = {
-      'application/pdf': 'fa-file-pdf-o',
-      'image/': 'fa-file-image-o',
-      'application/vnd.openxmlformats-officedocument': 'fa-file-excel-o',
-      'application/msword': 'fa-file-word-o',
-      'text/': 'fa-file-text-o'
+      'application/pdf': 'fa-file-pdf',
+      'image/': 'fa-file-image',
+      'application/vnd.openxmlformats-officedocument': 'fa-file-excel',
+      'application/msword': 'fa-file-word',
+      'text/': 'fa-file-lines'
     };
     function icona(mime) {
-      if (!mime) return 'fa-file-o';
+      if (!mime) return 'fa-file';
       for (const [k, v] of Object.entries(iconMap)) {
         if (mime.startsWith(k)) return v;
       }
-      return 'fa-file-o';
+      return 'fa-file';
     }
     function formatSize(bytes) {
       if (!bytes) return '';
@@ -750,7 +750,7 @@
       </div>`;
     }
     if (docs.length === 0) {
-      html += '<p style="color:var(--text-muted);font-size:13px"><i class="fa fa-folder-open-o"></i> Nessun documento allegato</p>';
+      html += '<p style="color:var(--text-muted);font-size:13px"><i class="fa fa-folder-open"></i> Nessun documento allegato</p>';
     } else {
       html += docs.map(d => `
         <div class="alarm-row" style="align-items:center">

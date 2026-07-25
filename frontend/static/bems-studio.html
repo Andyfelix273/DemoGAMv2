@@ -364,10 +364,10 @@
             <div style="padding:12px;border-bottom:1px solid var(--border);">
               <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Zone selezionate</div>
               <button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:4px;" onclick="selezionaTutte()">
-                <i class="fa fa-check-square-o"></i> Seleziona tutte
+                <i class="fa fa-square-check"></i> Seleziona tutte
               </button>
               <button class="btn btn-outline btn-sm" style="width:100%;" onclick="deselezionaTutte()">
-                <i class="fa fa-square-o"></i> Deseleziona tutte
+                <i class="fa fa-square"></i> Deseleziona tutte
               </button>
             </div>
             <div id="zone-sidebar" style="flex:1;overflow-y:auto;padding:8px;"></div>
@@ -509,7 +509,7 @@
           <button class="btn btn-outline" onclick="esportaJSON()"><i class="fa fa-download"></i> Esporta JSON configurazione</button>
         </div>
         <div id="export-preview" class="export-preview">
-          <div class="empty-state" style="color:#666;"><i class="fa fa-file-text-o"></i>Clicca "Genera anteprima" per visualizzare il documento</div>
+          <div class="empty-state" style="color:#666;"><i class="fa fa-file-lines"></i>Clicca "Genera anteprima" per visualizzare il documento</div>
         </div>
       </div>
     </div>
@@ -632,7 +632,7 @@ async function caricaEdifici() {
     const features = assets.features || assets;
     const grid = document.getElementById('building-grid');
     if (!features.length) {
-      grid.innerHTML = '<div class="empty-state"><i class="fa fa-building-o"></i>Nessun edificio disponibile</div>';
+      grid.innerHTML = '<div class="empty-state"><i class="fa fa-building"></i>Nessun edificio disponibile</div>';
       return;
     }
     grid.innerHTML = features.map(f => {
@@ -861,7 +861,7 @@ function renderZoneSidebar() {
     : allZones;
 
   if (!zonesInFloor.length) {
-    sidebar.innerHTML = '<div class="empty-state" style="padding:20px;"><i class="fa fa-map-o"></i><br>Nessuna zona</div>';
+    sidebar.innerHTML = '<div class="empty-state" style="padding:20px;"><i class="fa fa-map"></i><br>Nessuna zona</div>';
     return;
   }
 

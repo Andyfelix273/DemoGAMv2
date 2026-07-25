@@ -44,14 +44,14 @@ function mimeBadge(mime, nomeFile) {
   const nm = (nomeFile || '').toLowerCase();
   const m  = (mime || '').toLowerCase();
   if (m.includes('pdf') || nm.endsWith('.pdf'))
-    return '<span class="mime-badge mime-pdf"><i class="fa fa-file-pdf-o"></i> PDF</span>';
+    return '<span class="mime-badge mime-pdf"><i class="fa fa-file-pdf"></i> PDF</span>';
   if (m.includes('word') || nm.endsWith('.docx') || nm.endsWith('.doc'))
-    return '<span class="mime-badge mime-word"><i class="fa fa-file-word-o"></i> Word</span>';
+    return '<span class="mime-badge mime-word"><i class="fa fa-file-word"></i> Word</span>';
   if (m.includes('excel') || m.includes('spreadsheet') || nm.endsWith('.xlsx') || nm.endsWith('.xls'))
-    return '<span class="mime-badge mime-xls"><i class="fa fa-file-excel-o"></i> Excel</span>';
+    return '<span class="mime-badge mime-xls"><i class="fa fa-file-excel"></i> Excel</span>';
   if (m.includes('image') || nm.endsWith('.png') || nm.endsWith('.jpg') || nm.endsWith('.jpeg'))
-    return '<span class="mime-badge mime-img"><i class="fa fa-file-image-o"></i> Immagine</span>';
-  return '<span class="mime-badge mime-other"><i class="fa fa-file-o"></i> File</span>';
+    return '<span class="mime-badge mime-img"><i class="fa fa-file-image"></i> Immagine</span>';
+  return '<span class="mime-badge mime-other"><i class="fa fa-file"></i> File</span>';
 }
 
 // ── Caricamento dati ──────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ function renderTabella() {
 
   if (totale === 0) {
     tbody.innerHTML = `<tr><td colspan="8">
-      <div class="empty-state"><i class="fa fa-folder-open-o"></i> Nessun documento trovato.</div>
+      <div class="empty-state"><i class="fa fa-folder-open"></i> Nessun documento trovato.</div>
     </td></tr>`;
     const pg = document.getElementById('pagination');
     if (pg) pg.style.display = 'none';
@@ -232,7 +232,7 @@ async function apriViewerPdf(docId, nomeFile) {
       <div style="display:flex;align-items:center;justify-content:space-between;
                   padding:12px 18px;border-bottom:1px solid #1E3A5F;flex-shrink:0;background:#0a1628;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <i class="fa fa-file-pdf-o" style="color:#E74C3C;font-size:16px;"></i>
+          <i class="fa fa-file-pdf" style="color:#E74C3C;font-size:16px;"></i>
           <span style="font-size:13px;font-weight:600;color:#E0F0FF;">${nomeFile}</span>
         </div>
         <div style="display:flex;gap:8px;">
