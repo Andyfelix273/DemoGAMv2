@@ -370,6 +370,11 @@ const DeadlinesPanel = (() => {
   }
 
   // ── API pubblica ──────────────────────────────────────────────────────────────
+  /**
+   * mount(containerEl, opts)
+   * Se containerEl è null, inietta solo la modale CRUD senza renderizzare la lista.
+   * Utile nelle pagine standalone che hanno già la propria tabella.
+   */
   function mount(containerEl, opts = {}) {
     _container = containerEl;
     _opts = {
@@ -380,7 +385,7 @@ const DeadlinesPanel = (() => {
       readonly:  opts.readonly  ?? false,
     };
     _injectModal(_opts.zIndex);
-    _carica();
+    if (_container) _carica();
   }
 
   function refresh() { return _carica(); }

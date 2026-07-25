@@ -177,8 +177,8 @@
   const PRIO_COLOR = { critica:'var(--accent-red)', alta:'var(--accent-orange)', media:'var(--accent-blue)', bassa:'var(--text-muted)' };
   const TIPO_ICON  = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-circle-check', contratto:'fa-file-lines', scadenza:'fa-clock' };
 
-  // Monta DeadlinesPanel: inietta la modale CRUD nel body e gestisce salvataggio
-  DeadlinesPanel.mount(document.body, {
+  // Monta DeadlinesPanel: null = inietta solo la modale CRUD (la tabella è gestita dalla pagina)
+  DeadlinesPanel.mount(null, {
     assetId: null,
     zIndex:  1000,
     onSave:  () => caricaTutto()

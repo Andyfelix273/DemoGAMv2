@@ -128,8 +128,8 @@ var oggi = new Date().toISOString().split('T')[0];
     document.getElementById('btn-nuovo-wo').style.display = '';
   }
 
-  // Monta WoPanel: inietta le modali CRUD nel body e gestisce salvataggio
-  WoPanel.mount(document.body, {
+  // Monta WoPanel: null = inietta solo le modali CRUD (la tabella è gestita dalla pagina)
+  WoPanel.mount(null, {
     assetId:  null,
     zIndex:   1000,
     onSave:   async () => { await caricaKPI(); await caricaWO(); }

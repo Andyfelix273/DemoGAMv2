@@ -560,6 +560,11 @@ const WoPanel = (() => {
    * @param {function|null} opts.onSave    - Callback dopo ogni salvataggio/eliminazione
    * @param {boolean}       opts.readonly  - Se true, nasconde i controlli di scrittura
    */
+  /**
+   * mount(containerEl, opts)
+   * Se containerEl è null, inietta solo le modali CRUD senza renderizzare la lista.
+   * Utile nelle pagine standalone che hanno già la propria tabella.
+   */
   function mount(containerEl, opts = {}) {
     _container = containerEl;
     _opts = {
@@ -570,7 +575,7 @@ const WoPanel = (() => {
       readonly:  opts.readonly  ?? false,
     };
     _injectModals(_opts.zIndex);
-    _carica();
+    if (_container) _carica();
   }
 
   /** Ricarica la lista (utile dopo operazioni esterne) */
