@@ -357,14 +357,20 @@ async function apriModaleAsset(id) {
             const scad = new Date(d.data_scadenza);
             const giorni = Math.ceil((scad - oggi) / 86400000);
             const statoEff = d.stato !== 'completata' && scad < oggi ? 'scaduta' : d.stato;
-            const giorniLabel = d.stato === 'completata' ? '' : giorni < 0 ? `<span style="color:var(--stato-inattivo);font-size:11px">${Math.abs(giorni)}gg scaduta</span>` : `<span style="color:var(--stato-man);font-size:11px">${giorni}gg</span>`;
-            return `<div class="mm-alarm-row">
+            const giorniLabel = d.stato === 'completata' ? '' : giorni < 0
+              ? `<span style="color:var(--stato-inattivo);font-size:11px">${Math.abs(giorni)}gg scaduta</span>`
+              : `<span style="color:var(--stato-man);font-size:11px">${giorni}gg</span>`;
+            return `<div class="mm-alarm-row mm-dl-row" onclick="_mmApriDettaglioScadenza(${d.id})"
+              style="cursor:pointer;transition:background 0.15s;"
+              onmouseover="this.style.background='rgba(0,180,216,0.07)'"
+              onmouseout="this.style.background=''">
               <i class="fa ${iconaStato[statoEff] || 'fa-calendar'} " style="color:${coloreStato[statoEff] || '#aaa'};font-size:16px;min-width:20px"></i>
               <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
               <span style="flex:1;font-size:13px;margin-left:8px">${d.titolo}</span>
               <span style="font-size:11px;color:var(--text-secondary);margin-right:8px">${d.tipo || ''}</span>
               <span style="font-size:11px;color:var(--text-secondary)">${d.data_scadenza || ''}</span>
               ${giorniLabel}
+              <i class="fa fa-chevron-right" style="color:var(--text-secondary);font-size:10px;margin-left:6px;"></i>
             </div>`;
           }).join('');
       const dlPanel = document.getElementById('mm-panel-scadenze');
@@ -519,6 +525,154 @@ async function _mmApriViewerPdf(docId, nomeFile) {
         </a>
       </div>`;
     }
+  }
+}
+
+
+// =============================================
+// DETTAGLIO SCADENZA — funzione helper
+// =============================================
+
+/**
+ * Apre una modale sovrapposta con il dettaglio completo di una scadenza.
+ * Carica i dati tramite GET /api/deadlines/{id} e mostra tutti i campi.
+ */
+async function _mmApriDettaglioScadenza(dlId) {
+  // Rimuovi dettaglio precedente se esiste
+  const old = document.getElementById('mm-dl-detail-overlay');
+  if (old) old.remove();
+
+  // Mostra spinner
+  const overlay = document.createElement('div');
+  overlay.id = 'mm-dl-detail-overlay';
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'background:rgba(0,0,0,0.75)',
+    'z-index:4500', 'display:flex', 'align-items:center',
+    'justify-content:center', 'padding:20px'
+  ].join(';');
+  overlay.innerHTML = `
+    <div style="background:#0D1B2A;border:1px solid #1E3A5F;border-radius:12px;
+                padding:30px;min-width:200px;text-align:center;color:#7BAFC4;">
+      <i class="fa fa-spinner fa-spin" style="font-size:24px;"></i>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+
+  try {
+    const d = await API.getDeadline(dlId);
+
+    const coloreStato = { 'aperta': '#F39C12', 'in_corso': '#3498DB', 'completata': '#2ECC71', 'scaduta': '#E74C3C' };
+    const labelStato  = { 'aperta': 'Aperta', 'in_corso': 'In corso', 'completata': 'Completata', 'scaduta': 'Scaduta' };
+    const colorePrio  = { 'bassa': '#2ECC71', 'media': '#F39C12', 'alta': '#E74C3C', 'critica': '#C0392B' };
+    const labelPrio   = { 'bassa': 'Bassa', 'media': 'Media', 'alta': 'Alta', 'critica': 'Critica' };
+
+    const oggi = new Date();
+    const scad = new Date(d.data_scadenza);
+    const giorni = Math.ceil((scad - oggi) / 86400000);
+    const statoEff = d.stato !== 'completata' && scad < oggi ? 'scaduta' : d.stato;
+    const giorniTxt = d.stato === 'completata'
+      ? ''
+      : giorni < 0
+        ? `<span style="color:#E74C3C;font-weight:600;">${Math.abs(giorni)} giorni fa</span>`
+        : giorni === 0
+          ? `<span style="color:#E74C3C;font-weight:600;">Oggi</span>`
+          : `<span style="color:#F39C12;font-weight:600;">tra ${giorni} giorni</span>`;
+
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      const dt = new Date(s);
+      return dt.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+    };
+
+    const row = (label, val) => val
+      ? `<tr>
+          <td style="padding:6px 10px 6px 0;color:#7BAFC4;font-size:12px;white-space:nowrap;vertical-align:top;">${label}</td>
+          <td style="padding:6px 0;color:#E0F0FF;font-size:13px;">${val}</td>
+        </tr>`
+      : '';
+
+    overlay.innerHTML = `
+      <div style="width:100%;max-width:560px;background:#0D1B2A;border:1px solid #1E3A5F;
+                  border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;
+                    padding:16px 20px;border-bottom:1px solid #1E3A5F;background:#0a1628;">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span style="font-size:10px;font-family:monospace;color:#7BAFC4;">${d.codice || ''}</span>
+              <span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;
+                           background:${coloreStato[statoEff] || '#aaa'}22;
+                           color:${coloreStato[statoEff] || '#aaa'};border:1px solid ${coloreStato[statoEff] || '#aaa'}44;">
+                ${labelStato[statoEff] || statoEff}
+              </span>
+              <span style="padding:2px 8px;border-radius:10px;font-size:11px;
+                           background:${colorePrio[d.priorita] || '#aaa'}22;
+                           color:${colorePrio[d.priorita] || '#aaa'};border:1px solid ${colorePrio[d.priorita] || '#aaa'}44;">
+                ${labelPrio[d.priorita] || d.priorita || ''}
+              </span>
+            </div>
+            <div style="font-size:15px;font-weight:700;color:#E0F0FF;">${d.titolo}</div>
+          </div>
+          <button onclick="document.getElementById('mm-dl-detail-overlay').remove()"
+                  style="background:transparent;border:1px solid #1E3A5F;border-radius:5px;
+                         color:#7BAFC4;cursor:pointer;font-size:18px;padding:4px 10px;
+                         margin-left:12px;flex-shrink:0;">&times;</button>
+        </div>
+
+        <!-- Corpo -->
+        <div style="padding:16px 20px;">
+          <table style="width:100%;border-collapse:collapse;">
+            ${row('Tipo', d.tipo)}
+            ${row('Scadenza', `${fmtDate(d.data_scadenza)} &nbsp; ${giorniTxt}`)}
+            ${row('Assegnatario', d.assegnatario)}
+            ${row('Creato da', d.creato_da)}
+            ${row('Data creazione', fmtDate(d.created_at))}
+            ${d.stato === 'completata' ? row('Data chiusura', fmtDate(d.closed_at)) : ''}
+          </table>
+
+          ${d.descrizione ? `
+            <div style="margin-top:12px;padding:10px 14px;background:rgba(0,180,216,0.05);
+                         border:1px solid #1E3A5F;border-radius:6px;">
+              <div style="font-size:11px;color:#7BAFC4;margin-bottom:4px;">Descrizione</div>
+              <div style="font-size:13px;color:#E0F0FF;line-height:1.5;">${d.descrizione}</div>
+            </div>` : ''}
+
+          ${d.note ? `
+            <div style="margin-top:10px;padding:10px 14px;background:rgba(243,156,18,0.05);
+                         border:1px solid rgba(243,156,18,0.2);border-radius:6px;">
+              <div style="font-size:11px;color:#F39C12;margin-bottom:4px;">Note</div>
+              <div style="font-size:13px;color:#E0F0FF;line-height:1.5;">${d.note}</div>
+            </div>` : ''}
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:12px 20px;border-top:1px solid #1E3A5F;display:flex;justify-content:flex-end;">
+          <button onclick="document.getElementById('mm-dl-detail-overlay').remove()"
+                  style="padding:6px 18px;background:transparent;border:1px solid #1E3A5F;
+                         border-radius:6px;color:#7BAFC4;cursor:pointer;font-size:13px;">Chiudi</button>
+        </div>
+      </div>`;
+
+    // Ri-aggancia chiusura Escape dopo innerHTML
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  } catch (err) {
+    overlay.innerHTML = `
+      <div style="background:#0D1B2A;border:1px solid #1E3A5F;border-radius:12px;
+                  padding:30px;text-align:center;color:#E74C3C;max-width:400px;">
+        <i class="fa fa-exclamation-triangle" style="font-size:24px;margin-bottom:10px;display:block;"></i>
+        <div style="font-size:13px;">Impossibile caricare il dettaglio scadenza.</div>
+        <div style="font-size:11px;margin-top:6px;color:#7BAFC4;">${err.message}</div>
+        <button onclick="document.getElementById('mm-dl-detail-overlay').remove()"
+                style="margin-top:14px;padding:6px 18px;background:transparent;
+                       border:1px solid #1E3A5F;border-radius:6px;color:#7BAFC4;cursor:pointer;">
+          Chiudi
+        </button>
+      </div>`;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   }
 }
 
