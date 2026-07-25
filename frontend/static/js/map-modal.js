@@ -278,7 +278,11 @@ async function apriModaleAsset(id) {
             const isPdf = (d.tipo_mime === 'application/pdf') || d.nome_file.toLowerCase().endsWith('.pdf');
             const viewBtn = isPdf
               ? `<button onclick="_mmApriViewerPdf(${d.id}, '${d.nome_file.replace(/'/g, "\\'")}')"
-                   class="btn btn-secondary btn-sm" style="margin-left:4px;padding:2px 8px" title="Visualizza PDF">
+                   style="margin-left:4px;padding:2px 8px;background:transparent;
+                          border:1px solid var(--border,#1E3A5F);border-radius:4px;
+                          color:var(--text-secondary,#7BAFC4);cursor:pointer;font-size:12px;
+                          display:inline-flex;align-items:center;gap:4px;"
+                   title="Visualizza PDF">
                    <i class="fa fa-eye"></i>
                  </button>`
               : '';
@@ -406,12 +410,14 @@ function chiudiModaleAsset() {
  * Usa l'elemento <iframe> con l'URL di download del documento.
  * Funziona per qualsiasi PDF servito dall'endpoint /api/documents/{id}/download.
  */
-function _mmApriViewerPdf(docId, nomeFile) {
+async function _mmApriViewerPdf(docId, nomeFile) {
   // Rimuovi viewer precedente se esiste
   const old = document.getElementById('mm-pdf-viewer-overlay');
   if (old) old.remove();
 
-  const url = API.getDocumentDownloadUrl(docId);
+  const downloadUrl = API.getDocumentDownloadUrl(docId);
+
+  // Costruisci la modale con spinner di caricamento
   const overlay = document.createElement('div');
   overlay.id = 'mm-pdf-viewer-overlay';
   overlay.style.cssText = [
@@ -421,51 +427,99 @@ function _mmApriViewerPdf(docId, nomeFile) {
   ].join(';');
 
   overlay.innerHTML = `
-    <div style="width:100%;max-width:900px;height:90vh;display:flex;flex-direction:column;
-                background:var(--bg-panel,#0D1B2A);border:1px solid var(--border,#1E3A5F);
+    <div id="mm-pdf-viewer-box" style="width:100%;max-width:900px;height:90vh;display:flex;flex-direction:column;
+                background:#0D1B2A;border:1px solid #1E3A5F;
                 border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
       <!-- Header viewer -->
       <div style="display:flex;align-items:center;justify-content:space-between;
-                  padding:12px 18px;border-bottom:1px solid var(--border,#1E3A5F);flex-shrink:0;">
+                  padding:12px 18px;border-bottom:1px solid #1E3A5F;flex-shrink:0;background:#0D1B2A;">
         <div style="display:flex;align-items:center;gap:10px;">
           <i class="fa fa-file-pdf-o" style="color:#E74C3C;font-size:16px;"></i>
-          <span style="font-size:13px;font-weight:600;color:var(--text-primary,#E0F0FF);">${nomeFile}</span>
+          <span style="font-size:13px;font-weight:600;color:#E0F0FF;">${nomeFile}</span>
         </div>
         <div style="display:flex;gap:8px;">
-          <a href="${url}" target="_blank"
-             style="padding:5px 12px;background:var(--accent-dim,rgba(0,180,216,0.15));
-                    border:1px solid var(--accent,#00B4D8);border-radius:5px;
-                    color:var(--accent,#00B4D8);font-size:12px;text-decoration:none;
+          <a id="mm-pdf-dl-link" href="#"
+             style="padding:5px 12px;background:rgba(0,180,216,0.15);
+                    border:1px solid #00B4D8;border-radius:5px;
+                    color:#00B4D8;font-size:12px;text-decoration:none;
                     display:flex;align-items:center;gap:5px;">
             <i class="fa fa-download"></i> Scarica
           </a>
           <button onclick="document.getElementById('mm-pdf-viewer-overlay').remove()"
-                  style="padding:5px 12px;background:none;border:1px solid var(--border,#1E3A5F);
-                         border-radius:5px;color:var(--text-secondary,#7BAFC4);cursor:pointer;
+                  style="padding:5px 12px;background:transparent;border:1px solid #1E3A5F;
+                         border-radius:5px;color:#7BAFC4;cursor:pointer;
                          font-size:18px;line-height:1;">&times;</button>
         </div>
       </div>
-      <!-- Iframe PDF -->
-      <div style="flex:1;overflow:hidden;">
-        <iframe src="${url}" style="width:100%;height:100%;border:none;"
-                title="${nomeFile}">
-          <p style="color:#aaa;padding:20px;text-align:center;">
-            Il browser non supporta la visualizzazione inline dei PDF.
-            <a href="${url}" target="_blank" style="color:var(--accent,#00B4D8);">Apri in una nuova scheda</a>
-          </p>
-        </iframe>
+      <!-- Area contenuto -->
+      <div id="mm-pdf-content" style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0D1B2A;">
+        <div style="text-align:center;color:#7BAFC4;">
+          <i class="fa fa-spinner fa-spin" style="font-size:28px;margin-bottom:10px;display:block;"></i>
+          <span style="font-size:13px;">Caricamento documento...</span>
+        </div>
       </div>
     </div>`;
 
   // Chiudi cliccando fuori dalla modale
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) {
+      const blobUrl = overlay._blobUrl;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      overlay.remove();
+    }
   });
   // Chiudi con Escape
-  const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      const blobUrl = overlay._blobUrl;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+    }
+  };
   document.addEventListener('keydown', onKey);
-
   document.body.appendChild(overlay);
+
+  // Scarica il PDF con il token JWT e crea un Blob URL
+  try {
+    const token = API.getToken ? API.getToken() : (localStorage.getItem('gam_token') || sessionStorage.getItem('gam_token') || '');
+    const resp = await fetch(downloadUrl, {
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    overlay._blobUrl = blobUrl;
+
+    // Imposta link download
+    const dlLink = document.getElementById('mm-pdf-dl-link');
+    if (dlLink) {
+      dlLink.href = blobUrl;
+      dlLink.download = nomeFile;
+    }
+
+    // Sostituisci spinner con iframe
+    const contentDiv = document.getElementById('mm-pdf-content');
+    if (contentDiv) {
+      contentDiv.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none;"
+        title="${nomeFile}"></iframe>`;
+    }
+  } catch (err) {
+    const contentDiv = document.getElementById('mm-pdf-content');
+    if (contentDiv) {
+      contentDiv.innerHTML = `<div style="text-align:center;color:#E74C3C;padding:30px;">
+        <i class="fa fa-exclamation-triangle" style="font-size:28px;margin-bottom:10px;display:block;"></i>
+        <div style="font-size:13px;">Impossibile caricare il documento.</div>
+        <div style="font-size:11px;margin-top:6px;color:#7BAFC4;">${err.message}</div>
+        <a href="${downloadUrl}" target="_blank"
+           style="display:inline-block;margin-top:14px;padding:6px 16px;
+                  background:rgba(0,180,216,0.15);border:1px solid #00B4D8;
+                  border-radius:5px;color:#00B4D8;font-size:12px;text-decoration:none;">
+          <i class="fa fa-external-link"></i> Apri in nuova scheda
+        </a>
+      </div>`;
+    }
+  }
 }
 
 
