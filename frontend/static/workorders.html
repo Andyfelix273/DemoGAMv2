@@ -517,9 +517,16 @@ function formatData(d) {
 }
 function formatDataOra(dt) {
   if (!dt) return '—';
-  const [d, t] = dt.split(' ');
-  const [y,m,g] = d.split('-');
-  return `${g}/${m}/${y} ${t ? t.substring(0,5) : ''}`;
+  try {
+    const date = new Date(dt);
+    if (isNaN(date.getTime())) return dt;
+    const g = String(date.getDate()).padStart(2,'0');
+    const m = String(date.getMonth()+1).padStart(2,'0');
+    const y = date.getFullYear();
+    const hh = String(date.getHours()).padStart(2,'0');
+    const mm = String(date.getMinutes()).padStart(2,'0');
+    return `${g}/${m}/${y} ${hh}:${mm}`;
+  } catch(e) { return dt; }
 }
 
 // ── Modal form nuovo/modifica ─────────────────────────────────────────────────
