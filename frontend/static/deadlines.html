@@ -7,10 +7,8 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
-  <style>/* KPI strip */
-/* Tabs */
-/* Filtri */
-/* Riga scadenza */
+  <style>
+    /* Riga scadenza */
     .dl-row {
       display:flex; align-items:center; gap:12px;
       padding:12px 16px; border-radius:8px; margin-bottom:8px;
@@ -55,33 +53,13 @@
     .cal-event.bassa    { background:var(--text-muted);     color:#fff; }
     .cal-event.scaduta  { background:#c0392b; color:#fff; }
 
-    /* Modal */
-.modal { background:var(--bg-primary); border-radius:12px; padding:0; width:100%; max-width:520px; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
-.modal-title { font-size:16px; font-weight:600; }
-    .modal-close { background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer; padding:0 4px; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-
-    /* ══ Responsive mobile ═══════════════════════════════════════════════ */
     @media (max-width: 768px) {
-      /* Calendario: scroll orizzontale */
-      .cal-grid {
-        overflow-x: auto;
-        display: grid;
-        grid-template-columns: repeat(7, minmax(44px, 1fr));
-        gap: 2px;
-      }
-      .cal-day { min-height: 52px; padding: 4px; }
-      .cal-event { font-size: 9px; }
-
-      /* Riga scadenza: stack verticale */
-      .dl-row { flex-wrap: wrap; }
-      .dl-actions { width: 100%; justify-content: flex-end; margin-top: 4px; }
-
-      /* Form modal: 1 colonna */
-      .form-row { grid-template-columns: 1fr; }
-
-      /* KPI strip: 2 per riga */
-}
+      .cal-grid { overflow-x:auto; grid-template-columns:repeat(7, minmax(44px, 1fr)); gap:2px; }
+      .cal-day { min-height:52px; padding:4px; }
+      .cal-event { font-size:9px; }
+      .dl-row { flex-wrap:wrap; }
+      .dl-actions { width:100%; justify-content:flex-end; margin-top:4px; }
+    }
   </style>
   <link rel="stylesheet" href="/static/css/icons.css">
   <link rel="stylesheet" href="/static/css/bems-ui.css">
@@ -100,7 +78,7 @@
         <button class="btn btn-secondary" onclick="window.location.href='/api/export/report/pdf'" title="Report PDF completo">
           <i class="fa fa-file-pdf"></i> Report PDF
         </button>
-        <button class="btn btn-primary" id="btn-nuova-scadenza">
+        <button class="btn btn-primary" id="btn-nuova-scadenza" onclick="DeadlinesPanel._apriNuova()">
           <i class="fa fa-plus"></i> Nuova scadenza
         </button>
       </div>
@@ -170,75 +148,9 @@
   </div>
   </div><!-- /sidebar-content -->
 
-  <!-- Modal nuova/modifica scadenza -->
-  <div class="modal-overlay" id="modal-scadenza">
-    <div class="modal">
-      <div class="modal-header">
-        <span class="modal-title" id="modal-scadenza-titolo">Nuova scadenza</span>
-        <button class="modal-close" id="modal-scadenza-close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="form-dl-id">
-        <div class="form-group">
-          <label>Asset *</label>
-          <select id="form-asset-id"></select>
-        </div>
-        <div class="form-group">
-          <label>Titolo *</label>
-          <input type="text" id="form-titolo" placeholder="Titolo scadenza">
-        </div>
-        <div class="form-group">
-          <label>Descrizione</label>
-          <textarea id="form-descrizione" rows="2" placeholder="Descrizione opzionale"></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Tipo</label>
-            <select id="form-tipo">
-              <option value="scadenza">Scadenza</option>
-              <option value="normativa">Normativa</option>
-              <option value="manutenzione">Manutenzione</option>
-              <option value="collaudo">Collaudo</option>
-              <option value="contratto">Contratto</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Priorità</label>
-            <select id="form-priorita">
-              <option value="bassa">Bassa</option>
-              <option value="media" selected>Media</option>
-              <option value="alta">Alta</option>
-              <option value="critica">Critica</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Data scadenza *</label>
-            <input type="date" id="form-data-scadenza">
-          </div>
-          <div class="form-group">
-            <label>Assegnatario</label>
-            <input type="text" id="form-assegnatario" placeholder="Nome / ente">
-          </div>
-        </div>
-        <div class="form-group" id="form-stato-wrap" style="display:none">
-          <label>Stato</label>
-          <select id="form-stato">
-            <option value="aperta">Aperta</option>
-            <option value="chiusa">Chiusa</option>
-            <option value="scaduta">Scaduta</option>
-          </select>
-        </div>
-        <div id="form-error" style="color:var(--accent-red);font-size:12px;margin-top:4px;display:none"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="modal-scadenza-annulla">Annulla</button>
-        <button class="btn btn-primary" id="modal-scadenza-salva">Salva</button>
-      </div>
-    </div>
-  </div>
+  <!-- DeadlinesPanel inietta la modale CRUD nel body automaticamente al mount() -->
 
+  <script src="/static/js/deadlines-panel.js"></script>
   <script src="/static/js/i18n.js?v=6"></script>
   <script src="/static/js/api.js?v=6"></script>
   <script src="/static/js/utils.js?v=8"></script>
@@ -247,7 +159,6 @@
    * deadlines.html - Scadenze GIS Asset Manager v2.0
    * Autore: Felix / KeyBiz
    */
-
   if (!requireAuth()) throw new Error('not authenticated');
   Tema.apply();
   renderTopbar('scadenze', { filtri: false });
@@ -261,11 +172,17 @@
 
   let allDeadlines = [];
   let calAnno = new Date().getFullYear();
-  let calMese = new Date().getMonth(); // 0-based
+  let calMese = new Date().getMonth();
 
   const PRIO_COLOR = { critica:'var(--accent-red)', alta:'var(--accent-orange)', media:'var(--accent-blue)', bassa:'var(--text-muted)' };
-  const STATO_COLOR = { aperta:'var(--accent-blue)', chiusa:'var(--accent-green)', scaduta:'var(--accent-red)' };
-  const TIPO_ICON = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-circle-check', contratto:'fa-file-lines', scadenza:'fa-clock' };
+  const TIPO_ICON  = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-circle-check', contratto:'fa-file-lines', scadenza:'fa-clock' };
+
+  // Monta DeadlinesPanel: inietta la modale CRUD nel body e gestisce salvataggio
+  DeadlinesPanel.mount(document.body, {
+    assetId: null,
+    zIndex:  1000,
+    onSave:  () => caricaTutto()
+  });
 
   // ── Caricamento dati ────────────────────────────────────────────────────────
   async function caricaTutto() {
@@ -285,19 +202,19 @@
   }
 
   function aggiornaKPI(s) {
-    document.getElementById('kpi-aperte').textContent    = s.aperte ?? '–';
+    document.getElementById('kpi-aperte').textContent     = s.aperte ?? '–';
     document.getElementById('kpi-in-ritardo').textContent = s.in_ritardo ?? '–';
-    document.getElementById('kpi-7gg').textContent       = s.in_scadenza_7gg ?? '–';
-    document.getElementById('kpi-urgenti').textContent   = s.urgenti ?? '–';
-    document.getElementById('kpi-chiuse').textContent    = s.chiuse ?? '–';
+    document.getElementById('kpi-7gg').textContent        = s.in_scadenza_7gg ?? '–';
+    document.getElementById('kpi-urgenti').textContent    = s.urgenti ?? '–';
+    document.getElementById('kpi-chiuse').textContent     = s.chiuse ?? '–';
   }
 
   // ── Lista ───────────────────────────────────────────────────────────────────
   function renderLista() {
-    const search   = document.getElementById('search-input').value.toLowerCase();
-    const fStato   = document.getElementById('filter-stato').value;
-    const fTipo    = document.getElementById('filter-tipo').value;
-    const fPriorita= document.getElementById('filter-priorita').value;
+    const search    = document.getElementById('search-input').value.toLowerCase();
+    const fStato    = document.getElementById('filter-stato').value;
+    const fTipo     = document.getElementById('filter-tipo').value;
+    const fPriorita = document.getElementById('filter-priorita').value;
 
     let lista = allDeadlines.filter(d => {
       if (fStato    && d.stato    !== fStato)    return false;
@@ -319,23 +236,23 @@
 
     const oggi = new Date(); oggi.setHours(0,0,0,0);
     const html = lista.map(d => {
-      const scad = new Date(d.data_scadenza);
-      const diffGg = Math.ceil((scad - oggi) / 86400000);
+      const scad    = new Date(d.data_scadenza);
+      const diffGg  = Math.ceil((scad - oggi) / 86400000);
       const isScaduta = d.stato === 'scaduta' || (d.stato === 'aperta' && diffGg < 0);
       const isUrgente = d.stato === 'aperta' && diffGg >= 0 && diffGg <= 7;
       const rowClass  = d.stato === 'chiusa' ? 'chiusa' : isScaduta ? 'scaduta' : isUrgente ? 'urgente' : 'normale';
 
       let dataLabel = '';
-      if (d.stato === 'chiusa') dataLabel = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
-      else if (isScaduta)       dataLabel = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
-      else if (diffGg === 0)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade oggi</span>`;
-      else if (diffGg === 1)    dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade domani</span>`;
-      else if (diffGg <= 7)     dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
-      else                      dataLabel = `<span style="color:var(--text-muted)"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
+      if (d.stato === 'chiusa')   dataLabel = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
+      else if (isScaduta)         dataLabel = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
+      else if (diffGg === 0)      dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade oggi</span>`;
+      else if (diffGg === 1)      dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade domani</span>`;
+      else if (diffGg <= 7)       dataLabel = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
+      else                        dataLabel = `<span style="color:var(--text-muted)"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
 
       const canEdit   = API.can('deadlines.update');
       const canDelete = API.can('deadlines.delete');
-      const canClose  = API.can('deadlines.update') && d.stato === 'aperta';
+      const canClose  = canEdit && d.stato === 'aperta';
 
       return `<div class="dl-row ${rowClass}">
         <i class="fa ${TIPO_ICON[d.tipo]||'fa-clock'}" style="color:${PRIO_COLOR[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
@@ -350,9 +267,9 @@
           </div>
         </div>
         <div class="dl-actions">
-          ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi scadenza" onclick="chiudiScadenza(${d.id})"><i class="fa fa-check"></i></button>` : ''}
-          ${canEdit  ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="apriModifica(${d.id})"><i class="fa fa-pen"></i></button>` : ''}
-          ${canDelete? `<button class="btn-icon danger" onclick="eliminaScadenza(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
+          ${canClose  ? `<button class="btn btn-secondary btn-sm" title="Chiudi scadenza" onclick="DeadlinesPanel._chiudiScadenza(${d.id})"><i class="fa fa-check"></i></button>` : ''}
+          ${canEdit   ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="DeadlinesPanel._apriModifica(${d.id})"><i class="fa fa-pen"></i></button>` : ''}
+          ${canDelete ? `<button class="btn-icon danger" onclick="DeadlinesPanel._elimina(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -364,34 +281,25 @@
     const GIORNI = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
     document.getElementById('cal-headers').innerHTML = GIORNI.map(g =>
       `<div class="cal-header">${g}</div>`).join('');
-
     const mesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
                   'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
     document.getElementById('cal-titolo').textContent = mesi[calMese] + ' ' + calAnno;
-
     const primoGiorno = new Date(calAnno, calMese, 1);
-    // Lunedì = 0, domenica = 6
-    let startDow = primoGiorno.getDay(); // 0=domenica
+    let startDow = primoGiorno.getDay();
     startDow = startDow === 0 ? 6 : startDow - 1;
     const giorniMese = new Date(calAnno, calMese + 1, 0).getDate();
-    const oggi = new Date(); oggi.setHours(0,0,0,0);
-
-    // Mappa data -> scadenze
+    const oggiD = new Date(); oggiD.setHours(0,0,0,0);
     const byDate = {};
     allDeadlines.forEach(d => {
       const k = d.data_scadenza ? d.data_scadenza.slice(0,10) : null;
       if (k) { if (!byDate[k]) byDate[k] = []; byDate[k].push(d); }
     });
-
     let cells = '';
-    // Celle vuote prima del primo giorno
-    for (let i = 0; i < startDow; i++) {
-      cells += `<div class="cal-day other-month"></div>`;
-    }
+    for (let i = 0; i < startDow; i++) cells += `<div class="cal-day other-month"></div>`;
     for (let g = 1; g <= giorniMese; g++) {
       const d = new Date(calAnno, calMese, g);
-      const isOggi = d.getTime() === oggi.getTime();
-      const key = d.toISOString().slice(0,10);
+      const isOggi = d.getTime() === oggiD.getTime();
+      const key    = d.toISOString().slice(0,10);
       const events = byDate[key] || [];
       const evHtml = events.slice(0,3).map(ev => {
         const cls = ev.stato === 'scaduta' ? 'scaduta' : ev.priorita;
@@ -407,16 +315,13 @@
 
   // ── Navigazione calendario ──────────────────────────────────────────────────
   document.getElementById('cal-prev').addEventListener('click', () => {
-    calMese--; if (calMese < 0) { calMese = 11; calAnno--; }
-    renderCalendario();
+    calMese--; if (calMese < 0) { calMese = 11; calAnno--; } renderCalendario();
   });
   document.getElementById('cal-next').addEventListener('click', () => {
-    calMese++; if (calMese > 11) { calMese = 0; calAnno++; }
-    renderCalendario();
+    calMese++; if (calMese > 11) { calMese = 0; calAnno++; } renderCalendario();
   });
   document.getElementById('cal-oggi').addEventListener('click', () => {
-    calAnno = new Date().getFullYear(); calMese = new Date().getMonth();
-    renderCalendario();
+    calAnno = new Date().getFullYear(); calMese = new Date().getMonth(); renderCalendario();
   });
 
   // ── Tab switching ───────────────────────────────────────────────────────────
@@ -434,119 +339,6 @@
     document.getElementById(id).addEventListener('input', renderLista);
     document.getElementById(id).addEventListener('change', renderLista);
   });
-
-  // ── Modal nuova/modifica scadenza ───────────────────────────────────────────
-  let assetsCache = [];
-
-  async function apriNuova() {
-    document.getElementById('modal-scadenza-titolo').textContent = 'Nuova scadenza';
-    document.getElementById('form-dl-id').value = '';
-    document.getElementById('form-titolo').value = '';
-    document.getElementById('form-descrizione').value = '';
-    document.getElementById('form-tipo').value = 'scadenza';
-    document.getElementById('form-priorita').value = 'media';
-    document.getElementById('form-data-scadenza').value = '';
-    document.getElementById('form-assegnatario').value = '';
-    document.getElementById('form-stato-wrap').style.display = 'none';
-    document.getElementById('form-error').style.display = 'none';
-    await caricaAssets();
-    document.getElementById('modal-scadenza').style.display = 'flex';
-  }
-
-  async function apriModifica(id) {
-    const d = allDeadlines.find(x => x.id === id);
-    if (!d) return;
-    document.getElementById('modal-scadenza-titolo').textContent = 'Modifica scadenza';
-    document.getElementById('form-dl-id').value = d.id;
-    document.getElementById('form-titolo').value = d.titolo || '';
-    document.getElementById('form-descrizione').value = d.descrizione || '';
-    document.getElementById('form-tipo').value = d.tipo || 'scadenza';
-    document.getElementById('form-priorita').value = d.priorita || 'media';
-    document.getElementById('form-data-scadenza').value = d.data_scadenza || '';
-    document.getElementById('form-assegnatario').value = d.assegnatario || '';
-    document.getElementById('form-stato').value = d.stato || 'aperta';
-    document.getElementById('form-stato-wrap').style.display = 'block';
-    document.getElementById('form-error').style.display = 'none';
-    await caricaAssets();
-    document.getElementById('form-asset-id').value = d.asset_id;
-    document.getElementById('modal-scadenza').style.display = 'flex';
-  }
-
-  async function caricaAssets() {
-    if (assetsCache.length === 0) {
-      const geo = await API.getAssets();
-      assetsCache = (geo.features || []).map(f => f.properties);
-    }
-    const sel = document.getElementById('form-asset-id');
-    sel.innerHTML = assetsCache.map(a =>
-      `<option value="${a.id}">${a.codice} – ${a.nome}</option>`
-    ).join('');
-  }
-
-  function chiudiModal() {
-    document.getElementById('modal-scadenza').style.display = 'none';
-  }
-
-  document.getElementById('modal-scadenza-close').addEventListener('click', chiudiModal);
-  document.getElementById('modal-scadenza-annulla').addEventListener('click', chiudiModal);
-
-  document.getElementById('modal-scadenza-salva').addEventListener('click', async () => {
-    const id       = document.getElementById('form-dl-id').value;
-    const titolo   = document.getElementById('form-titolo').value.trim();
-    const assetId  = parseInt(document.getElementById('form-asset-id').value);
-    const dataScad = document.getElementById('form-data-scadenza').value;
-    const errEl    = document.getElementById('form-error');
-
-    if (!titolo || !dataScad) {
-      errEl.textContent = 'Titolo e data scadenza sono obbligatori.';
-      errEl.style.display = 'block';
-      return;
-    }
-    errEl.style.display = 'none';
-
-    const payload = {
-      asset_id:      assetId,
-      titolo,
-      descrizione:   document.getElementById('form-descrizione').value.trim() || null,
-      tipo:          document.getElementById('form-tipo').value,
-      priorita:      document.getElementById('form-priorita').value,
-      data_scadenza: dataScad,
-      assegnatario:  document.getElementById('form-assegnatario').value.trim() || null,
-    };
-    if (id) payload.stato = document.getElementById('form-stato').value;
-
-    try {
-      if (id) {
-        await API.updateDeadline(parseInt(id), payload);
-      } else {
-        await API.createDeadline(payload);
-      }
-      chiudiModal();
-      await caricaTutto();
-    } catch(e) {
-      errEl.textContent = 'Errore: ' + e.message;
-      errEl.style.display = 'block';
-    }
-  });
-
-  // ── Azioni ──────────────────────────────────────────────────────────────────
-  async function chiudiScadenza(id) {
-    if (!confirm('Segnare la scadenza come chiusa?')) return;
-    try {
-      await API.updateDeadline(id, { stato: 'chiusa' });
-      await caricaTutto();
-    } catch(e) { alert('Errore: ' + e.message); }
-  }
-
-  async function eliminaScadenza(id) {
-    if (!confirm('Eliminare definitivamente questa scadenza?')) return;
-    try {
-      await API.deleteDeadline(id);
-      await caricaTutto();
-    } catch(e) { alert('Errore: ' + e.message); }
-  }
-
-  document.getElementById('btn-nuova-scadenza')?.addEventListener('click', apriNuova);
 
   // ── Avvio ───────────────────────────────────────────────────────────────────
   caricaTutto();
