@@ -149,6 +149,8 @@ const API = (() => {
 
   // -- Documenti
   async function getAssetDocuments(assetId)   { return request('GET', `/api/assets/${assetId}/documents`); }
+  async function getDocuments(params)          { const q = params ? '?' + new URLSearchParams(params).toString() : ''; return request('GET', '/api/documents' + q); }
+  async function getDocumentStats()            { return request('GET', '/api/documents/stats'); }
   async function deleteDocument(docId)         { return request('DELETE', `/api/documents/${docId}`); }
   function getDocumentDownloadUrl(docId) {
     const token = getToken();
@@ -233,7 +235,7 @@ const API = (() => {
     getAlarms, ackAlarm,
     getConfig, updateConfig,
     getWorkOrders, getWorkOrder, getWorkOrderStats, createWorkOrder, updateWorkOrder, deleteWorkOrder, getAssetWorkOrders,
-    getAssetDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl,
+    getAssetDocuments, getDocuments, getDocumentStats, uploadDocument, deleteDocument, getDocumentDownloadUrl,
     getDeadlines, getDeadlineStats, getDeadline, createDeadline, updateDeadline, deleteDeadline, getAssetDeadlines,
     startAlarmPolling, stopAlarmPolling, onAlarmUpdate
   };
