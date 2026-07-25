@@ -1240,6 +1240,71 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 from fastapi.responses import FileResponse
 
+@app.get("/api/documents")
+def lista_documenti_globale(
+    asset_id: int = None,
+    tipo: str = None,
+    anno: int = None,
+    caricato_da: str = None,
+    q: str = None,
+    limit: int = 200,
+    offset: int = 0,
+    db=Depends(get_db),
+    _=Depends(richiedi_permesso("documents.read"))
+):
+    """Lista globale documenti con filtri opzionali."""
+    sql = """
+        SELECT d.*, a.codice AS asset_codice, a.nome AS asset_nome, a.tipo AS asset_tipo
+        FROM documents d
+        LEFT JOIN assets a ON a.id = d.asset_id
+        WHERE 1=1
+    """
+    params = []
+    if asset_id:
+        sql += " AND d.asset_id = %s"; params.append(asset_id)
+    if tipo:
+        sql += " AND d.tipo_mime ILIKE %s"; params.append(f"%{tipo}%")
+    if anno:
+        sql += " AND d.codice LIKE %s"; params.append(f"DOC-{anno}-%")
+    if caricato_da:
+        sql += " AND d.caricato_da ILIKE %s"; params.append(f"%{caricato_da}%")
+    if q:
+        sql += " AND (d.nome_file ILIKE %s OR d.codice ILIKE %s)"
+        params.extend([f"%{q}%", f"%{q}%"])
+    sql += " ORDER BY d.created_at DESC LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
+    rows = db.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/documents/stats")
+def stats_documenti(
+    db=Depends(get_db),
+    _=Depends(richiedi_permesso("documents.read"))
+):
+    """Statistiche globali documenti."""
+    totale = db.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+    questo_mese = db.execute(
+        "SELECT COUNT(*) FROM documents WHERE created_at >= date_trunc('month', now())"
+    ).fetchone()[0]
+    asset_con_docs = db.execute(
+        "SELECT COUNT(DISTINCT asset_id) FROM documents"
+    ).fetchone()[0]
+    anni = db.execute(
+        "SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS anno FROM documents ORDER BY anno DESC"
+    ).fetchall()
+    caricatori = db.execute(
+        "SELECT DISTINCT caricato_da FROM documents WHERE caricato_da IS NOT NULL ORDER BY caricato_da"
+    ).fetchall()
+    return {
+        "totale": totale,
+        "questo_mese": questo_mese,
+        "asset_con_docs": asset_con_docs,
+        "anni": [r[0] for r in anni],
+        "caricatori": [r[0] for r in caricatori],
+    }
+
+
 @app.get("/api/assets/{asset_id}/documents")
 def lista_documenti(asset_id: int, db=Depends(get_db), _=Depends(richiedi_permesso("documents.read"))):
     """Lista documenti allegati a un asset."""

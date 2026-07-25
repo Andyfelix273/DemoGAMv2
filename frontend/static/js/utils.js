@@ -128,6 +128,12 @@ function renderSidebar(paginaAttiva) {
       <i class="fa fa-bolt"></i>
     </a>
 
+    <a href="/static/documents.html"
+       class="sidebar-btn ${paginaAttiva === 'documenti' ? 'active' : ''}"
+       title="Documenti">
+      <i class="fa fa-file-text-o"></i>
+    </a>
+
     <a href="/static/settings.html"
        class="sidebar-btn ${paginaAttiva === 'impostazioni' ? 'active' : ''}"
        title="Impostazioni">

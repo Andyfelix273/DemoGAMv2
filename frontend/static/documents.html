@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Documenti</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:16px 24px; }
+
+    /* KPI strip */
+    .kpi-strip { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+    .kpi-card {
+      flex:1; min-width:120px; background:var(--bg-secondary);
+      border:1px solid var(--border-color); border-radius:10px;
+      padding:14px 18px; text-align:center;
+    }
+    .kpi-val { font-size:26px; font-weight:700; line-height:1; }
+    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+    /* Filtri */
+    .filtri-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+    .filtri-bar select, .filtri-bar input {
+      padding:7px 10px; border-radius:7px;
+      background:var(--input-bg); border:1px solid var(--input-border);
+      color:var(--text-primary); font-size:13px;
+    }
+    .filtri-bar select:focus, .filtri-bar input:focus { outline:none; border-color:var(--accent-blue); }
+
+    /* Tabella documenti */
+    .doc-table { width:100%; border-collapse:collapse; }
+    .doc-table th {
+      text-align:left; padding:8px 12px; font-size:11px; font-weight:700;
+      color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;
+      border-bottom:1px solid var(--border-color); white-space:nowrap;
+    }
+    .doc-table td {
+      padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border-color);
+      vertical-align:middle;
+    }
+    .doc-table tr:hover td { background:rgba(0,180,216,0.04); }
+    .doc-table tr:last-child td { border-bottom:none; }
+
+    .doc-codice { font-family:monospace; font-size:11px; color:var(--text-muted); white-space:nowrap; }
+    .doc-nome { font-weight:500; }
+    .doc-asset-link {
+      font-size:12px; color:var(--accent-blue); cursor:pointer;
+      text-decoration:none; white-space:nowrap;
+    }
+    .doc-asset-link:hover { text-decoration:underline; }
+    .doc-dim { font-size:11px; color:var(--text-muted); white-space:nowrap; }
+    .doc-data { font-size:11px; color:var(--text-muted); white-space:nowrap; }
+    .doc-actions { display:flex; gap:6px; flex-shrink:0; }
+
+    .btn-icon {
+      padding:4px 8px; border-radius:5px; border:1px solid var(--border-color);
+      background:transparent; color:var(--text-secondary); cursor:pointer;
+      font-size:13px; display:inline-flex; align-items:center; gap:4px;
+      transition:border-color 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .btn-icon.danger:hover { border-color:var(--accent-red); color:var(--accent-red); }
+
+    /* Tipo MIME badge */
+    .mime-badge {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600;
+    }
+    .mime-pdf  { background:rgba(231,76,60,0.15);  color:#E74C3C; }
+    .mime-word { background:rgba(52,152,219,0.15); color:#3498DB; }
+    .mime-xls  { background:rgba(46,204,113,0.15); color:#2ECC71; }
+    .mime-img  { background:rgba(155,89,182,0.15); color:#9B59B6; }
+    .mime-other{ background:rgba(127,140,141,0.15);color:#7F8C8D; }
+
+    /* Stato vuoto */
+    .empty-state {
+      text-align:center; padding:48px 24px; color:var(--text-muted);
+    }
+    .empty-state i { font-size:40px; margin-bottom:12px; display:block; }
+
+    /* Paginazione */
+    .pagination { display:flex; align-items:center; gap:8px; margin-top:16px; justify-content:flex-end; }
+    .pagination button {
+      padding:5px 12px; border-radius:6px; border:1px solid var(--border-color);
+      background:transparent; color:var(--text-secondary); cursor:pointer; font-size:13px;
+    }
+    .pagination button:disabled { opacity:0.35; cursor:default; }
+    .pagination button:not(:disabled):hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .pagination .pg-info { font-size:12px; color:var(--text-muted); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .kpi-card { min-width: calc(50% - 8px); }
+      .doc-table th:nth-child(4),
+      .doc-table td:nth-child(4),
+      .doc-table th:nth-child(6),
+      .doc-table td:nth-child(6) { display:none; }
+    }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fa fa-file-text-o"></i> Documenti</h1>
+      <div style="display:flex;gap:8px;" id="admin-actions">
+        <button class="btn btn-secondary" id="btn-export-excel" title="Esporta in Excel">
+          <i class="fa fa-file-excel-o"></i> Excel
+        </button>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- KPI strip -->
+      <div class="kpi-strip">
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpi-totale">–</div>
+          <div class="kpi-lbl">Totale documenti</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpi-mese" style="color:var(--accent-blue)">–</div>
+          <div class="kpi-lbl">Caricati questo mese</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpi-asset" style="color:var(--accent-green)">–</div>
+          <div class="kpi-lbl">Asset con documenti</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpi-pdf" style="color:var(--accent-red)">–</div>
+          <div class="kpi-lbl">PDF</div>
+        </div>
+      </div>
+
+      <!-- Filtri -->
+      <div class="filtri-bar">
+        <input type="text" id="search-input" placeholder="Cerca per nome file o codice..." style="flex:1;min-width:200px;">
+        <select id="filter-anno">
+          <option value="">Tutti gli anni</option>
+        </select>
+        <select id="filter-tipo">
+          <option value="">Tutti i tipi</option>
+          <option value="pdf">PDF</option>
+          <option value="word">Word</option>
+          <option value="excel">Excel</option>
+          <option value="image">Immagini</option>
+        </select>
+        <select id="filter-caricato">
+          <option value="">Tutti gli utenti</option>
+        </select>
+        <button class="btn btn-secondary" id="btn-reset-filtri" title="Azzera filtri">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Tabella -->
+      <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:10px;overflow:hidden;">
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>Codice</th>
+              <th>Nome file</th>
+              <th>Asset</th>
+              <th>Tipo</th>
+              <th>Dimensione</th>
+              <th>Data caricamento</th>
+              <th>Caricato da</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="doc-tbody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);">
+              <i class="fa fa-spinner fa-spin"></i> Caricamento...
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginazione -->
+      <div class="pagination" id="pagination" style="display:none;">
+        <button id="pg-prev"><i class="fa fa-chevron-left"></i></button>
+        <span class="pg-info" id="pg-info"></span>
+        <button id="pg-next"><i class="fa fa-chevron-right"></i></button>
+      </div>
+
+    </div>
+  </div>
+  </div>
+
+  <script src="/static/js/i18n.js?v=7"></script>
+  <script src="/static/js/api.js?v=7"></script>
+  <script src="/static/js/utils.js?v=7"></script>
+  <script src="/static/js/documents.js?v=1"></script>
+</body>
+</html>
