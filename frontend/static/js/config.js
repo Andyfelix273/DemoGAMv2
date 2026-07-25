@@ -10,7 +10,6 @@
  * @example
  * // Accesso alla configurazione:
  * const token = GAM_CONFIG.JAWG_TOKEN;
- * const bimIds = GAM_CONFIG.BIM_ASSET_IDS;
  */
 
 /**
@@ -18,9 +17,12 @@
  *
  * @constant {Object} GAM_CONFIG
  * @property {string}   JAWG_TOKEN            Token di accesso per i tile layer Jawg Maps
- * @property {number[]} BIM_ASSET_IDS         Array di asset_id con tab Planimetria/BIM abilitata nella modale
- * @property {number}   IFC_ASSET_ID          asset_id con planimetrie IFC reali (Sede Centrale Roma)
  * @property {number}   LIVE_REFRESH_INTERVAL Intervallo di polling live in millisecondi (default: 60000 ms)
+ *
+ * NOTA: BIM_ASSET_IDS e IFC_ASSET_ID sono stati rimossi.
+ * La disponibilità di BIM/Planimetria/Modello 3D è ora gestita dal DB
+ * tramite le colonne has_bim, has_planimetria, has_modello_3d in assets
+ * e l'endpoint GET /api/bim/{asset_id}/config.
  */
 const GAM_CONFIG = {
   /**
@@ -28,20 +30,6 @@ const GAM_CONFIG = {
    * Ottenibile su https://www.jawg.io/
    */
   JAWG_TOKEN: 'QHoHKE9mfIrm3sUkmrrM1v95NtcsqYNtMOdLeC91Hb1n1mLrqMzLWKzTkHLON1bD',
-
-  /**
-   * Asset ID con tab Planimetria e BIM abilitata nella modale dettaglio.
-   * - 1, 2, 7: planimetrie schematiche (non IFC reale)
-   * - 6: Sede Centrale Roma → planimetrie estratte da file IFC4 reale (ArchiCAD)
-   */
-  BIM_ASSET_IDS: [1, 2, 6, 7],
-
-  /**
-   * Asset ID con planimetrie IFC reali (estratte da AC20-Institute-Var-2.ifc).
-   * Solo questo asset mostra le piante SVG generate da ifcopenshell.
-   * Corrisponde alla Sede Centrale Roma.
-   */
-  IFC_ASSET_ID: 6,
 
   /**
    * Intervallo di aggiornamento live in millisecondi.

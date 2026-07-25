@@ -150,6 +150,7 @@ function renderSidebar(paginaAttiva, modulo, elementId) {
       ${a('/static/deadlines.html',        'scadenze',     'fa-calendar',    'Scadenze')}
       ${a('/static/asset-efficiency.html', 'efficiency',   'fa-bolt',        'Asset Efficiency')}
       ${a('/static/documents.html',        'documenti',    'fa-file-text-o', 'Documenti')}
+      ${a('/static/bim-manager.html',       'bim-manager',  'fa-cube',        'Gestione BIM')}
       ${a('/static/settings.html',         'impostazioni', 'fa-cog',         'Impostazioni')}
       <div class="${spacer}"></div>
       <button class="${cls}" onclick="API.logout()" title="Esci">

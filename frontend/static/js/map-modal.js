@@ -41,8 +41,8 @@ function selezionaAsset(feature, marker) {
 // =============================================
 // MODALE DETTAGLIO ASSET
 // =============================================
-// Asset ID con tab Planimetria/BIM abilitata — letto dalla configurazione centralizzata (config.js)
-const BIM_ASSET_IDS_MODAL = GAM_CONFIG.BIM_ASSET_IDS;
+// BIM_ASSET_IDS_MODAL rimosso: la disponibilità BIM è ora letta dal DB per ogni asset
+// tramite window._assetApertoData (iniettato in apriModaleAsset)
 
 /**
  * Carica i dati di un asset dal backend e popola la modale dettaglio.
@@ -81,6 +81,7 @@ async function apriModaleAsset(id) {
 
   _assetAperto = id;
   window._assetApertoId = id; // esposto globalmente per il viewer 3D
+  window._assetApertoData = null; // reset: verrà popolato dopo il caricamento asset
 
   try {
     const [d, referenti] = await Promise.all([
@@ -101,6 +102,14 @@ async function apriModaleAsset(id) {
     const _btnAnagrafica = document.getElementById('mm-btn-anagrafica');
     if (_btnAnagrafica) _btnAnagrafica.href = '/static/assets.html';
 
+    // Inietta i flag BIM dal DB in window._assetApertoData (usato da map-bim.js e map-stats.js)
+    window._assetApertoData = {
+      id: a.id,
+      has_bim: a.has_bim || false,
+      has_planimetria: a.has_planimetria || false,
+      has_modello_3d: a.has_modello_3d || false,
+      modello_3d_file: a.modello_3d_file || null,
+    };
     // Tab Planimetria, BIM e Modello 3D: sempre visibili
     // Se non ci sono dati, i moduli mostreranno il messaggio "Nessun elemento da visualizzare"
     mmCaricaPlanimetria(a.id);

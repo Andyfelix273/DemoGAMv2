@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Asset Manager – Gestione BIM</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: row; }
+    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .page { flex: 1; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+    .page-title { font-size:18px; font-weight:600; }
+    .page-body { padding:16px 24px; }
+
+    /* Layout a due colonne */
+    .bim-layout { display:flex; gap:20px; height: calc(100vh - 130px); }
+    .bim-list-col { width:320px; flex-shrink:0; display:flex; flex-direction:column; }
+    .bim-detail-col { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+    /* Lista asset */
+    .bim-search { width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-primary); font-size:13px; margin-bottom:12px; }
+    .bim-search:focus { outline:none; border-color:var(--accent-blue); }
+    .asset-list { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+    .asset-card {
+      padding:12px 14px; border-radius:8px; border:1px solid var(--border-color);
+      background:var(--bg-secondary); cursor:pointer; transition:border-color 0.15s, background 0.15s;
+    }
+    .asset-card:hover { border-color:var(--accent-blue); }
+    .asset-card.selected { border-color:var(--accent-blue); background:rgba(0,180,216,0.08); }
+    .asset-card-nome { font-weight:600; font-size:13px; margin-bottom:4px; }
+    .asset-card-info { font-size:11px; color:var(--text-muted); display:flex; gap:8px; flex-wrap:wrap; }
+    .bim-badge {
+      display:inline-flex; align-items:center; gap:3px;
+      padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600;
+    }
+    .bim-badge.has { background:rgba(0,180,216,0.15); color:var(--accent-blue); }
+    .bim-badge.none { background:rgba(127,140,141,0.15); color:var(--text-muted); }
+
+    /* Pannello dettaglio */
+    .bim-empty-state {
+      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      color:var(--text-muted); gap:12px;
+    }
+    .bim-empty-state i { font-size:48px; opacity:0.3; }
+    .bim-detail-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .bim-detail-nome { font-size:16px; font-weight:700; }
+    .bim-detail-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+    /* Sezioni del pannello dettaglio */
+    .bim-section {
+      background:var(--bg-secondary); border:1px solid var(--border-color);
+      border-radius:10px; padding:16px; margin-bottom:14px;
+    }
+    .bim-section-title {
+      font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+      color:var(--text-muted); margin-bottom:12px; display:flex; align-items:center; gap:8px;
+    }
+    .bim-section-title i { font-size:14px; }
+
+    /* Upload area */
+    .upload-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .upload-label { font-size:13px; color:var(--text-secondary); flex:1; min-width:120px; }
+    .upload-status { font-size:11px; color:var(--text-muted); }
+    .upload-status.has { color:var(--accent-green, #2ecc71); }
+    .upload-status.none { color:var(--text-muted); }
+    .btn-upload {
+      padding:6px 12px; border-radius:6px; border:1px solid var(--border-color);
+      background:transparent; color:var(--text-secondary); cursor:pointer;
+      font-size:12px; display:inline-flex; align-items:center; gap:5px;
+      transition:border-color 0.15s, color 0.15s;
+    }
+    .btn-upload:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+    .btn-upload.danger:hover { border-color:var(--accent-red); color:var(--accent-red); }
+    .btn-upload input[type=file] { display:none; }
+
+    /* Checkbox genera SVG */
+    .genera-svg-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
+    .genera-svg-row label { font-size:12px; color:var(--text-secondary); cursor:pointer; }
+    .genera-svg-row input[type=checkbox] { cursor:pointer; }
+
+    /* Tabella piani */
+    .piani-table { width:100%; border-collapse:collapse; }
+    .piani-table th {
+      text-align:left; padding:6px 10px; font-size:11px; font-weight:700;
+      color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;
+      border-bottom:1px solid var(--border-color);
+    }
+    .piani-table td {
+      padding:8px 10px; font-size:13px; border-bottom:1px solid var(--border-color);
+      vertical-align:middle;
+    }
+    .piani-table tr:last-child td { border-bottom:none; }
+    .piani-table tr:hover td { background:rgba(0,180,216,0.03); }
+
+    /* Form aggiungi piano */
+    .add-floor-form {
+      display:none; background:var(--bg-tertiary, var(--bg-secondary));
+      border:1px solid var(--border-color); border-radius:8px;
+      padding:14px; margin-top:10px; gap:10px; flex-wrap:wrap;
+    }
+    .add-floor-form.open { display:flex; }
+    .add-floor-form input, .add-floor-form select {
+      padding:7px 10px; border-radius:6px; border:1px solid var(--input-border);
+      background:var(--input-bg); color:var(--text-primary); font-size:13px;
+    }
+    .add-floor-form input:focus, .add-floor-form select:focus { outline:none; border-color:var(--accent-blue); }
+
+    /* Spinner */
+    .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border-color); border-top-color:var(--accent-blue); border-radius:50%; animation:spin 0.6s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Progress bar upload */
+    .upload-progress { display:none; height:4px; background:var(--border-color); border-radius:2px; margin-top:6px; overflow:hidden; }
+    .upload-progress.visible { display:block; }
+    .upload-progress-bar { height:100%; background:var(--accent-blue); width:0; transition:width 0.3s; border-radius:2px; }
+
+    /* Permesso negato */
+    .no-permission { padding:20px; text-align:center; color:var(--text-muted); font-size:13px; }
+  </style>
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+    <div id="topbar" class="topbar"></div>
+    <div class="page">
+      <div class="page-header">
+        <h1 class="page-title"><i class="fa fa-cube"></i> Gestione BIM</h1>
+        <span style="font-size:12px;color:var(--text-muted)">Associa file IFC, SVG planimetrie e modelli 3D agli asset</span>
+      </div>
+      <div class="page-body">
+        <div id="no-perm" class="no-permission" style="display:none">
+          <i class="fa fa-lock" style="font-size:32px;margin-bottom:8px;display:block"></i>
+          Accesso riservato a manager e admin.
+        </div>
+        <div id="bim-layout" class="bim-layout">
+          <!-- Colonna sinistra: lista asset -->
+          <div class="bim-list-col">
+            <input type="text" id="asset-search" class="bim-search" placeholder="Cerca asset...">
+            <div class="asset-list" id="asset-list">
+              <div style="text-align:center;padding:20px;color:var(--text-muted)">
+                <span class="spinner"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Colonna destra: dettaglio asset selezionato -->
+          <div class="bim-detail-col" id="bim-detail">
+            <div class="bim-empty-state">
+              <i class="fa fa-cube"></i>
+              <div>Seleziona un asset dalla lista per gestire i file BIM</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/i18n.js"></script>
+  <script>
+  // ── Inizializzazione ────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!API.isAuthenticated()) { window.location.href = '/static/login.html'; return; }
+    Tema.apply();
+    renderSidebar('bim-manager', 'gam', 'sidebar');
+    renderTopbar('bim-manager', { filtri: false });
+    API.startAlarmPolling();
+
+    // Verifica permesso
+    const role = API.getRole();
+    if (!['manager','admin','superadmin'].includes(role)) {
+      document.getElementById('bim-layout').style.display = 'none';
+      document.getElementById('no-perm').style.display = 'block';
+      return;
+    }
+
+    await caricaAssets();
+
+    // Ricerca
+    document.getElementById('asset-search').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase();
+      document.querySelectorAll('.asset-card').forEach(card => {
+        const nome = card.dataset.nome || '';
+        card.style.display = nome.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    // Se c'è un asset_id nell'URL, selezionalo automaticamente
+    const params = new URLSearchParams(window.location.search);
+    const assetId = params.get('asset_id');
+    if (assetId) {
+      setTimeout(() => {
+        const card = document.querySelector(`.asset-card[data-id="${assetId}"]`);
+        if (card) card.click();
+      }, 300);
+    }
+  });
+
+  // ── Carica lista asset ──────────────────────────────────────────────────────
+  let _assets = [];
+  async function caricaAssets() {
+    try {
+      const geo = await API.request('GET', '/api/assets?geojson=true');
+      _assets = (geo.features || []).map(f => ({
+        id: f.properties.id,
+        nome: f.properties.nome,
+        tipo: f.properties.tipo,
+        citta: f.properties.citta || '',
+        has_bim: f.properties.has_bim || false,
+        has_planimetria: f.properties.has_planimetria || false,
+        has_modello_3d: f.properties.has_modello_3d || false,
+      }));
+      renderAssetList();
+    } catch(e) {
+      document.getElementById('asset-list').innerHTML = '<div style="color:var(--accent-red);padding:10px">Errore caricamento asset</div>';
+    }
+  }
+
+  function renderAssetList() {
+    const list = document.getElementById('asset-list');
+    if (!_assets.length) {
+      list.innerHTML = '<div style="color:var(--text-muted);padding:10px">Nessun asset trovato</div>';
+      return;
+    }
+    list.innerHTML = _assets.map(a => `
+      <div class="asset-card" data-id="${a.id}" data-nome="${a.nome}" onclick="selezionaAsset(${a.id})">
+        <div class="asset-card-nome">${a.nome}</div>
+        <div class="asset-card-info">
+          <span>${a.tipo || ''}</span>
+          ${a.citta ? `<span>${a.citta}</span>` : ''}
+        </div>
+        <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+          <span class="bim-badge ${a.has_bim ? 'has' : 'none'}"><i class="fa fa-map"></i> BIM</span>
+          <span class="bim-badge ${a.has_planimetria ? 'has' : 'none'}"><i class="fa fa-th-large"></i> Planimetria</span>
+          <span class="bim-badge ${a.has_modello_3d ? 'has' : 'none'}"><i class="fa fa-cube"></i> 3D</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Seleziona asset ─────────────────────────────────────────────────────────
+  let _assetSelezionato = null;
+  async function selezionaAsset(assetId) {
+    // Evidenzia card
+    document.querySelectorAll('.asset-card').forEach(c => c.classList.remove('selected'));
+    const card = document.querySelector(`.asset-card[data-id="${assetId}"]`);
+    if (card) card.classList.add('selected');
+
+    // Carica dati BIM dal backend
+    const detail = document.getElementById('bim-detail');
+    detail.innerHTML = '<div class="bim-empty-state"><span class="spinner"></span></div>';
+
+    try {
+      const [assetData, floors] = await Promise.all([
+        API.request('GET', `/api/bim/${assetId}/config`).catch(() => null),
+        API.request('GET', `/api/bim/${assetId}/floors`).catch(() => []),
+      ]);
+
+      const asset = _assets.find(a => a.id === assetId) || {};
+      _assetSelezionato = { ...asset, ...assetData, floors };
+      renderDettaglio();
+    } catch(e) {
+      detail.innerHTML = `<div class="bim-empty-state"><i class="fa fa-exclamation-triangle"></i><div>Errore caricamento dati BIM</div></div>`;
+    }
+  }
+
+  // ── Render pannello dettaglio ───────────────────────────────────────────────
+  function renderDettaglio() {
+    const a = _assetSelezionato;
+    if (!a) return;
+    const floors = a.floors || [];
+
+    const detail = document.getElementById('bim-detail');
+    detail.innerHTML = `
+      <div class="bim-detail-header">
+        <div>
+          <div class="bim-detail-nome">${a.nome}</div>
+          <div class="bim-detail-sub">${a.tipo || ''} ${a.citta ? '· ' + a.citta : ''}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <span class="bim-badge ${a.has_bim ? 'has' : 'none'}">BIM</span>
+          <span class="bim-badge ${a.has_planimetria ? 'has' : 'none'}">Planimetria</span>
+          <span class="bim-badge ${a.has_modello_3d ? 'has' : 'none'}">3D</span>
+        </div>
+      </div>
+
+      <!-- Sezione Modello 3D (IFC viewer) -->
+      <div class="bim-section">
+        <div class="bim-section-title"><i class="fa fa-cube"></i> Modello 3D (IFC Viewer)</div>
+        <div class="upload-row">
+          <div class="upload-label">File IFC per il viewer 3D</div>
+          <div class="upload-status ${a.has_modello_3d ? 'has' : 'none'}">
+            ${a.has_modello_3d
+              ? `<i class="fa fa-check-circle"></i> ${a.modello_3d_file ? a.modello_3d_file.split('/').pop() : 'File presente'}`
+              : '<i class="fa fa-times-circle"></i> Nessun file'}
+          </div>
+          <label class="btn-upload">
+            <i class="fa fa-upload"></i> Carica IFC
+            <input type="file" accept=".ifc" onchange="uploadIFC(this)">
+          </label>
+          ${a.has_modello_3d ? `
+          <button class="btn-upload danger" onclick="eliminaIFC()">
+            <i class="fa fa-trash"></i>
+          </button>` : ''}
+        </div>
+        <div class="genera-svg-row">
+          <input type="checkbox" id="genera-svg-check">
+          <label for="genera-svg-check">Estrai piani dal file IFC (popola automaticamente la lista piani)</label>
+        </div>
+        <div class="upload-progress" id="ifc-progress">
+          <div class="upload-progress-bar" id="ifc-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Sezione Piani e Planimetrie -->
+      <div class="bim-section">
+        <div class="bim-section-title" style="justify-content:space-between">
+          <span><i class="fa fa-th-large"></i> Piani e Planimetrie SVG</span>
+          <button class="btn-upload" onclick="toggleAddFloor()">
+            <i class="fa fa-plus"></i> Aggiungi piano
+          </button>
+        </div>
+
+        ${floors.length === 0 ? `
+          <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:10px">
+            Nessun piano configurato. Carica un IFC con estrazione piani oppure aggiungi manualmente.
+          </div>
+        ` : `
+          <table class="piani-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Quota (m)</th>
+                <th>SVG</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${floors.map(f => `
+                <tr>
+                  <td style="font-family:monospace;font-size:11px;color:var(--text-muted)">${f.floor_id}</td>
+                  <td style="font-weight:500">${f.nome}</td>
+                  <td>${f.quota_m != null ? f.quota_m + ' m' : '—'}</td>
+                  <td>
+                    ${f.svg_file
+                      ? `<span style="color:var(--accent-green,#2ecc71);font-size:12px"><i class="fa fa-check-circle"></i> ${f.svg_file.split('/').pop()}</span>`
+                      : `<span style="color:var(--text-muted);font-size:12px"><i class="fa fa-times-circle"></i> Nessun SVG</span>`}
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:4px">
+                      <label class="btn-upload" title="Carica SVG planimetria">
+                        <i class="fa fa-image"></i> SVG
+                        <input type="file" accept=".svg" onchange="uploadSVG(this, '${f.floor_id}')">
+                      </label>
+                      ${f.svg_file ? `
+                      <button class="btn-upload danger" onclick="eliminaSVG('${f.floor_id}')" title="Elimina SVG">
+                        <i class="fa fa-trash"></i>
+                      </button>` : ''}
+                      <button class="btn-upload danger" onclick="eliminaPiano('${f.floor_id}')" title="Elimina piano">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `}
+
+        <!-- Form aggiungi piano -->
+        <div class="add-floor-form" id="add-floor-form">
+          <input type="text" id="new-floor-id" placeholder="ID (es. p0)" style="width:80px">
+          <input type="text" id="new-floor-nome" placeholder="Nome (es. Piano Terra)" style="flex:1;min-width:140px">
+          <input type="number" id="new-floor-level" placeholder="Livello" value="0" style="width:70px">
+          <input type="number" id="new-floor-quota" placeholder="Quota (m)" value="0" step="0.1" style="width:90px">
+          <button class="btn-upload" onclick="aggiungiPiano()"><i class="fa fa-check"></i> Salva</button>
+          <button class="btn-upload" onclick="toggleAddFloor()"><i class="fa fa-times"></i></button>
+        </div>
+      </div>
+
+      <!-- Info aggiuntive -->
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        <i class="fa fa-info-circle"></i>
+        I file IFC vengono salvati in <code>static/ifc/assets/${a.id}/</code>.
+        Gli SVG in <code>static/ifc/assets/${a.id}/plans/</code>.
+        Le modifiche sono immediate e visibili nella modale asset.
+      </div>
+    `;
+  }
+
+  // ── Upload IFC ──────────────────────────────────────────────────────────────
+  async function uploadIFC(input) {
+    if (!input.files[0] || !_assetSelezionato) return;
+    const file = input.files[0];
+    const generaSvg = document.getElementById('genera-svg-check')?.checked || false;
+
+    const progress = document.getElementById('ifc-progress');
+    const bar = document.getElementById('ifc-progress-bar');
+    if (progress) { progress.classList.add('visible'); bar.style.width = '10%'; }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      if (progress) bar.style.width = '40%';
+
+      const url = `/api/bim/${_assetSelezionato.id}/upload-ifc?genera_svg=${generaSvg}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + API.getToken() },
+        body: formData,
+      });
+
+      if (progress) bar.style.width = '90%';
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Errore upload');
+      }
+
+      const data = await res.json();
+      if (progress) { bar.style.width = '100%'; setTimeout(() => progress.classList.remove('visible'), 800); }
+
+      let msg = `File IFC caricato: ${file.name}`;
+      if (data.n_piani_estratti) msg += ` · ${data.n_piani_estratti} piani estratti`;
+      if (data.svg_warning) msg += ` · ⚠ ${data.svg_warning}`;
+      showToast(msg, 'success');
+
+      // Aggiorna stato locale
+      _assetSelezionato.has_modello_3d = true;
+      _assetSelezionato.modello_3d_file = data.modello_3d_file;
+      if (data.svg_generati?.length) {
+        _assetSelezionato.has_bim = true;
+        _assetSelezionato.has_planimetria = true;
+        _assetSelezionato.floors = data.svg_generati.map((p, i) => ({
+          floor_id: p.floor_id, nome: p.nome, quota_m: p.quota_m,
+          level: i, svg_file: null, ifc_storey_guid: null
+        }));
+      }
+      aggiornaBadgeAsset(_assetSelezionato.id);
+      renderDettaglio();
+    } catch(e) {
+      if (progress) progress.classList.remove('visible');
+      showToast('Errore upload IFC: ' + e.message, 'error');
+    }
+    input.value = '';
+  }
+
+  // ── Upload SVG ──────────────────────────────────────────────────────────────
+  async function uploadSVG(input, floorId) {
+    if (!input.files[0] || !_assetSelezionato) return;
+    const file = input.files[0];
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`/api/bim/${_assetSelezionato.id}/floors/${floorId}/upload-svg`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + API.getToken() },
+        body: formData,
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Errore upload'); }
+      const data = await res.json();
+      showToast(`SVG caricato per piano ${floorId}`, 'success');
+      // Aggiorna floors localmente
+      const f = _assetSelezionato.floors.find(f => f.floor_id === floorId);
+      if (f) f.svg_file = data.svg_file;
+      _assetSelezionato.has_planimetria = true;
+      aggiornaBadgeAsset(_assetSelezionato.id);
+      renderDettaglio();
+    } catch(e) {
+      showToast('Errore upload SVG: ' + e.message, 'error');
+    }
+    input.value = '';
+  }
+
+  // ── Elimina IFC ─────────────────────────────────────────────────────────────
+  async function eliminaIFC() {
+    if (!_assetSelezionato) return;
+    showConfirm('Eliminare il file IFC del viewer 3D?', async () => {
+      try {
+        await API.request('DELETE', `/api/bim/${_assetSelezionato.id}/modello-3d`);
+        showToast('File IFC eliminato', 'success');
+        _assetSelezionato.has_modello_3d = false;
+        _assetSelezionato.modello_3d_file = null;
+        aggiornaBadgeAsset(_assetSelezionato.id);
+        renderDettaglio();
+      } catch(e) { showToast('Errore eliminazione IFC', 'error'); }
+    });
+  }
+
+  // ── Elimina SVG ─────────────────────────────────────────────────────────────
+  async function eliminaSVG(floorId) {
+    if (!_assetSelezionato) return;
+    showConfirm(`Eliminare l'SVG del piano ${floorId}?`, async () => {
+      try {
+        await API.request('DELETE', `/api/bim/${_assetSelezionato.id}/floors/${floorId}/svg`);
+        showToast('SVG eliminato', 'success');
+        const f = _assetSelezionato.floors.find(f => f.floor_id === floorId);
+        if (f) f.svg_file = null;
+        renderDettaglio();
+      } catch(e) { showToast('Errore eliminazione SVG', 'error'); }
+    });
+  }
+
+  // ── Aggiungi piano ──────────────────────────────────────────────────────────
+  function toggleAddFloor() {
+    const form = document.getElementById('add-floor-form');
+    if (form) form.classList.toggle('open');
+  }
+
+  async function aggiungiPiano() {
+    if (!_assetSelezionato) return;
+    const floorId = document.getElementById('new-floor-id')?.value.trim();
+    const nome = document.getElementById('new-floor-nome')?.value.trim();
+    const level = parseInt(document.getElementById('new-floor-level')?.value || '0');
+    const quota = parseFloat(document.getElementById('new-floor-quota')?.value || '0');
+
+    if (!floorId || !nome) { showToast('ID e Nome piano sono obbligatori', 'warning'); return; }
+
+    try {
+      await API.request('POST', `/api/bim/${_assetSelezionato.id}/floors`, { floor_id: floorId, nome, level, quota_m: quota });
+      showToast(`Piano ${nome} aggiunto`, 'success');
+      // Aggiorna floors localmente
+      _assetSelezionato.floors = _assetSelezionato.floors || [];
+      _assetSelezionato.floors.push({ floor_id: floorId, nome, level, quota_m: quota, svg_file: null });
+      _assetSelezionato.floors.sort((a, b) => a.level - b.level);
+      _assetSelezionato.has_bim = true;
+      _assetSelezionato.has_planimetria = true;
+      aggiornaBadgeAsset(_assetSelezionato.id);
+      renderDettaglio();
+    } catch(e) { showToast('Errore aggiunta piano: ' + (e.message || ''), 'error'); }
+  }
+
+  // ── Elimina piano ───────────────────────────────────────────────────────────
+  async function eliminaPiano(floorId) {
+    if (!_assetSelezionato) return;
+    showConfirm(`Eliminare il piano ${floorId} e tutti i suoi locali?`, async () => {
+      try {
+        await API.request('DELETE', `/api/bim/${_assetSelezionato.id}/floors/${floorId}`);
+        showToast(`Piano ${floorId} eliminato`, 'success');
+        _assetSelezionato.floors = _assetSelezionato.floors.filter(f => f.floor_id !== floorId);
+        if (!_assetSelezionato.floors.length) {
+          _assetSelezionato.has_bim = false;
+          _assetSelezionato.has_planimetria = false;
+        }
+        aggiornaBadgeAsset(_assetSelezionato.id);
+        renderDettaglio();
+      } catch(e) { showToast('Errore eliminazione piano', 'error'); }
+    });
+  }
+
+  // ── Aggiorna badge nella lista asset ───────────────────────────────────────
+  function aggiornaBadgeAsset(assetId) {
+    const a = _assets.find(x => x.id === assetId);
+    if (!a || !_assetSelezionato) return;
+    a.has_bim = _assetSelezionato.has_bim;
+    a.has_planimetria = _assetSelezionato.has_planimetria;
+    a.has_modello_3d = _assetSelezionato.has_modello_3d;
+    renderAssetList();
+    // Ri-seleziona la card
+    const card = document.querySelector(`.asset-card[data-id="${assetId}"]`);
+    if (card) card.classList.add('selected');
+  }
+  </script>
+</body>
+</html>

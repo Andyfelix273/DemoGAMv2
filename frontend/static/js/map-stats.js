@@ -710,14 +710,55 @@ function _getViewer3DIframe() {
 
 /**
  * Avvia il viewer 3D impostando src dell'iframe su ifc-viewer.html.
- * Il caricamento del file IFC (90 MB) parte solo quando la tab è attiva.
+ * Il caricamento del file IFC parte solo quando la tab è attiva.
+ * Se l'asset non ha has_modello_3d=TRUE (dal DB), mostra un messaggio informativo.
  */
 function _avviaViewer3D() {
   const iframe = _getViewer3DIframe();
   if (!iframe) return;
+
+  // Verifica se l'asset ha un modello 3D dal DB (window._assetApertoData)
+  const assetData = window._assetApertoData || {};
+  const hasModello3D = assetData.has_modello_3d || false;
+  const modello3dFile = assetData.modello_3d_file || null;
+
+  if (!hasModello3D) {
+    // Nessun modello 3D: nascondi iframe e mostra messaggio nel panel
+    iframe.style.display = 'none';
+    const panel = document.getElementById('mm-panel-viewer3d');
+    if (panel) {
+      const prev = panel.querySelector('.viewer3d-no-data');
+      if (prev) prev.remove();
+      const role = (typeof API !== 'undefined' && API.getRole) ? API.getRole() : '';
+      const assetId = window._assetApertoId;
+      const linkGestisci = ['manager','admin','superadmin'].includes(role)
+        ? `<div style="margin-top:10px"><a href="/static/bim-manager.html?asset_id=${assetId}" style="color:var(--accent-blue);font-size:12px"><i class="fa fa-cog"></i> Gestisci file BIM</a></div>`
+        : '';
+      const msg = document.createElement('div');
+      msg.className = 'viewer3d-no-data';
+      msg.style.cssText = 'text-align:center;padding:32px 20px;color:var(--text-secondary);display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%';
+      msg.innerHTML = `
+        <i class="fa fa-cube" style="font-size:32px;margin-bottom:12px;opacity:0.35"></i>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">Nessun modello 3D disponibile</div>
+        <div style="font-size:11px">Il file IFC non è stato ancora associato a questo asset.</div>
+        ${linkGestisci}
+      `;
+      panel.appendChild(msg);
+    }
+    return;
+  }
+
+  // Ripristina iframe se era nascosto e rimuovi eventuale messaggio
+  iframe.style.display = '';
+  const prev = document.querySelector('.viewer3d-no-data');
+  if (prev) prev.remove();
+
   if (!iframe.src || iframe.src === window.location.href || iframe.src === '') {
-    console.log('[Viewer3D] Avvio iframe → /static/ifc-viewer.html');
-    iframe.src = '/static/ifc-viewer.html';
+    // Passa il file IFC specifico dell'asset al viewer tramite URL param
+    const ifcParam = modello3dFile ? encodeURIComponent('/static/' + modello3dFile) : '';
+    const viewerUrl = '/static/ifc-viewer.html' + (ifcParam ? '?ifc=' + ifcParam : '');
+    console.log('[Viewer3D] Avvio iframe →', viewerUrl);
+    iframe.src = viewerUrl;
   }
 }
 

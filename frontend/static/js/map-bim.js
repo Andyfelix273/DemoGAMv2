@@ -48,12 +48,7 @@ const MM_IFC_PIANI = [
  */
 async function mmCaricaPlanimetria(assetId) {
   document.getElementById('mm-panel-planimetria').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
-  if (assetId === MM_IFC_ASSET_ID) {
-    // Usa direttamente i piani IFC reali senza chiamare il backend BIM simulato
-    _mmPlaniData = { bim: { piani: MM_IFC_PIANI, locali: [] } };
-    mmRenderPlanimetriaPanel();
-    return;
-  }
+  // Tutti gli asset ora leggono dal DB tramite /api/bim/{assetId}
   try {
     const res = await fetch(`/api/bim/${assetId}`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } });
     if (!res.ok) throw new Error('Dati planimetria non disponibili');
@@ -77,8 +72,8 @@ const MM_IFC_SVG_MAP = {
   'piano_2':          '/static/ifc/plans/piano_2.svg',
   'piano_copertura':  '/static/ifc/plans/copertura.svg',
 };
-// ID asset con planimetrie IFC reali — letto dalla configurazione centralizzata (config.js)
-const MM_IFC_ASSET_ID = GAM_CONFIG.IFC_ASSET_ID;
+// MM_IFC_ASSET_ID deprecato: ora la disponibilità SVG è determinata dal campo svg_file nel DB per ogni piano
+const MM_IFC_ASSET_ID = -1; // non più usato
 
 /**
  * Renderizza i pulsanti di selezione piano e il primo SVG nel panel Planimetria.
@@ -94,7 +89,8 @@ function mmRenderPlanimetriaPanel() {
   const bim = _mmPlaniData.bim;
   const piani = bim.piani;
   _mmPianoCorrente = piani[0].id;
-  const hasIFC = (_assetAperto === MM_IFC_ASSET_ID);
+  // Determina se almeno un piano ha un SVG reale (dal DB)
+  const hasIFC = bim.piani.some(p => p.svg_file);
 
   const pianiHtml = piani.map((p, i) =>
     `<button class="mm-piano-btn ${i===0?'active':''}" data-piano="${p.id}" onclick="mmSelezionaPiano('${p.id}', this)">${p.label}</button>`
@@ -122,7 +118,7 @@ function mmRenderPlanimetriaPanel() {
         ${pianiHtml}
       </div>
       <div class="mm-svg-container" id="mm-svg-container" style="position:relative">
-        ${hasIFC ? '<div id="mm-plani-inline" style="width:100%;height:100%"></div>' : '<svg id="mm-plani-svg" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg"></svg>'}
+        ${hasIFC ? '<div id="mm-plani-inline" style="width:100%;height:100%"></div>' : '<svg id="mm-plani-svg" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"></svg>'}
       </div>
       <div id="mm-space-tooltip" style="
         display:none;position:fixed;z-index:9999;
@@ -168,8 +164,13 @@ function mmRenderSVG(pianoId) {
   if (!_mmPlaniData) return;
   // Se asset con IFC reale: carica SVG inline via fetch per abilitare tooltip
   const inlineEl = document.getElementById('mm-plani-inline');
-  if (inlineEl && MM_IFC_SVG_MAP[pianoId]) {
-    const svgUrl = MM_IFC_SVG_MAP[pianoId] + '?v=' + Date.now();
+  // Determina URL SVG: prima dal DB (svg_file), poi dalla mappa legacy MM_IFC_SVG_MAP
+  const pianoData = _mmPlaniData?.bim?.piani?.find(p => p.id === pianoId);
+  const svgUrlDB = pianoData?.svg_file ? '/static/' + pianoData.svg_file : null;
+  const svgUrlLegacy = MM_IFC_SVG_MAP[pianoId] || null;
+  const svgUrlToLoad = svgUrlDB || svgUrlLegacy;
+  if (inlineEl && svgUrlToLoad) {
+    const svgUrl = svgUrlToLoad + '?v=' + Date.now();
     fetch(svgUrl)
       .then(r => r.text())
       .then(svgText => {
@@ -313,8 +314,8 @@ function _mmBindSpaceTooltips(svgEl) {
 // =============================================
 // TAB BIM — dati IFC reali nella modale
 // =============================================
-// ID asset con modello IFC reale per il panel BIM — letto dalla configurazione centralizzata (config.js)
-const BIM_IFC_ASSET_ID = GAM_CONFIG.IFC_ASSET_ID;
+// BIM_IFC_ASSET_ID deprecato: la disponibilità BIM è ora determinata dal DB (has_bim in assets)
+const BIM_IFC_ASSET_ID = -1; // non più usato
 let _mmBimData = null;
 
 /**
@@ -331,12 +332,19 @@ let _mmBimData = null;
  */
 async function mmCaricaBIM(assetId) {
   document.getElementById('mm-panel-bim').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
-  if (assetId !== BIM_IFC_ASSET_ID) {
+  // Verifica has_bim dal DB (iniettato da map-modal.js in window._assetApertoData)
+  const hasBim = window._assetApertoData?.has_bim || false;
+  if (!hasBim) {
+    const role = API.getRole();
+    const linkGestisci = ['manager','admin','superadmin'].includes(role)
+      ? `<div style="margin-top:10px"><a href="/static/bim-manager.html?asset_id=${assetId}" style="color:var(--accent-blue);font-size:12px"><i class="fa fa-cog"></i> Gestisci file BIM</a></div>`
+      : '';
     document.getElementById('mm-panel-bim').innerHTML =
       `<div style="text-align:center;padding:32px 20px;color:var(--text-secondary)">
          <i class="fa fa-cube" style="font-size:32px;margin-bottom:12px;display:block;opacity:0.35"></i>
          <div style="font-size:13px;font-weight:600;margin-bottom:4px">Nessun modello BIM disponibile</div>
          <div style="font-size:11px">Il modello IFC non è stato ancora associato a questo asset.</div>
+         ${linkGestisci}
        </div>`;
     return;
   }

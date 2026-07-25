@@ -15,7 +15,7 @@
  *   gestisciRicerca()       Filtra asset per nome/città/codice nella search box
  */
 /* global L, API, map, JAWG_TOKEN, ICONE_TIPO, COLORE_MARKER, COLORE_SELECTED,
-          COLORI_STATO, _assetStati, BIM_ASSET_IDS_MODAL, apriModaleAsset,
+          COLORI_STATO, _assetStati, apriModaleAsset,
           selezionaAsset, i18n */
 // =============================================
 // ROTTE MARITTIME

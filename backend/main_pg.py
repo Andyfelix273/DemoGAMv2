@@ -284,6 +284,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "reports.read",
         "settings.read",
         "planimetrie.read",
+        "bim.read",
         "stats.read",
         "thresholds.read",
         "esg.read",
@@ -301,6 +302,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "reports.read",
         "settings.read",
         "planimetrie.read",
+        "bim.read",
         "stats.read",
         "thresholds.read",
         "esg.read",
@@ -325,6 +327,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "reports.export",
         "settings.read",
         "planimetrie.read",
+        "bim.read",
+        "bim.manage",
         "stats.read",
         "thresholds.read",
         "esg.read",
@@ -354,6 +358,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "settings.read",
         "settings.update",
         "planimetrie.read",
+        "bim.read",
+        "bim.manage",
         "stats.read",
         "thresholds.read",
         "thresholds.update",
@@ -384,6 +390,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "settings.read",
         "settings.update",
         "planimetrie.read",
+        "bim.read",
+        "bim.manage",
         "stats.read",
         "thresholds.read",
         "thresholds.update",
@@ -499,6 +507,203 @@ def _migrate_codice_documents_deadlines(database_url: str):
         conn.close()
 
 _migrate_codice_documents_deadlines(DATABASE_URL)
+
+# ── Migrazione schema BIM ────────────────────────────────────────────────────
+def _migrate_bim_schema(database_url: str):
+    """Aggiunge colonne BIM ad assets e zones, crea directory upload BIM,
+    e migra i dati BIM_DATA hardcoded nel DB (eseguita una sola volta)."""
+    import psycopg2 as _pg
+    conn = _pg.connect(database_url)
+    cur = conn.cursor()
+    try:
+        # ─ assets: aggiungi colonne BIM ─────────────────────────────────────
+        for col, typedef in [
+            ('has_bim',        'BOOLEAN DEFAULT FALSE'),
+            ('has_planimetria','BOOLEAN DEFAULT FALSE'),
+            ('has_modello_3d', 'BOOLEAN DEFAULT FALSE'),
+            ('modello_3d_file','TEXT'),
+        ]:
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='assets' AND column_name=%s", (col,))
+            if not cur.fetchone():
+                cur.execute(f"ALTER TABLE assets ADD COLUMN {col} {typedef}")
+                print(f"[migrate_bim] Colonna {col} aggiunta ad assets")
+        # ─ zones: aggiungi coordinate planimetria schematica ─────────────────
+        for col, typedef in [
+            ('bim_x', 'NUMERIC(8,2)'),
+            ('bim_y', 'NUMERIC(8,2)'),
+            ('bim_w', 'NUMERIC(8,2)'),
+            ('bim_h', 'NUMERIC(8,2)'),
+            ('linked_asset_id', 'INTEGER'),
+        ]:
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='zones' AND column_name=%s", (col,))
+            if not cur.fetchone():
+                cur.execute(f"ALTER TABLE zones ADD COLUMN {col} {typedef}")
+                print(f"[migrate_bim] Colonna {col} aggiunta a zones")
+        # ─ floors: aggiungi quota_m se manca ──────────────────────────────────
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='floors' AND column_name='quota_m'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE floors ADD COLUMN quota_m NUMERIC(8,2) DEFAULT 0")
+            print("[migrate_bim] Colonna quota_m aggiunta a floors")
+        # ─ svg_element_id in zones (se manca) ───────────────────────────────
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='zones' AND column_name='svg_element_id'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE zones ADD COLUMN svg_element_id VARCHAR(100)")
+        conn.commit()
+        print("[migrate_bim] Schema BIM aggiornato OK")
+    except Exception as e:
+        conn.rollback()
+        print(f"[migrate_bim] Errore migrazione schema: {e}")
+        import traceback; traceback.print_exc()
+    finally:
+        cur.close()
+        conn.close()
+
+def _seed_bim_data(database_url: str):
+    """Migra BIM_DATA hardcoded nel DB (floors + zones + flag assets).
+    Eseguita solo se floors è vuota per gli asset BIM."""
+    import psycopg2 as _pg
+    # Dati BIM da migrare (ex BIM_DATA hardcoded)
+    BIM_SEED = {
+        1: {
+            "piani": [
+                {"id": "p0", "label": "Piano Terra", "quota_m": 0.0},
+                {"id": "p1", "label": "Piano 1",    "quota_m": 4.5},
+                {"id": "p2", "label": "Piano 2",    "quota_m": 9.0},
+            ],
+            "locali": [
+                {"id":"L01","piano":"p0","nome":"Reparto Produzione A","tipo":"produzione","mq":2800,"x":5,"y":5,"w":45,"h":30,"asset_id":1},
+                {"id":"L02","piano":"p0","nome":"Reparto Produzione B","tipo":"produzione","mq":2400,"x":55,"y":5,"w":38,"h":30,"asset_id":1},
+                {"id":"L03","piano":"p0","nome":"Magazzino Materie Prime","tipo":"magazzino","mq":1800,"x":5,"y":40,"w":35,"h":25,"asset_id":None},
+                {"id":"L04","piano":"p0","nome":"Centrale Termica","tipo":"impianto","mq":320,"x":45,"y":40,"w":15,"h":12,"asset_id":None},
+                {"id":"L05","piano":"p0","nome":"Cabina Elettrica","tipo":"impianto","mq":180,"x":65,"y":40,"w":12,"h":10,"asset_id":None},
+                {"id":"L06","piano":"p0","nome":"Ingresso / Reception","tipo":"comune","mq":220,"x":82,"y":5,"w":13,"h":12,"asset_id":None},
+                {"id":"L07","piano":"p0","nome":"Spogliatoi","tipo":"comune","mq":280,"x":82,"y":20,"w":13,"h":10,"asset_id":None},
+                {"id":"L11","piano":"p1","nome":"Uffici Tecnici","tipo":"ufficio","mq":950,"x":5,"y":5,"w":40,"h":22,"asset_id":None},
+                {"id":"L12","piano":"p1","nome":"Sala Controllo","tipo":"controllo","mq":420,"x":50,"y":5,"w":20,"h":22,"asset_id":1},
+                {"id":"L13","piano":"p1","nome":"Laboratorio Qualita","tipo":"laboratorio","mq":380,"x":75,"y":5,"w":20,"h":22,"asset_id":None},
+                {"id":"L14","piano":"p1","nome":"Sala Riunioni","tipo":"comune","mq":180,"x":5,"y":32,"w":20,"h":15,"asset_id":None},
+                {"id":"L15","piano":"p1","nome":"Archivio Tecnico","tipo":"archivio","mq":240,"x":30,"y":32,"w":20,"h":15,"asset_id":None},
+                {"id":"L21","piano":"p2","nome":"Direzione","tipo":"ufficio","mq":480,"x":5,"y":5,"w":30,"h":25,"asset_id":None},
+                {"id":"L22","piano":"p2","nome":"Sala Consiglio","tipo":"comune","mq":280,"x":40,"y":5,"w":25,"h":25,"asset_id":None},
+                {"id":"L23","piano":"p2","nome":"Open Space","tipo":"ufficio","mq":620,"x":70,"y":5,"w":25,"h":25,"asset_id":None},
+            ]
+        },
+        2: {
+            "piani": [
+                {"id": "p0", "label": "Piano Terra", "quota_m": 0.0},
+                {"id": "p1", "label": "Piano 1",    "quota_m": 4.2},
+            ],
+            "locali": [
+                {"id":"L01","piano":"p0","nome":"Produzione Principale","tipo":"produzione","mq":4200,"x":5,"y":5,"w":55,"h":35,"asset_id":2},
+                {"id":"L02","piano":"p0","nome":"Magazzino Prodotti Finiti","tipo":"magazzino","mq":2100,"x":65,"y":5,"w":30,"h":35,"asset_id":None},
+                {"id":"L03","piano":"p0","nome":"Manutenzione","tipo":"impianto","mq":480,"x":5,"y":45,"w":20,"h":18,"asset_id":None},
+                {"id":"L04","piano":"p0","nome":"Cabina Elettrica","tipo":"impianto","mq":160,"x":30,"y":45,"w":12,"h":10,"asset_id":None},
+                {"id":"L05","piano":"p0","nome":"Reception","tipo":"comune","mq":120,"x":47,"y":45,"w":12,"h":10,"asset_id":None},
+                {"id":"L11","piano":"p1","nome":"Uffici Amministrativi","tipo":"ufficio","mq":1200,"x":5,"y":5,"w":45,"h":28,"asset_id":None},
+                {"id":"L12","piano":"p1","nome":"Sala Controllo","tipo":"controllo","mq":360,"x":55,"y":5,"w":20,"h":28,"asset_id":2},
+                {"id":"L13","piano":"p1","nome":"Sala Riunioni","tipo":"comune","mq":220,"x":80,"y":5,"w":15,"h":28,"asset_id":None},
+            ]
+        },
+        6: {
+            "piani": [
+                {"id": "p0", "label": "Piano Terra",  "quota_m": 0.0},
+                {"id": "p1", "label": "Piano 1",      "quota_m": 3.5},
+                {"id": "p2", "label": "Piano 2",      "quota_m": 7.0},
+                {"id": "p3", "label": "Piano 3",      "quota_m": 10.5},
+            ],
+            "locali": [
+                {"id":"L01","piano":"p0","nome":"Reception / Lobby","tipo":"comune","mq":280,"x":10,"y":10,"w":35,"h":30,"asset_id":None},
+                {"id":"L02","piano":"p0","nome":"Sala Conferenze A","tipo":"comune","mq":180,"x":50,"y":10,"w":25,"h":20,"asset_id":None},
+                {"id":"L03","piano":"p0","nome":"Sala Conferenze B","tipo":"comune","mq":140,"x":50,"y":35,"w":25,"h":18,"asset_id":None},
+                {"id":"L04","piano":"p0","nome":"Centrale Tecnica","tipo":"impianto","mq":120,"x":80,"y":10,"w":15,"h":20,"asset_id":6},
+                {"id":"L11","piano":"p1","nome":"Open Space Marketing","tipo":"ufficio","mq":420,"x":5,"y":5,"w":45,"h":30,"asset_id":None},
+                {"id":"L12","piano":"p1","nome":"Uffici Commerciali","tipo":"ufficio","mq":320,"x":55,"y":5,"w":35,"h":30,"asset_id":None},
+                {"id":"L13","piano":"p1","nome":"Sala Riunioni","tipo":"comune","mq":120,"x":5,"y":40,"w":20,"h":18,"asset_id":None},
+                {"id":"L21","piano":"p2","nome":"Uffici IT","tipo":"ufficio","mq":380,"x":5,"y":5,"w":40,"h":30,"asset_id":None},
+                {"id":"L22","piano":"p2","nome":"Server Room","tipo":"impianto","mq":180,"x":50,"y":5,"w":20,"h":20,"asset_id":6},
+                {"id":"L23","piano":"p2","nome":"HR & Amministrazione","tipo":"ufficio","mq":280,"x":75,"y":5,"w":20,"h":30,"asset_id":None},
+                {"id":"L31","piano":"p3","nome":"Direzione Generale","tipo":"ufficio","mq":360,"x":5,"y":5,"w":35,"h":30,"asset_id":None},
+                {"id":"L32","piano":"p3","nome":"Sala Consiglio","tipo":"comune","mq":220,"x":45,"y":5,"w":25,"h":30,"asset_id":None},
+                {"id":"L33","piano":"p3","nome":"Terrazza","tipo":"comune","mq":180,"x":75,"y":5,"w":20,"h":30,"asset_id":None},
+            ]
+        },
+        7: {
+            "piani": [
+                {"id": "p0", "label": "Piano Terra", "quota_m": 0.0},
+                {"id": "p1", "label": "Piano 1",    "quota_m": 3.2},
+                {"id": "p2", "label": "Piano 2",    "quota_m": 6.4},
+            ],
+            "locali": [
+                {"id":"L01","piano":"p0","nome":"Reception","tipo":"comune","mq":120,"x":10,"y":10,"w":30,"h":25,"asset_id":None},
+                {"id":"L02","piano":"p0","nome":"Sala Riunioni","tipo":"comune","mq":90,"x":45,"y":10,"w":25,"h":20,"asset_id":None},
+                {"id":"L03","piano":"p0","nome":"Locale Tecnico","tipo":"impianto","mq":60,"x":75,"y":10,"w":15,"h":15,"asset_id":7},
+                {"id":"L11","piano":"p1","nome":"Open Space","tipo":"ufficio","mq":480,"x":5,"y":5,"w":55,"h":35,"asset_id":None},
+                {"id":"L12","piano":"p1","nome":"Uffici Privati","tipo":"ufficio","mq":220,"x":65,"y":5,"w":30,"h":35,"asset_id":None},
+                {"id":"L21","piano":"p2","nome":"Management","tipo":"ufficio","mq":320,"x":5,"y":5,"w":40,"h":30,"asset_id":None},
+                {"id":"L22","piano":"p2","nome":"Sala Formazione","tipo":"comune","mq":240,"x":50,"y":5,"w":30,"h":30,"asset_id":None},
+                {"id":"L23","piano":"p2","nome":"Sala Server","tipo":"impianto","mq":80,"x":85,"y":5,"w":10,"h":15,"asset_id":7},
+            ]
+        },
+    }
+    conn = _pg.connect(database_url)
+    cur = conn.cursor()
+    try:
+        for asset_id, data in BIM_SEED.items():
+            # Controlla se i dati sono già stati migrati
+            cur.execute("SELECT COUNT(*) FROM floors WHERE asset_id=%s", (asset_id,))
+            count = cur.fetchone()[0]
+            if count > 0:
+                continue  # già migrato
+            # Inserisci piani
+            for i, piano in enumerate(data["piani"]):
+                cur.execute("""
+                    INSERT INTO floors (asset_id, floor_id, nome, level, quota_m)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (asset_id, floor_id) DO NOTHING
+                """, (asset_id, piano["id"], piano["label"], i, piano["quota_m"]))
+            # Inserisci locali come zones
+            for loc in data["locali"]:
+                cur.execute("""
+                    INSERT INTO zones (asset_id, floor_id, zone_id, nome, tipo, superficie_mq,
+                                       bim_x, bim_y, bim_w, bim_h, linked_asset_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (asset_id, zone_id) DO UPDATE SET
+                        bim_x=EXCLUDED.bim_x, bim_y=EXCLUDED.bim_y,
+                        bim_w=EXCLUDED.bim_w, bim_h=EXCLUDED.bim_h,
+                        linked_asset_id=EXCLUDED.linked_asset_id
+                """, (asset_id, loc["piano"], loc["id"], loc["nome"], loc["tipo"],
+                       loc["mq"], loc["x"], loc["y"], loc["w"], loc["h"],
+                       loc["asset_id"]))
+            # Aggiorna flag has_bim e has_planimetria
+            cur.execute("""
+                UPDATE assets SET has_bim=TRUE, has_planimetria=TRUE WHERE id=%s
+            """, (asset_id,))
+            print(f"[seed_bim] Asset {asset_id}: {len(data['piani'])} piani, {len(data['locali'])} locali migrati")
+        # Asset 6: ha anche SVG IFC reali
+        cur.execute("""
+            UPDATE floors SET svg_file=%s WHERE asset_id=6 AND floor_id='p0'
+        """, ('ifc/plans/piano_terra.svg',))
+        cur.execute("""
+            UPDATE floors SET svg_file=%s WHERE asset_id=6 AND floor_id='p1'
+        """, ('ifc/plans/piano_1.svg',))
+        cur.execute("""
+            UPDATE floors SET svg_file=%s WHERE asset_id=6 AND floor_id='p2'
+        """, ('ifc/plans/piano_2.svg',))
+        cur.execute("""
+            UPDATE floors SET svg_file=%s WHERE asset_id=6 AND floor_id='p3'
+        """, ('ifc/plans/copertura.svg',))
+        conn.commit()
+        print("[seed_bim] Seed BIM completato OK")
+    except Exception as e:
+        conn.rollback()
+        print(f"[seed_bim] Errore: {e}")
+        import traceback; traceback.print_exc()
+    finally:
+        cur.close()
+        conn.close()
+
+_migrate_bim_schema(DATABASE_URL)
+_seed_bim_data(DATABASE_URL)
 
 # ── Modulo Referenti ────────────────────────────────────────────────────────
 migrate_referenti_schema(DATABASE_URL)
@@ -2139,207 +2344,345 @@ def get_stats_operational(db=Depends(get_db), _=Depends(richiedi_permesso("asset
     }
 
 
-# ── BIM Viewer ───────────────────────────────────────────────────────────────
+# ── BIM Viewer (DB-driven) ───────────────────────────────────────────────────
+# Tutti i dati BIM sono ora nel DB (tabelle floors, zones, assets).
+# BIM_DATA hardcoded è stato rimosso — usare gli endpoint /api/bim/* qui sotto.
 
-# Dati planimetrici simulati per edificio (keyed by asset_id)
-BIM_DATA = {
-    # Stabilimento Nord Milano (id=1, 18000 mq, 3 piani)
-    1: {
-        "nome": "Stabilimento Nord Milano",
-        "citta": "Sesto San Giovanni",
-        "anno": 1987,
-        "superficie_mq": 18000,
-        "ifc_url": "https://view.ifcopenshell.org/",
-        "piani": [
-            {"id": "p0", "label": "Piano Terra", "quota_m": 0.0},
-            {"id": "p1", "label": "Piano 1",    "quota_m": 4.5},
-            {"id": "p2", "label": "Piano 2",    "quota_m": 9.0},
-        ],
-        "locali": [
-            {"id":"L01","piano":"p0","nome":"Reparto Produzione A","tipo":"produzione","mq":2800,"x":5,"y":5,"w":45,"h":30,"asset_id":1},
-            {"id":"L02","piano":"p0","nome":"Reparto Produzione B","tipo":"produzione","mq":2400,"x":55,"y":5,"w":38,"h":30,"asset_id":1},
-            {"id":"L03","piano":"p0","nome":"Magazzino Materie Prime","tipo":"magazzino","mq":1800,"x":5,"y":40,"w":35,"h":25,"asset_id":None},
-            {"id":"L04","piano":"p0","nome":"Centrale Termica","tipo":"impianto","mq":320,"x":45,"y":40,"w":15,"h":12,"asset_id":None},
-            {"id":"L05","piano":"p0","nome":"Cabina Elettrica","tipo":"impianto","mq":180,"x":65,"y":40,"w":12,"h":10,"asset_id":None},
-            {"id":"L06","piano":"p0","nome":"Ingresso / Reception","tipo":"comune","mq":220,"x":82,"y":5,"w":13,"h":12,"asset_id":None},
-            {"id":"L07","piano":"p0","nome":"Spogliatoi","tipo":"comune","mq":280,"x":82,"y":20,"w":13,"h":10,"asset_id":None},
-            {"id":"L11","piano":"p1","nome":"Uffici Tecnici","tipo":"ufficio","mq":950,"x":5,"y":5,"w":40,"h":22,"asset_id":None},
-            {"id":"L12","piano":"p1","nome":"Sala Controllo","tipo":"controllo","mq":420,"x":50,"y":5,"w":20,"h":22,"asset_id":1},
-            {"id":"L13","piano":"p1","nome":"Laboratorio Qualita'","tipo":"laboratorio","mq":380,"x":75,"y":5,"w":20,"h":22,"asset_id":None},
-            {"id":"L14","piano":"p1","nome":"Sala Riunioni","tipo":"comune","mq":180,"x":5,"y":32,"w":20,"h":15,"asset_id":None},
-            {"id":"L15","piano":"p1","nome":"Archivio Tecnico","tipo":"archivio","mq":240,"x":30,"y":32,"w":20,"h":15,"asset_id":None},
-            {"id":"L21","piano":"p2","nome":"Direzione","tipo":"ufficio","mq":480,"x":5,"y":5,"w":30,"h":25,"asset_id":None},
-            {"id":"L22","piano":"p2","nome":"Sala Consiglio","tipo":"comune","mq":280,"x":40,"y":5,"w":25,"h":25,"asset_id":None},
-            {"id":"L23","piano":"p2","nome":"Open Space","tipo":"ufficio","mq":620,"x":70,"y":5,"w":25,"h":25,"asset_id":None},
-        ]
-    },
-    # Stabilimento Torino Est (id=2, 12500 mq, 2 piani)
-    2: {
-        "nome": "Stabilimento Torino Est",
-        "citta": "Torino",
-        "anno": 1995,
-        "superficie_mq": 12500,
-        "ifc_url": "https://view.ifcopenshell.org/",
-        "piani": [
-            {"id": "p0", "label": "Piano Terra", "quota_m": 0.0},
-            {"id": "p1", "label": "Piano 1",    "quota_m": 4.2},
-        ],
-        "locali": [
-            {"id":"L01","piano":"p0","nome":"Produzione Principale","tipo":"produzione","mq":4200,"x":5,"y":5,"w":55,"h":35,"asset_id":2},
-            {"id":"L02","piano":"p0","nome":"Magazzino Prodotti Finiti","tipo":"magazzino","mq":2100,"x":65,"y":5,"w":30,"h":35,"asset_id":None},
-            {"id":"L03","piano":"p0","nome":"Manutenzione","tipo":"impianto","mq":480,"x":5,"y":45,"w":20,"h":18,"asset_id":None},
-            {"id":"L04","piano":"p0","nome":"Cabina Elettrica","tipo":"impianto","mq":160,"x":30,"y":45,"w":12,"h":10,"asset_id":None},
-            {"id":"L05","piano":"p0","nome":"Reception","tipo":"comune","mq":120,"x":47,"y":45,"w":12,"h":10,"asset_id":None},
-            {"id":"L11","piano":"p1","nome":"Uffici Amministrativi","tipo":"ufficio","mq":1200,"x":5,"y":5,"w":45,"h":28,"asset_id":None},
-            {"id":"L12","piano":"p1","nome":"Sala Controllo","tipo":"controllo","mq":360,"x":55,"y":5,"w":20,"h":28,"asset_id":2},
-            {"id":"L13","piano":"p1","nome":"Sala Riunioni","tipo":"comune","mq":220,"x":80,"y":5,"w":15,"h":28,"asset_id":None},
-        ]
-    },
-    # Sede Centrale Roma (id=6, 3200 mq, 4 piani)
-    6: {
-        "nome": "Sede Centrale Roma",
-        "citta": "Roma",
-        "anno": 2003,
-        "superficie_mq": 3200,
-        "ifc_url": "https://view.ifcopenshell.org/",
-        "piani": [
-            {"id": "p0", "label": "Piano Terra",  "quota_m": 0.0},
-            {"id": "p1", "label": "Piano 1",      "quota_m": 3.5},
-            {"id": "p2", "label": "Piano 2",      "quota_m": 7.0},
-            {"id": "p3", "label": "Piano 3",      "quota_m": 10.5},
-        ],
-        "locali": [
-            {"id":"L01","piano":"p0","nome":"Reception / Lobby","tipo":"comune","mq":280,"x":10,"y":10,"w":35,"h":30,"asset_id":None},
-            {"id":"L02","piano":"p0","nome":"Sala Conferenze A","tipo":"comune","mq":180,"x":50,"y":10,"w":25,"h":20,"asset_id":None},
-            {"id":"L03","piano":"p0","nome":"Sala Conferenze B","tipo":"comune","mq":140,"x":50,"y":35,"w":25,"h":18,"asset_id":None},
-            {"id":"L04","piano":"p0","nome":"Centrale Tecnica","tipo":"impianto","mq":120,"x":80,"y":10,"w":15,"h":20,"asset_id":6},
-            {"id":"L11","piano":"p1","nome":"Open Space Marketing","tipo":"ufficio","mq":420,"x":5,"y":5,"w":45,"h":30,"asset_id":None},
-            {"id":"L12","piano":"p1","nome":"Uffici Commerciali","tipo":"ufficio","mq":320,"x":55,"y":5,"w":35,"h":30,"asset_id":None},
-            {"id":"L13","piano":"p1","nome":"Sala Riunioni","tipo":"comune","mq":120,"x":5,"y":40,"w":20,"h":18,"asset_id":None},
-            {"id":"L21","piano":"p2","nome":"Uffici IT","tipo":"ufficio","mq":380,"x":5,"y":5,"w":40,"h":30,"asset_id":None},
-            {"id":"L22","piano":"p2","nome":"Server Room","tipo":"impianto","mq":180,"x":50,"y":5,"w":20,"h":20,"asset_id":6},
-            {"id":"L23","piano":"p2","nome":"HR & Amministrazione","tipo":"ufficio","mq":280,"x":75,"y":5,"w":20,"h":30,"asset_id":None},
-            {"id":"L31","piano":"p3","nome":"Direzione Generale","tipo":"ufficio","mq":360,"x":5,"y":5,"w":35,"h":30,"asset_id":None},
-            {"id":"L32","piano":"p3","nome":"Sala Consiglio","tipo":"comune","mq":220,"x":45,"y":5,"w":25,"h":30,"asset_id":None},
-            {"id":"L33","piano":"p3","nome":"Terrazza","tipo":"comune","mq":180,"x":75,"y":5,"w":20,"h":30,"asset_id":None},
-        ]
-    },
-    # Ufficio Milano Centro (id=7, 1800 mq, 3 piani)
-    7: {
-        "nome": "Ufficio Milano Centro",
-        "citta": "Milano",
-        "anno": 2011,
-        "superficie_mq": 1800,
-        "ifc_url": "https://view.ifcopenshell.org/",
-        "piani": [
-            {"id": "p0", "label": "Piano Terra", "quota_m": 0.0},
-            {"id": "p1", "label": "Piano 1",    "quota_m": 3.2},
-            {"id": "p2", "label": "Piano 2",    "quota_m": 6.4},
-        ],
-        "locali": [
-            {"id":"L01","piano":"p0","nome":"Reception","tipo":"comune","mq":120,"x":10,"y":10,"w":30,"h":25,"asset_id":None},
-            {"id":"L02","piano":"p0","nome":"Sala Riunioni","tipo":"comune","mq":90,"x":45,"y":10,"w":25,"h":20,"asset_id":None},
-            {"id":"L03","piano":"p0","nome":"Locale Tecnico","tipo":"impianto","mq":60,"x":75,"y":10,"w":15,"h":15,"asset_id":7},
-            {"id":"L11","piano":"p1","nome":"Open Space","tipo":"ufficio","mq":480,"x":5,"y":5,"w":55,"h":35,"asset_id":None},
-            {"id":"L12","piano":"p1","nome":"Uffici Privati","tipo":"ufficio","mq":220,"x":65,"y":5,"w":30,"h":35,"asset_id":None},
-            {"id":"L21","piano":"p2","nome":"Management","tipo":"ufficio","mq":320,"x":5,"y":5,"w":40,"h":30,"asset_id":None},
-            {"id":"L22","piano":"p2","nome":"Sala Formazione","tipo":"comune","mq":240,"x":50,"y":5,"w":30,"h":30,"asset_id":None},
-            {"id":"L23","piano":"p2","nome":"Sala Server","tipo":"impianto","mq":80,"x":85,"y":5,"w":10,"h":15,"asset_id":7},
-        ]
-    },
-}
+import shutil as _shutil
+
+# Directory per i file BIM caricati dagli utenti
+BIM_UPLOAD_DIR = os.path.join(STATIC_DIR, "ifc", "assets")
+os.makedirs(BIM_UPLOAD_DIR, exist_ok=True)
+
+
+def _bim_stato_operativo(asset_id: int, db) -> str:
+    """Calcola lo stato operativo di un asset per il BIM viewer."""
+    if not asset_id:
+        return "nessuno"
+    oggi = date.today().isoformat()
+    fra7 = (date.today() + timedelta(days=7)).isoformat()
+    if db.execute("SELECT 1 FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso') AND priorita='critica'", (asset_id,)).fetchone():
+        return "critico"
+    if db.execute("SELECT 1 FROM alarms WHERE asset_id=%s AND ack_at IS NULL AND livello='alarm'", (asset_id,)).fetchone():
+        return "critico"
+    if db.execute("SELECT 1 FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso') AND priorita='alta'", (asset_id,)).fetchone():
+        return "warning"
+    if db.execute("SELECT 1 FROM alarms WHERE asset_id=%s AND ack_at IS NULL AND livello='warning'", (asset_id,)).fetchone():
+        return "warning"
+    if db.execute("SELECT 1 FROM deadlines WHERE asset_id=%s AND stato='aperta' AND data_scadenza<=%s AND data_scadenza>=%s", (asset_id, fra7, oggi)).fetchone():
+        return "warning"
+    asset = db.execute("SELECT stato FROM assets WHERE id=%s", (asset_id,)).fetchone()
+    if asset and asset["stato"] == "inattivo":
+        return "inattivo"
+    return "ok"
 
 
 @app.get("/api/bim/edifici")
 def bim_edifici(_=Depends(get_utente_corrente), db=Depends(get_db)):
-    """Lista degli edifici con viewer BIM disponibile."""
-    oggi = date.today().isoformat()
-    fra7 = (date.today() + timedelta(days=7)).isoformat()
+    """Lista degli asset con dati BIM disponibili (has_bim=TRUE)."""
+    assets = db.execute("""
+        SELECT id, codice, nome, tipo, citta, stato, superficie_mq, anno_costruzione,
+               has_bim, has_planimetria, has_modello_3d, modello_3d_file
+        FROM assets
+        WHERE has_bim=TRUE OR has_planimetria=TRUE OR has_modello_3d=TRUE
+        ORDER BY nome
+    """).fetchall()
     result = []
-    for asset_id, bim in BIM_DATA.items():
-        asset = db.execute("SELECT id, codice, nome, tipo, citta, stato FROM assets WHERE id=%s", (asset_id,)).fetchone()
-        if not asset:
-            continue
-        stato_op = "ok"
-        if db.execute("SELECT 1 FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso') AND priorita='critica'", (asset_id,)).fetchone():
-            stato_op = "critico"
-        elif db.execute("SELECT 1 FROM alarms WHERE asset_id=%s AND ack_at IS NULL AND livello='alarm'", (asset_id,)).fetchone():
-            stato_op = "critico"
-        elif db.execute("SELECT 1 FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso') AND priorita='alta'", (asset_id,)).fetchone():
-            stato_op = "warning"
-        elif db.execute("SELECT 1 FROM alarms WHERE asset_id=%s AND ack_at IS NULL AND livello='warning'", (asset_id,)).fetchone():
-            stato_op = "warning"
-        elif db.execute("SELECT 1 FROM deadlines WHERE asset_id=%s AND stato='aperta' AND data_scadenza<=%s AND data_scadenza>=%s", (asset_id, fra7, oggi)).fetchone():
-            stato_op = "warning"
-        if asset["stato"] == "inattivo":
-            stato_op = "inattivo"
+    for a in assets:
+        n_piani = db.execute("SELECT COUNT(*) FROM floors WHERE asset_id=%s", (a["id"],)).fetchone()[0]
+        n_locali = db.execute("SELECT COUNT(*) FROM zones WHERE asset_id=%s", (a["id"],)).fetchone()[0]
+        stato_op = _bim_stato_operativo(a["id"], db)
         result.append({
-            "id": asset_id,
-            "codice": asset["codice"],
-            "nome": bim["nome"],
-            "citta": bim["citta"],
-            "tipo": asset["tipo"],
-            "stato_anagrafico": asset["stato"],
+            "id": a["id"],
+            "codice": a["codice"],
+            "nome": a["nome"],
+            "citta": a["citta"],
+            "tipo": a["tipo"],
+            "stato_anagrafico": a["stato"],
             "stato_operativo": stato_op,
-            "superficie_mq": bim["superficie_mq"],
-            "anno": bim["anno"],
-            "n_piani": len(bim["piani"]),
-            "n_locali": len(bim["locali"]),
-            "ifc_url": bim["ifc_url"],
+            "superficie_mq": a["superficie_mq"],
+            "anno": a["anno_costruzione"],
+            "n_piani": n_piani,
+            "n_locali": n_locali,
+            "has_bim": a["has_bim"],
+            "has_planimetria": a["has_planimetria"],
+            "has_modello_3d": a["has_modello_3d"],
+            "modello_3d_file": a["modello_3d_file"],
         })
     return result
 
 
 @app.get("/api/bim/{asset_id}")
 def bim_detail(asset_id: int, _=Depends(get_utente_corrente), db=Depends(get_db)):
-    """Dati planimetrici completi per un edificio: piani, locali, stato operativo per locale."""
-    if asset_id not in BIM_DATA:
-        raise HTTPException(status_code=404, detail="Edificio non presente nel viewer BIM")
-    bim = BIM_DATA[asset_id]
-    oggi = date.today().isoformat()
-    fra7 = (date.today() + timedelta(days=7)).isoformat()
-    asset_ids = list({l["asset_id"] for l in bim["locali"] if l["asset_id"]})
-    stati = {}
-    for aid in asset_ids:
-        s = "ok"
-        if db.execute("SELECT 1 FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso') AND priorita='critica'", (aid,)).fetchone():
-            s = "critico"
-        elif db.execute("SELECT 1 FROM alarms WHERE asset_id=%s AND ack_at IS NULL AND livello='alarm'", (aid,)).fetchone():
-            s = "critico"
-        elif db.execute("SELECT 1 FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso') AND priorita='alta'", (aid,)).fetchone():
-            s = "warning"
-        elif db.execute("SELECT 1 FROM alarms WHERE asset_id=%s AND ack_at IS NULL AND livello='warning'", (aid,)).fetchone():
-            s = "warning"
-        elif db.execute("SELECT 1 FROM deadlines WHERE asset_id=%s AND stato='aperta' AND data_scadenza<=%s AND data_scadenza>=%s", (aid, fra7, oggi)).fetchone():
-            s = "warning"
-        stati[aid] = s
+    """Dati planimetrici completi per un asset: piani, locali, stato operativo per locale."""
+    asset = db.execute("""
+        SELECT id, codice, nome, tipo, citta, stato, superficie_mq, anno_costruzione,
+               has_bim, has_planimetria, has_modello_3d, modello_3d_file
+        FROM assets WHERE id=%s
+    """, (asset_id,)).fetchone()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset non trovato")
+    if not asset["has_bim"] and not asset["has_planimetria"]:
+        raise HTTPException(status_code=404, detail="Nessun dato BIM disponibile per questo asset")
+
+    piani = db.execute("""
+        SELECT floor_id, nome, level, quota_m, svg_file, ifc_storey_guid
+        FROM floors WHERE asset_id=%s ORDER BY level
+    """, (asset_id,)).fetchall()
+
     locali_out = []
-    for loc in bim["locali"]:
-        aid = loc["asset_id"]
-        wo_count = 0
-        alarm_count = 0
-        if aid:
-            wo_count = db.execute("SELECT COUNT(*) FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso')", (aid,)).fetchone()[0]
-            alarm_count = db.execute("SELECT COUNT(*) FROM alarms WHERE asset_id=%s AND ack_at IS NULL", (aid,)).fetchone()[0]
-        locali_out.append({
-            **loc,
-            "stato_operativo": stati.get(aid, "ok") if aid else "nessuno",
-            "wo_aperti": wo_count,
-            "allarmi_attivi": alarm_count,
-        })
-    asset_db = db.execute("SELECT id, codice, nome, tipo, citta, stato, superficie_mq, anno_costruzione FROM assets WHERE id=%s", (asset_id,)).fetchone()
+    for piano in piani:
+        zones = db.execute("""
+            SELECT zone_id, nome, tipo, superficie_mq, capacita_persone,
+                   bim_x, bim_y, bim_w, bim_h, linked_asset_id, svg_element_id
+            FROM zones WHERE asset_id=%s AND floor_id=%s
+        """, (asset_id, piano["floor_id"])).fetchall()
+        for z in zones:
+            aid = z["linked_asset_id"]
+            wo_count = db.execute("SELECT COUNT(*) FROM work_orders WHERE asset_id=%s AND stato IN ('aperto','in_corso')", (aid,)).fetchone()[0] if aid else 0
+            alarm_count = db.execute("SELECT COUNT(*) FROM alarms WHERE asset_id=%s AND ack_at IS NULL", (aid,)).fetchone()[0] if aid else 0
+            locali_out.append({
+                "id": z["zone_id"],
+                "piano": piano["floor_id"],
+                "nome": z["nome"],
+                "tipo": z["tipo"],
+                "mq": float(z["superficie_mq"]) if z["superficie_mq"] else 0,
+                "x": float(z["bim_x"]) if z["bim_x"] is not None else 0,
+                "y": float(z["bim_y"]) if z["bim_y"] is not None else 0,
+                "w": float(z["bim_w"]) if z["bim_w"] is not None else 0,
+                "h": float(z["bim_h"]) if z["bim_h"] is not None else 0,
+                "asset_id": aid,
+                "svg_element_id": z["svg_element_id"],
+                "stato_operativo": _bim_stato_operativo(aid, db) if aid else "nessuno",
+                "wo_aperti": wo_count,
+                "allarmi_attivi": alarm_count,
+            })
+
     return {
-        "asset": dict(asset_db) if asset_db else {},
+        "asset": dict(asset),
         "bim": {
-            "nome": bim["nome"],
-            "citta": bim["citta"],
-            "anno": bim["anno"],
-            "superficie_mq": bim["superficie_mq"],
-            "ifc_url": bim["ifc_url"],
-            "piani": bim["piani"],
+            "has_bim": asset["has_bim"],
+            "has_planimetria": asset["has_planimetria"],
+            "has_modello_3d": asset["has_modello_3d"],
+            "modello_3d_file": asset["modello_3d_file"],
+            "piani": [{"id": p["floor_id"], "label": p["nome"], "quota_m": float(p["quota_m"] or 0), "svg_file": p["svg_file"], "ifc_storey_guid": p["ifc_storey_guid"]} for p in piani],
             "locali": locali_out,
         }
     }
+
+
+@app.get("/api/bim/{asset_id}/config")
+def bim_config_asset(asset_id: int, _=Depends(get_utente_corrente), db=Depends(get_db)):
+    """Configurazione BIM sintetica per un asset (usata dalla modale per decidere quali tab mostrare)."""
+    asset = db.execute("""
+        SELECT has_bim, has_planimetria, has_modello_3d, modello_3d_file
+        FROM assets WHERE id=%s
+    """, (asset_id,)).fetchone()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset non trovato")
+    n_piani = db.execute("SELECT COUNT(*) FROM floors WHERE asset_id=%s", (asset_id,)).fetchone()[0]
+    return {
+        "asset_id": asset_id,
+        "has_bim": bool(asset["has_bim"]),
+        "has_planimetria": bool(asset["has_planimetria"]),
+        "has_modello_3d": bool(asset["has_modello_3d"]),
+        "modello_3d_file": asset["modello_3d_file"],
+        "n_piani": n_piani,
+    }
+
+
+# ── BIM: Gestione piani (floors) ─────────────────────────────────────────────
+
+class FloorCreate(BaseModel):
+    floor_id: str
+    nome: str
+    level: int = 0
+    quota_m: float = 0.0
+
+class FloorUpdate(BaseModel):
+    nome: Optional[str] = None
+    level: Optional[int] = None
+    quota_m: Optional[float] = None
+
+@app.get("/api/bim/{asset_id}/floors")
+def bim_floors(asset_id: int, _=Depends(get_utente_corrente), db=Depends(get_db)):
+    """Lista piani di un asset."""
+    floors = db.execute("""
+        SELECT floor_id, nome, level, quota_m, svg_file, ifc_storey_guid
+        FROM floors WHERE asset_id=%s ORDER BY level
+    """, (asset_id,)).fetchall()
+    return [dict(f) for f in floors]
+
+@app.post("/api/bim/{asset_id}/floors")
+def bim_floor_create(asset_id: int, payload: FloorCreate,
+                     db=Depends(get_db), _=Depends(richiedi_permesso("bim.manage"))):
+    """Aggiunge un piano a un asset."""
+    db.execute("""
+        INSERT INTO floors (asset_id, floor_id, nome, level, quota_m)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (asset_id, floor_id) DO UPDATE SET nome=EXCLUDED.nome, level=EXCLUDED.level, quota_m=EXCLUDED.quota_m
+    """, (asset_id, payload.floor_id, payload.nome, payload.level, payload.quota_m))
+    db.execute("UPDATE assets SET has_bim=TRUE, has_planimetria=TRUE WHERE id=%s", (asset_id,))
+    db.commit()
+    return {"ok": True}
+
+@app.put("/api/bim/{asset_id}/floors/{floor_id}")
+def bim_floor_update(asset_id: int, floor_id: str, payload: FloorUpdate,
+                     db=Depends(get_db), _=Depends(richiedi_permesso("bim.manage"))):
+    """Modifica un piano."""
+    updates = {k: v for k, v in payload.dict().items() if v is not None}
+    if not updates:
+        return {"ok": True}
+    set_clause = ", ".join(f"{k}=%s" for k in updates)
+    db.execute(f"UPDATE floors SET {set_clause} WHERE asset_id=%s AND floor_id=%s",
+               (*updates.values(), asset_id, floor_id))
+    db.commit()
+    return {"ok": True}
+
+@app.delete("/api/bim/{asset_id}/floors/{floor_id}")
+def bim_floor_delete(asset_id: int, floor_id: str,
+                     db=Depends(get_db), _=Depends(richiedi_permesso("bim.manage"))):
+    """Elimina un piano e tutti i suoi locali."""
+    db.execute("DELETE FROM zones WHERE asset_id=%s AND floor_id=%s", (asset_id, floor_id))
+    db.execute("DELETE FROM floors WHERE asset_id=%s AND floor_id=%s", (asset_id, floor_id))
+    # Aggiorna flag
+    n = db.execute("SELECT COUNT(*) FROM floors WHERE asset_id=%s", (asset_id,)).fetchone()[0]
+    if n == 0:
+        db.execute("UPDATE assets SET has_bim=FALSE, has_planimetria=FALSE WHERE id=%s", (asset_id,))
+    db.commit()
+    return {"ok": True}
+
+
+# ── BIM: Upload file IFC (viewer 3D) ─────────────────────────────────────────
+
+@app.post("/api/bim/{asset_id}/upload-ifc")
+async def bim_upload_ifc(
+    asset_id: int,
+    file: UploadFile = File(...),
+    genera_svg: bool = False,
+    db=Depends(get_db),
+    _=Depends(richiedi_permesso("bim.manage"))
+):
+    """Carica un file IFC per il viewer 3D di un asset.
+    Se genera_svg=True, tenta di estrarre i metadati dei piani dal file IFC."""
+    asset = db.execute("SELECT id, nome FROM assets WHERE id=%s", (asset_id,)).fetchone()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset non trovato")
+
+    # Salva il file IFC
+    asset_dir = os.path.join(BIM_UPLOAD_DIR, str(asset_id))
+    os.makedirs(asset_dir, exist_ok=True)
+    ifc_filename = f"modello_3d_{asset_id}.ifc"
+    ifc_path = os.path.join(asset_dir, ifc_filename)
+    content = await file.read()
+    with open(ifc_path, "wb") as f_out:
+        f_out.write(content)
+
+    # Percorso relativo per il DB (relativo a STATIC_DIR)
+    ifc_rel = f"ifc/assets/{asset_id}/{ifc_filename}"
+
+    # Aggiorna il DB
+    db.execute("""
+        UPDATE assets SET has_modello_3d=TRUE, modello_3d_file=%s WHERE id=%s
+    """, (ifc_rel, asset_id))
+    db.commit()
+
+    result = {"ok": True, "modello_3d_file": ifc_rel, "svg_generati": []}
+
+    # Opzionale: estrai metadati piani dal file IFC
+    if genera_svg:
+        try:
+            import ifcopenshell
+            ifc_model = ifcopenshell.open(ifc_path)
+            storeys = ifc_model.by_type("IfcBuildingStorey")
+            svg_generati = []
+            for i, storey in enumerate(storeys):
+                # Filtra piani strutturali (Foundation, Roof, ecc.)
+                nome = storey.Name or f"Piano {i}"
+                quota_raw = storey.Elevation or 0
+                quota_m = round(quota_raw / 1000.0, 2) if abs(quota_raw) > 100 else round(float(quota_raw), 2)
+                floor_id = f"ifc_p{i}"
+                # Inserisci piano nel DB
+                db.execute("""
+                    INSERT INTO floors (asset_id, floor_id, nome, level, quota_m, ifc_storey_guid)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (asset_id, floor_id) DO UPDATE SET
+                        nome=EXCLUDED.nome, level=EXCLUDED.level,
+                        quota_m=EXCLUDED.quota_m, ifc_storey_guid=EXCLUDED.ifc_storey_guid
+                """, (asset_id, floor_id, nome, i, quota_m, storey.GlobalId))
+                svg_generati.append({"floor_id": floor_id, "nome": nome, "quota_m": quota_m})
+            db.execute("UPDATE assets SET has_bim=TRUE, has_planimetria=TRUE WHERE id=%s", (asset_id,))
+            db.commit()
+            result["svg_generati"] = svg_generati
+            result["n_piani_estratti"] = len(svg_generati)
+        except Exception as e:
+            result["svg_warning"] = f"Estrazione metadati IFC non riuscita: {str(e)}"
+
+    return result
+
+
+# ── BIM: Upload SVG planimetria per piano ─────────────────────────────────────
+
+@app.post("/api/bim/{asset_id}/floors/{floor_id}/upload-svg")
+async def bim_upload_svg(
+    asset_id: int,
+    floor_id: str,
+    file: UploadFile = File(...),
+    db=Depends(get_db),
+    _=Depends(richiedi_permesso("bim.manage"))
+):
+    """Carica un file SVG planimetria per un piano specifico."""
+    # Verifica che il piano esista
+    floor = db.execute("SELECT id FROM floors WHERE asset_id=%s AND floor_id=%s", (asset_id, floor_id)).fetchone()
+    if not floor:
+        raise HTTPException(status_code=404, detail=f"Piano {floor_id} non trovato per asset {asset_id}")
+
+    # Salva il file SVG
+    asset_dir = os.path.join(BIM_UPLOAD_DIR, str(asset_id), "plans")
+    os.makedirs(asset_dir, exist_ok=True)
+    svg_filename = f"piano_{floor_id}.svg"
+    svg_path = os.path.join(asset_dir, svg_filename)
+    content = await file.read()
+    with open(svg_path, "wb") as f_out:
+        f_out.write(content)
+
+    # Percorso relativo per il DB
+    svg_rel = f"ifc/assets/{asset_id}/plans/{svg_filename}"
+
+    # Aggiorna il DB
+    db.execute("UPDATE floors SET svg_file=%s WHERE asset_id=%s AND floor_id=%s",
+               (svg_rel, asset_id, floor_id))
+    db.execute("UPDATE assets SET has_planimetria=TRUE WHERE id=%s", (asset_id,))
+    db.commit()
+
+    return {"ok": True, "svg_file": svg_rel}
+
+
+# ── BIM: Elimina file IFC o SVG ───────────────────────────────────────────────
+
+@app.delete("/api/bim/{asset_id}/modello-3d")
+def bim_delete_ifc(asset_id: int, db=Depends(get_db), _=Depends(richiedi_permesso("bim.manage"))):
+    """Rimuove il file IFC del viewer 3D da un asset."""
+    asset = db.execute("SELECT modello_3d_file FROM assets WHERE id=%s", (asset_id,)).fetchone()
+    if asset and asset["modello_3d_file"]:
+        full_path = os.path.join(STATIC_DIR, asset["modello_3d_file"])
+        if os.path.exists(full_path):
+            os.remove(full_path)
+    db.execute("UPDATE assets SET has_modello_3d=FALSE, modello_3d_file=NULL WHERE id=%s", (asset_id,))
+    db.commit()
+    return {"ok": True}
+
+@app.delete("/api/bim/{asset_id}/floors/{floor_id}/svg")
+def bim_delete_svg(asset_id: int, floor_id: str, db=Depends(get_db), _=Depends(richiedi_permesso("bim.manage"))):
+    """Rimuove l'SVG planimetria di un piano."""
+    floor = db.execute("SELECT svg_file FROM floors WHERE asset_id=%s AND floor_id=%s", (asset_id, floor_id)).fetchone()
+    if floor and floor["svg_file"]:
+        full_path = os.path.join(STATIC_DIR, floor["svg_file"])
+        if os.path.exists(full_path):
+            os.remove(full_path)
+    db.execute("UPDATE floors SET svg_file=NULL WHERE asset_id=%s AND floor_id=%s", (asset_id, floor_id))
+    db.commit()
+    return {"ok": True}
 
 
 # ── Redirect root → login ────────────────────────────────────────────────────
