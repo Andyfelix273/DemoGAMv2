@@ -274,13 +274,25 @@ async function apriModaleAsset(id) {
         : '';
       const lista = docs.length === 0
         ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-folder-open-o"></i> Nessun documento allegato</p>'
-        : docs.map(d => `<div class="mm-alarm-row">
-            <i class="fa ${icona2(d.tipo_mime)}" style="color:#3498DB;font-size:16px;min-width:20px"></i>
-            <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
-            <span style="flex:1;font-size:13px;margin-left:8px">${d.nome_file}</span>
-            <span style="font-size:11px;color:var(--text-secondary)">${fmtSize(d.dimensione)}</span>
-            <a href="${API.getDocumentDownloadUrl(d.id)}" target="_blank" class="btn btn-secondary btn-sm" style="margin-left:8px;padding:2px 8px"><i class="fa fa-download"></i></a>
-          </div>`).join('');
+        : docs.map(d => {
+            const isPdf = (d.tipo_mime === 'application/pdf') || d.nome_file.toLowerCase().endsWith('.pdf');
+            const viewBtn = isPdf
+              ? `<button onclick="_mmApriViewerPdf(${d.id}, '${d.nome_file.replace(/'/g, "\\'")}')"
+                   class="btn btn-secondary btn-sm" style="margin-left:4px;padding:2px 8px" title="Visualizza PDF">
+                   <i class="fa fa-eye"></i>
+                 </button>`
+              : '';
+            return `<div class="mm-alarm-row">
+              <i class="fa ${icona2(d.tipo_mime)}" style="color:#3498DB;font-size:16px;min-width:20px"></i>
+              <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
+              <span style="flex:1;font-size:13px;margin-left:8px">${d.nome_file}</span>
+              <span style="font-size:11px;color:var(--text-secondary)">${fmtSize(d.dimensione)}</span>
+              ${viewBtn}
+              <a href="${API.getDocumentDownloadUrl(d.id)}" target="_blank" class="btn btn-secondary btn-sm" style="margin-left:4px;padding:2px 8px" title="Scarica">
+                <i class="fa fa-download"></i>
+              </a>
+            </div>`;
+          }).join('');
       // Pulsante upload + input nascosto + lista
       const canUpload = API.can('documents.upload');
       const uploadBar = canUpload
@@ -382,6 +394,78 @@ function chiudiModaleAsset() {
   document.getElementById('map-modal-overlay').classList.remove('open');
   _assetAperto = null;
   window._assetApertoId = null;
+}
+
+
+// =============================================
+// VIEWER PDF — funzione helper
+// =============================================
+
+/**
+ * Apre un viewer PDF inline in una modale sovrapposta.
+ * Usa l'elemento <iframe> con l'URL di download del documento.
+ * Funziona per qualsiasi PDF servito dall'endpoint /api/documents/{id}/download.
+ */
+function _mmApriViewerPdf(docId, nomeFile) {
+  // Rimuovi viewer precedente se esiste
+  const old = document.getElementById('mm-pdf-viewer-overlay');
+  if (old) old.remove();
+
+  const url = API.getDocumentDownloadUrl(docId);
+  const overlay = document.createElement('div');
+  overlay.id = 'mm-pdf-viewer-overlay';
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'background:rgba(0,0,0,0.82)',
+    'z-index:5000', 'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center', 'padding:20px'
+  ].join(';');
+
+  overlay.innerHTML = `
+    <div style="width:100%;max-width:900px;height:90vh;display:flex;flex-direction:column;
+                background:var(--bg-panel,#0D1B2A);border:1px solid var(--border,#1E3A5F);
+                border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+      <!-- Header viewer -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:12px 18px;border-bottom:1px solid var(--border,#1E3A5F);flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <i class="fa fa-file-pdf-o" style="color:#E74C3C;font-size:16px;"></i>
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary,#E0F0FF);">${nomeFile}</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a href="${url}" target="_blank"
+             style="padding:5px 12px;background:var(--accent-dim,rgba(0,180,216,0.15));
+                    border:1px solid var(--accent,#00B4D8);border-radius:5px;
+                    color:var(--accent,#00B4D8);font-size:12px;text-decoration:none;
+                    display:flex;align-items:center;gap:5px;">
+            <i class="fa fa-download"></i> Scarica
+          </a>
+          <button onclick="document.getElementById('mm-pdf-viewer-overlay').remove()"
+                  style="padding:5px 12px;background:none;border:1px solid var(--border,#1E3A5F);
+                         border-radius:5px;color:var(--text-secondary,#7BAFC4);cursor:pointer;
+                         font-size:18px;line-height:1;">&times;</button>
+        </div>
+      </div>
+      <!-- Iframe PDF -->
+      <div style="flex:1;overflow:hidden;">
+        <iframe src="${url}" style="width:100%;height:100%;border:none;"
+                title="${nomeFile}">
+          <p style="color:#aaa;padding:20px;text-align:center;">
+            Il browser non supporta la visualizzazione inline dei PDF.
+            <a href="${url}" target="_blank" style="color:var(--accent,#00B4D8);">Apri in una nuova scheda</a>
+          </p>
+        </iframe>
+      </div>
+    </div>`;
+
+  // Chiudi cliccando fuori dalla modale
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  // Chiudi con Escape
+  const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+
+  document.body.appendChild(overlay);
 }
 
 
