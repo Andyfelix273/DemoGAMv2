@@ -58,6 +58,13 @@ if not hasattr(bcrypt, "__about__"):
 from passlib.context import CryptContext
 
 from pydantic import BaseModel
+# ── Modulo Referenti ────────────────────────────────────────────────────────
+from referenti_pg import (
+    migrate_referenti_schema,
+    seed_referenti,
+    register_referenti_routes,
+)
+
 # ── Moduli Asset Efficiency (energy + occupancy) ─────────────────────────────
 from energy_pg import (
     migrate_bems_studio_schema,
@@ -451,6 +458,12 @@ seed_occupancy_history(DATABASE_URL, giorni=30)
 register_energy_routes(app, get_db, get_utente_corrente)
 register_occupancy_routes(app, get_db, get_utente_corrente)
 print("[main] Asset Efficiency routes registered OK")
+
+# ── Modulo Referenti ────────────────────────────────────────────────────────
+migrate_referenti_schema(DATABASE_URL)
+seed_referenti(DATABASE_URL)
+register_referenti_routes(app, get_db, get_utente_corrente, richiedi_permesso)
+print("[main] Referenti routes registered OK")
 
 
 # ── Endpoint autenticazione ──────────────────────────────────────────────────

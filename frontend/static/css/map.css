@@ -1349,6 +1349,56 @@
   .mm-esg-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
   .mm-esg-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
 
+  /* ── Sezione Referenti nella modale ── */
+  .mm-referenti-section { margin-top: 20px; }
+  .mm-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-secondary); padding-bottom: 8px;
+    border-bottom: 1px solid var(--border); margin-bottom: 12px;
+  }
+  .mm-btn-add-ref {
+    background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent);
+    border-radius: 5px; padding: 3px 8px; cursor: pointer; font-size: 11px;
+    transition: all 0.15s;
+  }
+  .mm-btn-add-ref:hover { background: var(--accent); color: #fff; }
+  .mm-ref-group-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-secondary); margin-bottom: 6px;
+  }
+  .mm-ref-grid { display: flex; flex-direction: column; gap: 6px; }
+  .mm-ref-card {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+    transition: border-color 0.15s;
+  }
+  .mm-ref-card:hover { border-color: var(--accent); }
+  .mm-ref-card.mm-ref-empty { opacity: 0.55; }
+  .mm-ref-icon {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-dim); display: flex; align-items: center; justify-content: center;
+    color: var(--accent); font-size: 12px; flex-shrink: 0; margin-top: 2px;
+  }
+  .mm-ref-body { flex: 1; min-width: 0; }
+  .mm-ref-ruolo { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 2px; }
+  .mm-ref-nome { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .mm-ref-contatti { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .mm-ref-link {
+    font-size: 11px; color: var(--accent); text-decoration: none;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .mm-ref-link:hover { text-decoration: underline; }
+  .mm-ref-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .mm-ref-edit-btn, .mm-ref-remove-btn {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text-secondary); padding: 3px 6px; cursor: pointer; font-size: 11px;
+    transition: all 0.15s;
+  }
+  .mm-ref-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .mm-ref-remove-btn:hover { border-color: #E74C3C; color: #E74C3C; }
+
   /* ── Planimetria SVG nella modale ── */
   .mm-plani-wrap { display: flex; flex-direction: column; gap: 12px; }
   .mm-plani-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

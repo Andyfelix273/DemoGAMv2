@@ -83,7 +83,12 @@ async function apriModaleAsset(id) {
   window._assetApertoId = id; // esposto globalmente per il viewer 3D
 
   try {
-    const d = await API.getAsset(id);
+    const [d, referenti] = await Promise.all([
+      API.getAsset(id),
+      fetch('/api/assets/' + id + '/referenti', { headers: { 'Authorization': 'Bearer ' + API.getToken() } })
+        .then(r => r.ok ? r.json() : [])
+        .catch(() => [])
+    ]);
     const a = d.asset;
     const m = d.monitoraggio || {};
     const esg = d.esg || {};
@@ -128,18 +133,30 @@ async function apriModaleAsset(id) {
       ['Indirizzo', a.indirizzo], ['Città', a.citta + (a.provincia ? ' (' + a.provincia + ')' : '')],
       ['CAP', a.cap], ['Superficie', a.superficie_mq ? a.superficie_mq.toLocaleString('it-IT') + ' mq' : '–'],
       ['Anno costruzione', a.anno_costruzione || '–'],
-      ['Referente', a.referente || '–'], ['Telefono', a.telefono || '–'],
-      ['Email', a.email || '–'], ['Coordinate', a.lat.toFixed(5) + ', ' + a.lon.toFixed(5)],
+      ['Coordinate', a.lat.toFixed(5) + ', ' + a.lon.toFixed(5)],
       ['Note', a.note || '–', true]
     ];
-    document.getElementById('mm-panel-anagrafica').innerHTML = `<div class="mm-detail-grid">${
-      campi.map(([lbl, val, full]) =>
-        `<div class="mm-detail-row${full ? ' full' : ''}">
-          <span class="mm-detail-label">${lbl}</span>
-          <span class="mm-detail-value">${val || '–'}</span>
-        </div>`
-      ).join('')
-    }</div>`;
+
+    // ── Sezione Referenti ────────────────────────────────────────────────────
+    const canEdit = API.can('assets.update');
+    const refHtml = _renderReferenti(referenti, id, canEdit);
+
+    document.getElementById('mm-panel-anagrafica').innerHTML =
+      `<div class="mm-detail-grid">${
+        campi.map(([lbl, val, full]) =>
+          `<div class="mm-detail-row${full ? ' full' : ''}">
+            <span class="mm-detail-label">${lbl}</span>
+            <span class="mm-detail-value">${val || '–'}</span>
+          </div>`
+        ).join('')
+      }</div>
+      <div class="mm-referenti-section">
+        <div class="mm-section-header">
+          <i class="fas fa-users" style="margin-right:6px;color:var(--accent);"></i>Referenti
+          ${canEdit ? `<button class="mm-btn-add-ref" onclick="_apriModaleNuovoReferente(${id})" title="Aggiungi referente"><i class="fas fa-plus"></i></button>` : ''}
+        </div>
+        ${refHtml}
+      </div>`;
 
     // Tab Monitoraggio
     let monHtml = '';
@@ -365,3 +382,310 @@ function chiudiModaleAsset() {
   window._assetApertoId = null;
 }
 
+
+// =============================================
+// SEZIONE REFERENTI — helper functions
+// =============================================
+
+/**
+ * Renderizza la griglia dei referenti per la tab Anagrafica.
+ * Mostra tutti gli slot (obbligatori e facoltativi), con card compatte.
+ */
+function _renderReferenti(referenti, assetId, canEdit) {
+  if (!referenti || referenti.length === 0) {
+    return '<p style="color:var(--text-secondary);font-size:12px;padding:8px 0;">Nessun referente associato.</p>';
+  }
+
+  const iconeRuolo = {
+    responsabile_asset:        'fa-user-tie',
+    responsabile_manutenzione: 'fa-wrench',
+    responsabile_sicurezza:    'fa-shield-alt',
+    facility_manager:          'fa-building',
+    responsabile_it:           'fa-server',
+    responsabile_energia:      'fa-bolt',
+    proprietario:              'fa-landmark',
+    locatore:                  'fa-key',
+    fornitore_manutenzione:    'fa-tools',
+    referente_legale:          'fa-balance-scale',
+    referente_emergenze:       'fa-fire-extinguisher',
+  };
+
+  // Separa obbligatori e facoltativi
+  const obbligatori = referenti.filter(r => r.obbligatorio);
+  const facoltativi = referenti.filter(r => !r.obbligatorio);
+
+  function renderCard(r) {
+    const icona = iconeRuolo[r.ruolo] || 'fa-user';
+    const hasRef = r.referente_id !== null;
+    const editBtn = canEdit
+      ? `<button class="mm-ref-edit-btn" onclick="_apriModaleEditReferente(${assetId}, '${r.ruolo}', ${r.referente_id || 'null'})" title="${hasRef ? 'Modifica' : 'Assegna'}">
+           <i class="fas ${hasRef ? 'fa-pencil-alt' : 'fa-plus-circle'}"></i>
+         </button>`
+      : '';
+    const removeBtn = (canEdit && hasRef)
+      ? `<button class="mm-ref-remove-btn" onclick="_rimuoviReferente(${assetId}, '${r.ruolo}')" title="Rimuovi"><i class="fas fa-times"></i></button>`
+      : '';
+
+    if (!hasRef) {
+      return `
+        <div class="mm-ref-card mm-ref-empty">
+          <div class="mm-ref-icon"><i class="fas ${icona}"></i></div>
+          <div class="mm-ref-body">
+            <div class="mm-ref-ruolo">${r.label}</div>
+            <div class="mm-ref-nome" style="color:var(--text-secondary);font-style:italic;">Non assegnato</div>
+          </div>
+          <div class="mm-ref-actions">${editBtn}</div>
+        </div>`;
+    }
+
+    return `
+      <div class="mm-ref-card">
+        <div class="mm-ref-icon"><i class="fas ${icona}"></i></div>
+        <div class="mm-ref-body">
+          <div class="mm-ref-ruolo">${r.label}</div>
+          <div class="mm-ref-nome">${r.nome} ${r.cognome}</div>
+          <div class="mm-ref-contatti">
+            ${r.telefono ? `<a href="tel:${r.telefono}" class="mm-ref-link"><i class="fas fa-phone"></i> ${r.telefono}</a>` : ''}
+            ${r.email    ? `<a href="mailto:${r.email}" class="mm-ref-link"><i class="fas fa-envelope"></i> ${r.email}</a>` : ''}
+          </div>
+        </div>
+        <div class="mm-ref-actions">${editBtn}${removeBtn}</div>
+      </div>`;
+  }
+
+  let html = '';
+
+  // Obbligatori
+  if (obbligatori.length > 0) {
+    html += `<div class="mm-ref-group-label">Obbligatori</div>`;
+    html += `<div class="mm-ref-grid">${obbligatori.map(renderCard).join('')}</div>`;
+  }
+
+  // Facoltativi (solo quelli assegnati + slot vuoti facoltativi)
+  const facoltativiAssegnati = facoltativi.filter(r => r.referente_id !== null);
+  const facoltativiVuoti     = facoltativi.filter(r => r.referente_id === null);
+
+  if (facoltativiAssegnati.length > 0 || canEdit) {
+    html += `<div class="mm-ref-group-label" style="margin-top:10px;">Facoltativi</div>`;
+    html += `<div class="mm-ref-grid">`;
+    html += facoltativiAssegnati.map(renderCard).join('');
+    // Mostra slot vuoti facoltativi solo in modalità edit
+    if (canEdit) {
+      html += facoltativiVuoti.map(renderCard).join('');
+    }
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+
+/**
+ * Apre la modale per assegnare/modificare un referente su un ruolo specifico.
+ */
+async function _apriModaleEditReferente(assetId, ruolo, referenteIdCorrente) {
+  // Carica la lista di tutti i referenti disponibili
+  let tutti = [];
+  try {
+    const res = await fetch('/api/referenti', { headers: { 'Authorization': 'Bearer ' + API.getToken() } });
+    tutti = res.ok ? await res.json() : [];
+  } catch(e) { tutti = []; }
+
+  const ruoliLabel = {
+    responsabile_asset: 'Responsabile asset', responsabile_manutenzione: 'Responsabile manutenzione',
+    responsabile_sicurezza: 'Responsabile sicurezza', facility_manager: 'Facility Manager',
+    responsabile_it: 'Responsabile IT', responsabile_energia: 'Responsabile energia',
+    proprietario: 'Proprietario', locatore: 'Locatore',
+    fornitore_manutenzione: 'Fornitore manutenzione', referente_legale: 'Referente legale',
+    referente_emergenze: 'Referente emergenze',
+  };
+
+  // Crea o riusa la modale referenti
+  let m = document.getElementById('mm-ref-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'mm-ref-modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:4000;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(m);
+  }
+
+  const opzioni = tutti.map(r =>
+    `<option value="${r.id}" ${r.id === referenteIdCorrente ? 'selected' : ''}>${r.cognome} ${r.nome}${r.ruolo_default ? ' — ' + r.ruolo_default.replace(/_/g,' ') : ''}</option>`
+  ).join('');
+
+  m.innerHTML = `
+    <div style="background:var(--bg-panel,#0D1B2A);border:1px solid var(--border,#1E3A5F);border-radius:12px;
+                padding:24px;width:420px;max-width:95vw;font-family:Inter,sans-serif;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary,#E0F0FF);">
+          Assegna referente — ${ruoliLabel[ruolo] || ruolo}
+        </div>
+        <button onclick="document.getElementById('mm-ref-modal').style.display='none'"
+                style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;">&times;</button>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">Seleziona referente dall'elenco</label>
+        <select id="mm-ref-select" style="width:100%;padding:8px;background:var(--bg-card,#0A1628);
+                border:1px solid var(--border,#1E3A5F);border-radius:6px;color:var(--text-primary,#E0F0FF);font-size:13px;">
+          <option value="">— Seleziona —</option>
+          ${opzioni}
+        </select>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">Note (opzionale)</label>
+        <input id="mm-ref-note" type="text" placeholder="Note sull'associazione..."
+               style="width:100%;padding:8px;background:var(--bg-card,#0A1628);
+               border:1px solid var(--border,#1E3A5F);border-radius:6px;color:var(--text-primary,#E0F0FF);font-size:13px;box-sizing:border-box;">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('mm-ref-modal').style.display='none'"
+                style="padding:7px 16px;background:var(--bg-card);border:1px solid var(--border);
+                       border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:13px;">Annulla</button>
+        <button id="mm-ref-save-btn"
+                style="padding:7px 16px;background:var(--accent,#2196F3);border:none;
+                       border-radius:6px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">Salva</button>
+      </div>
+      <div id="mm-ref-modal-err" style="margin-top:8px;font-size:12px;color:#E74C3C;display:none;"></div>
+    </div>`;
+
+  m.style.display = 'flex';
+
+  document.getElementById('mm-ref-save-btn').onclick = async () => {
+    const selId = parseInt(document.getElementById('mm-ref-select').value);
+    const nota  = document.getElementById('mm-ref-note').value.trim();
+    const errEl = document.getElementById('mm-ref-modal-err');
+    if (!selId) { errEl.textContent = 'Seleziona un referente.'; errEl.style.display = 'block'; return; }
+    errEl.style.display = 'none';
+    try {
+      const res = await fetch(`/api/assets/${assetId}/referenti`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + API.getToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referente_id: selId, ruolo: ruolo, note: nota || null })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      m.style.display = 'none';
+      // Ricarica la sezione referenti
+      apriModaleAsset(assetId);
+    } catch(e) {
+      errEl.textContent = 'Errore: ' + e.message;
+      errEl.style.display = 'block';
+    }
+  };
+}
+
+
+/**
+ * Rimuove l'associazione referente-ruolo da un asset.
+ */
+async function _rimuoviReferente(assetId, ruolo) {
+  if (!confirm('Rimuovere il referente per questo ruolo?')) return;
+  try {
+    const res = await fetch(`/api/assets/${assetId}/referenti/${ruolo}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + API.getToken() }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    apriModaleAsset(assetId);
+  } catch(e) {
+    alert('Errore nella rimozione: ' + e.message);
+  }
+}
+
+
+/**
+ * Apre la modale per creare un nuovo referente (anagrafica) e associarlo.
+ */
+async function _apriModaleNuovoReferente(assetId) {
+  let m = document.getElementById('mm-ref-new-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'mm-ref-new-modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:4000;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(m);
+  }
+
+  const ruoliOpts = [
+    ['responsabile_asset','Responsabile asset'], ['responsabile_manutenzione','Responsabile manutenzione'],
+    ['responsabile_sicurezza','Responsabile sicurezza'], ['facility_manager','Facility Manager'],
+    ['responsabile_it','Responsabile IT'], ['responsabile_energia','Responsabile energia'],
+    ['proprietario','Proprietario'], ['locatore','Locatore'],
+    ['fornitore_manutenzione','Fornitore manutenzione'], ['referente_legale','Referente legale'],
+    ['referente_emergenze','Referente emergenze'],
+  ].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+
+  m.innerHTML = `
+    <div style="background:var(--bg-panel,#0D1B2A);border:1px solid var(--border,#1E3A5F);border-radius:12px;
+                padding:24px;width:460px;max-width:95vw;font-family:Inter,sans-serif;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary,#E0F0FF);">Nuovo referente</div>
+        <button onclick="document.getElementById('mm-ref-new-modal').style.display='none'"
+                style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;">&times;</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Nome *</label>
+          <input id="mm-rn-nome" type="text" style="width:100%;padding:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Cognome *</label>
+          <input id="mm-rn-cognome" type="text" style="width:100%;padding:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Email</label>
+          <input id="mm-rn-email" type="email" style="width:100%;padding:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Telefono</label>
+          <input id="mm-rn-tel" type="text" style="width:100%;padding:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Ruolo per questo asset *</label>
+        <select id="mm-rn-ruolo" style="width:100%;padding:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;">
+          ${ruoliOpts}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('mm-ref-new-modal').style.display='none'"
+                style="padding:7px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:13px;">Annulla</button>
+        <button id="mm-rn-save"
+                style="padding:7px 16px;background:var(--accent,#2196F3);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">Crea e associa</button>
+      </div>
+      <div id="mm-rn-err" style="margin-top:8px;font-size:12px;color:#E74C3C;display:none;"></div>
+    </div>`;
+
+  m.style.display = 'flex';
+
+  document.getElementById('mm-rn-save').onclick = async () => {
+    const nome    = document.getElementById('mm-rn-nome').value.trim();
+    const cognome = document.getElementById('mm-rn-cognome').value.trim();
+    const email   = document.getElementById('mm-rn-email').value.trim();
+    const tel     = document.getElementById('mm-rn-tel').value.trim();
+    const ruolo   = document.getElementById('mm-rn-ruolo').value;
+    const errEl   = document.getElementById('mm-rn-err');
+    if (!nome || !cognome) { errEl.textContent = 'Nome e cognome sono obbligatori.'; errEl.style.display = 'block'; return; }
+    errEl.style.display = 'none';
+    try {
+      // 1. Crea il referente
+      const r1 = await fetch('/api/referenti', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + API.getToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, cognome, email: email || null, telefono: tel || null, ruolo_default: ruolo })
+      });
+      if (!r1.ok) throw new Error(await r1.text());
+      const { id: newId } = await r1.json();
+      // 2. Associa all'asset
+      const r2 = await fetch(`/api/assets/${assetId}/referenti`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + API.getToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referente_id: newId, ruolo: ruolo })
+      });
+      if (!r2.ok) throw new Error(await r2.text());
+      m.style.display = 'none';
+      apriModaleAsset(assetId);
+    } catch(e) {
+      errEl.textContent = 'Errore: ' + e.message;
+      errEl.style.display = 'block';
+    }
+  };
+}
