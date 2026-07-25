@@ -78,33 +78,31 @@
       </div>
     </div>
     <div class="page-body">
-      <div class="table-header">
-        <div class="table-header-left">
-          <div class="search-wrap">
+      <div class="filtri-bar">
+          <div class="search-wrap" style="flex:1;min-width:180px;max-width:280px">
             <i class="fa fa-search"></i>
-            <input class="form-control" type="text" id="search-input" placeholder="Cerca...">
+            <input type="text" id="search-input" placeholder="Cerca...">
           </div>
-          <select class="form-control" id="filter-tipo" style="width:auto">
+          <select id="filter-tipo">
             <option value="">Tutti i tipi</option>
             <option value="stabilimento">Stabilimento</option>
             <option value="ufficio">Ufficio</option>
             <option value="magazzino">Magazzino</option>
             <option value="deposito">Deposito</option>
           </select>
-          <select class="form-control" id="filter-stato" style="width:auto">
+          <select id="filter-stato">
             <option value="">Tutti gli stati</option>
             <option value="attivo">Attivo</option>
             <option value="manutenzione">Manutenzione</option>
             <option value="inattivo">Inattivo</option>
           </select>
-          <select class="form-control" id="filter-efficienza" style="width:auto">
+          <select id="filter-efficienza">
             <option value="">Tutte le efficienze</option>
             <option value="alta">Alta (A/B)</option>
             <option value="media">Media (C)</option>
             <option value="bassa">Bassa (D/E)</option>
           </select>
-        </div>
-        <span class="record-count" id="record-count"></span>
+          <span class="record-count" id="record-count"></span>
       </div>
 
       <div class="table-wrap">

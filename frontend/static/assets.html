@@ -47,28 +47,25 @@
       </div>
     </div>
     <div class="page-body">
-      <div class="table-header">
-        <div class="table-header-left">
-          <div class="search-wrap">
+      <div class="filtri-bar">
+          <div class="search-wrap" style="flex:1;min-width:180px;max-width:280px">
             <i class="fa fa-search"></i>
-            <input class="form-control" type="text" id="search-input"
-                   placeholder="Cerca..." data-i18n-placeholder="ana.cerca">
+            <input type="text" id="search-input" placeholder="Cerca..." data-i18n-placeholder="ana.cerca">
           </div>
-          <select class="form-control" id="filter-tipo" style="width:auto">
+          <select id="filter-tipo">
             <option value="" data-i18n="tipo.tutti">Tutti i tipi</option>
             <option value="stabilimento" data-i18n="tipo.stabilimento">Stabilimento</option>
             <option value="ufficio" data-i18n="tipo.ufficio">Ufficio</option>
             <option value="magazzino" data-i18n="tipo.magazzino">Magazzino</option>
             <option value="deposito" data-i18n="tipo.deposito">Deposito</option>
           </select>
-          <select class="form-control" id="filter-stato" style="width:auto">
+          <select id="filter-stato">
             <option value="" data-i18n="tipo.tutti">Tutti gli stati</option>
             <option value="attivo" data-i18n="stato.attivo">Attivo</option>
             <option value="manutenzione" data-i18n="stato.manutenzione">Manutenzione</option>
             <option value="inattivo" data-i18n="stato.inattivo">Inattivo</option>
           </select>
-        </div>
-        <span class="record-count" id="record-count"></span>
+          <span class="record-count" id="record-count"></span>
       </div>
 
       <div class="table-wrap">

@@ -80,25 +80,25 @@ thead th { background:var(--bg-secondary); padding:10px 12px; text-align:left; f
       </div>
 
       <!-- Filtri -->
-      <div class="filter-bar">
-        <div class="search-wrap">
+      <div class="filtri-bar">
+        <div class="search-wrap" style="flex:1;min-width:180px;max-width:280px">
           <i class="fa fa-search"></i>
-          <input type="text" id="search-input" class="form-control" placeholder="Cerca WO, asset..." oninput="filtra()">
+          <input type="text" id="search-input" placeholder="Cerca WO, asset..." oninput="filtra()">
         </div>
-        <select id="filter-stato" class="form-control" onchange="filtra()">
+        <select id="filter-stato" onchange="filtra()">
           <option value="">Tutti gli stati</option>
           <option value="aperto">Aperto</option>
           <option value="in_corso">In corso</option>
           <option value="completato">Completato</option>
           <option value="annullato">Annullato</option>
         </select>
-        <select id="filter-tipo" class="form-control" onchange="filtra()">
+        <select id="filter-tipo" onchange="filtra()">
           <option value="">Tutti i tipi</option>
           <option value="correttivo">Correttivo</option>
           <option value="preventivo">Preventivo</option>
           <option value="ispezione">Ispezione</option>
         </select>
-        <select id="filter-priorita" class="form-control" onchange="filtra()">
+        <select id="filter-priorita" onchange="filtra()">
           <option value="">Tutte le priorità</option>
           <option value="critica">Critica</option>
           <option value="alta">Alta</option>
