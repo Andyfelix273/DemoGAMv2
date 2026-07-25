@@ -8,56 +8,11 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
-  <style>
-    body { min-height: 100vh; display: flex; flex-direction: row; }
-    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
-    .page { flex: 1; }
-    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
-    .page-title { font-size:18px; font-weight:600; }
-    .page-actions { display:flex; gap:8px; align-items:center; }
-    .page-body { padding:16px 24px; }
-
-    /* Barra ricerca + contatore */
-    .table-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px; gap: 12px;
-    }
-    .table-header-left { display:flex; gap:8px; align-items:center; flex:1; }
-    .search-wrap { position:relative; flex:1; max-width:320px; }
-    .search-wrap .fa { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted); }
-    .search-wrap input { padding-left:30px; }
-    .record-count { font-size:12px; color:var(--text-muted); white-space:nowrap; }
-
-    /* Tabella */
-    .table-wrap { overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; }
-    .stato-badge {
-      display:inline-block; padding:2px 8px; border-radius:20px;
-      font-size:11px; font-weight:600;
-    }
-    .stato-attivo      { background:rgba(63,185,80,0.15);  color:var(--accent-green); }
-    .stato-manutenzione{ background:rgba(243,156,18,0.15); color:var(--accent-orange); }
-    .stato-inattivo    { background:rgba(110,118,129,0.15);color:var(--text-muted); }
-
-    /* Paginazione */
-    .pagination {
-      display:flex; align-items:center; justify-content:flex-end;
-      gap:4px; margin-top:12px;
-    }
-    .page-btn {
-      min-width:32px; height:32px; padding:0 8px;
-      border:1px solid var(--border-color); border-radius:6px;
-      background:var(--bg-secondary); color:var(--text-secondary);
-      font-size:13px; cursor:pointer; transition:all 0.15s;
-    }
-    .page-btn:hover:not(:disabled) { border-color:var(--accent-blue); color:var(--accent-blue); }
-    .page-btn.active { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
-    .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
-
-    /* Modal form asset */
-    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
-    .form-grid .full { grid-column:1/-1; }
-
-    /* Modal dettaglio asset */
+  <style>/* Barra ricerca + contatore */
+/* Tabella */
+/* Paginazione */
+/* Modal form asset */
+/* Modal dettaglio asset */
     .detail-tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:16px; }
     .detail-tab {
       padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer;
@@ -73,10 +28,7 @@
     .detail-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
     .detail-value { font-size:14px; color:var(--text-primary); }
     .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
-    .kpi-card { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center; }
-    .kpi-val { font-size:22px; font-weight:700; color:var(--accent-blue); }
-    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
-    .alarm-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:13px; }
+.alarm-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:13px; }
     .alarm-row:last-child { border-bottom:none; }
     .esg-bar-wrap { margin-bottom:10px; }
     .esg-bar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
@@ -104,6 +56,7 @@
     .eff-nd      { background:rgba(149,165,166,0.15);color:#95A5A6; }
   </style>
   <link rel="stylesheet" href="/static/css/icons.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css">
 </head>
 <body class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>

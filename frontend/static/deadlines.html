@@ -7,47 +7,10 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
-  <style>
-    body { min-height: 100vh; display: flex; flex-direction: row; }
-    .sidebar-content { flex:1; display:flex; flex-direction:column; min-width:0; }
-    .page { flex: 1; }
-    .page-header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-color); }
-    .page-title { font-size:18px; font-weight:600; }
-    .page-body { padding:16px 24px; }
-
-    /* KPI strip */
-    .kpi-strip { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-    .kpi-card {
-      flex:1; min-width:110px; background:var(--bg-secondary);
-      border:1px solid var(--border-color); border-radius:10px;
-      padding:14px 18px; text-align:center;
-    }
-    .kpi-val { font-size:26px; font-weight:700; line-height:1; }
-    .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:4px; }
-
-    /* Tabs */
-    .tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:20px; }
-    .tab-btn {
-      padding:10px 18px; font-size:13px; font-weight:500;
-      background:none; border:none; border-bottom:2px solid transparent;
-      color:var(--text-secondary); cursor:pointer; transition:all 0.15s;
-      margin-bottom:-1px;
-    }
-    .tab-btn.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
-    .tab-btn:hover:not(.active) { color:var(--text-primary); }
-    .tab-content { display:none; }
-    .tab-content.active { display:block; }
-
-    /* Filtri */
-    .filtri-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
-    .filtri-bar select, .filtri-bar input {
-      padding:7px 10px; border-radius:7px;
-      background:var(--input-bg); border:1px solid var(--input-border);
-      color:var(--text-primary); font-size:13px;
-    }
-    .filtri-bar select:focus, .filtri-bar input:focus { outline:none; border-color:var(--accent-blue); }
-
-    /* Riga scadenza */
+  <style>/* KPI strip */
+/* Tabs */
+/* Filtri */
+/* Riga scadenza */
     .dl-row {
       display:flex; align-items:center; gap:12px;
       padding:12px 16px; border-radius:8px; margin-bottom:8px;
@@ -93,24 +56,10 @@
     .cal-event.scaduta  { background:#c0392b; color:#fff; }
 
     /* Modal */
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
-    .modal { background:var(--bg-primary); border-radius:12px; padding:0; width:100%; max-width:520px; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
-    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 24px 12px; border-bottom:1px solid var(--border-color); }
-    .modal-title { font-size:16px; font-weight:600; }
+.modal { background:var(--bg-primary); border-radius:12px; padding:0; width:100%; max-width:520px; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+.modal-title { font-size:16px; font-weight:600; }
     .modal-close { background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer; padding:0 4px; }
-    .modal-body { padding:20px 24px; }
-    .modal-footer { display:flex; justify-content:flex-end; gap:10px; padding:12px 24px 18px; border-top:1px solid var(--border-color); }
-    .form-group { margin-bottom:14px; }
-    .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; }
-    .form-group input, .form-group select, .form-group textarea {
-      width:100%; padding:8px 10px; border-radius:7px;
-      background:var(--input-bg); border:1px solid var(--input-border);
-      color:var(--text-primary); font-size:13px; box-sizing:border-box;
-    }
-    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-      outline:none; border-color:var(--accent-blue);
-    }
-    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
     /* ══ Responsive mobile ═══════════════════════════════════════════════ */
     @media (max-width: 768px) {
@@ -132,12 +81,10 @@
       .form-row { grid-template-columns: 1fr; }
 
       /* KPI strip: 2 per riga */
-      .kpi-strip { gap: 8px; }
-      .kpi-card { min-width: calc(50% - 8px); padding: 10px 12px; }
-      .kpi-val { font-size: 22px; }
-    }
+}
   </style>
   <link rel="stylesheet" href="/static/css/icons.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css">
 </head>
 <body class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
@@ -405,7 +352,7 @@
         <div class="dl-actions">
           ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi scadenza" onclick="chiudiScadenza(${d.id})"><i class="fa fa-check"></i></button>` : ''}
           ${canEdit  ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="apriModifica(${d.id})"><i class="fa fa-pen"></i></button>` : ''}
-          ${canDelete? `<button class="btn btn-danger btn-sm" title="Elimina" onclick="eliminaScadenza(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
+          ${canDelete? `<button class="btn-icon danger" onclick="eliminaScadenza(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
         </div>
       </div>`;
     }).join('');
