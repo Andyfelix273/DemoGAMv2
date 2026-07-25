@@ -81,10 +81,7 @@ thead th { background:var(--bg-secondary); padding:10px 12px; text-align:left; f
 
       <!-- Filtri -->
       <div class="filtri-bar">
-        <div class="search-wrap" style="flex:1;min-width:180px;max-width:280px">
-          <i class="fa fa-search"></i>
-          <input type="text" id="search-input" placeholder="Cerca WO, asset..." oninput="filtra()">
-        </div>
+        <input type="text" id="search-input" placeholder="Cerca WO, asset..." oninput="filtra()" style="flex:1;min-width:180px">
         <select id="filter-stato" onchange="filtra()">
           <option value="">Tutti gli stati</option>
           <option value="aperto">Aperto</option>
