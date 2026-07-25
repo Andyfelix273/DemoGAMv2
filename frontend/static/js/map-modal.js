@@ -368,7 +368,7 @@ async function apriModaleAsset(id) {
               <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
               <span style="flex:1;font-size:13px;margin-left:8px">${d.titolo}</span>
               <span style="font-size:11px;color:var(--text-secondary);margin-right:8px">${d.tipo || ''}</span>
-              <span style="font-size:11px;color:var(--text-secondary)">${d.data_scadenza || ''}</span>
+              <span style="font-size:11px;color:var(--text-secondary)">${d.data_scadenza ? new Date(d.data_scadenza).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}) : ''}</span>
               ${giorniLabel}
               <i class="fa fa-chevron-right" style="color:var(--text-secondary);font-size:10px;margin-left:6px;"></i>
             </div>`;
