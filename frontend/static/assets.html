@@ -304,6 +304,21 @@
   <script>
     // _assetAperto è dichiarato in map-stats.js (non caricato qui)
     let _assetAperto = null;
+    // Funzioni viewer 3D (normalmente in map-stats.js, ridefinite qui per assets.html)
+    function _getViewer3DIframe() { return document.getElementById('ifc-viewer-iframe'); }
+    function _avviaViewer3D() {
+      const iframe = _getViewer3DIframe();
+      if (!iframe) return;
+      if (!iframe.src || iframe.src === window.location.href || iframe.src === '') {
+        iframe.src = '/static/ifc-viewer.html';
+      }
+    }
+    function _fermaViewer3D() {
+      const iframe = _getViewer3DIframe();
+      if (!iframe) return;
+      const src = iframe.getAttribute('src');
+      if (src && src !== '') { iframe.src = ''; iframe.removeAttribute('src'); }
+    }
   </script>
   <script src="/static/js/map-bim.js"></script>
   <script src="/static/js/map-modal.js"></script>
@@ -865,6 +880,7 @@
   });
 
   // Listener click sui tab della modale (map-stats.js non è caricato in questa pagina)
+  let _prevPanel = 'anagrafica';
   document.querySelectorAll('.map-modal-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       const panel = tab.dataset.mmpanel;
@@ -873,6 +889,14 @@
       tab.classList.add('active');
       const panelEl = document.getElementById('mm-panel-' + panel);
       if (panelEl) panelEl.classList.add('active');
+      // Gestione viewer 3D
+      if (_prevPanel === 'viewer3d' && panel !== 'viewer3d') {
+        if (typeof _fermaViewer3D === 'function') _fermaViewer3D();
+      }
+      if (panel === 'viewer3d') {
+        if (typeof _avviaViewer3D === 'function') _avviaViewer3D();
+      }
+      _prevPanel = panel;
     });
   });
 
