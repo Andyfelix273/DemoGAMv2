@@ -364,6 +364,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "thresholds.read",
         "thresholds.update",
         "esg.read",
+        "users.read",
+        "users.create",
+        "users.update",
+        "users.delete",
     },
     "superadmin": {
         "assets.read",
