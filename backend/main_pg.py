@@ -459,6 +459,47 @@ register_energy_routes(app, get_db, get_utente_corrente)
 register_occupancy_routes(app, get_db, get_utente_corrente)
 print("[main] Asset Efficiency routes registered OK")
 
+# ── Migrazione codice documents e deadlines ──────────────────────────────────────────
+def _migrate_codice_documents_deadlines(database_url: str):
+    """Aggiunge il campo codice a documents e deadlines se non esiste,
+    e assegna un codice retroattivo ai record esistenti."""
+    import psycopg2 as _pg
+    conn = _pg.connect(database_url)
+    cur = conn.cursor()
+    try:
+        # ─ documents ────────────────────────────────────────────────────────────────────────
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='documents' AND column_name='codice'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE documents ADD COLUMN codice TEXT UNIQUE")
+            # Assegna codici retroattivi ai record esistenti
+            cur.execute("SELECT id, created_at FROM documents ORDER BY id")
+            docs = cur.fetchall()
+            for i, (doc_id, created_at) in enumerate(docs, 1):
+                anno = created_at.year if created_at else 2026
+                codice = f"DOC-{anno}-{i:04d}"
+                cur.execute("UPDATE documents SET codice=%s WHERE id=%s", (codice, doc_id))
+            print(f"[migrate] Campo codice aggiunto a documents ({len(docs)} record aggiornati)")
+        # ─ deadlines ──────────────────────────────────────────────────────────────────────
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='deadlines' AND column_name='codice'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE deadlines ADD COLUMN codice TEXT UNIQUE")
+            cur.execute("SELECT id, created_at FROM deadlines ORDER BY id")
+            dls = cur.fetchall()
+            for i, (dl_id, created_at) in enumerate(dls, 1):
+                anno = created_at.year if created_at else 2026
+                codice = f"SCA-{anno}-{i:04d}"
+                cur.execute("UPDATE deadlines SET codice=%s WHERE id=%s", (codice, dl_id))
+            print(f"[migrate] Campo codice aggiunto a deadlines ({len(dls)} record aggiornati)")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"[migrate] Errore migrazione codice: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+_migrate_codice_documents_deadlines(DATABASE_URL)
+
 # ── Modulo Referenti ────────────────────────────────────────────────────────
 migrate_referenti_schema(DATABASE_URL)
 seed_referenti(DATABASE_URL)
@@ -1233,9 +1274,24 @@ async def carica_documento(
     with open(percorso, "wb") as f:
         f.write(contenuto)
 
+    # Genera codice progressivo DOC-YYYY-NNNN
+    anno = datetime.now().year
+    ultimo_doc = db.execute(
+        "SELECT codice FROM documents WHERE codice LIKE %s ORDER BY id DESC LIMIT 1",
+        (f"DOC-{anno}-%",)
+    ).fetchone()
+    if ultimo_doc:
+        try:
+            n_doc = int(ultimo_doc["codice"].split("-")[2]) + 1
+        except (IndexError, ValueError):
+            n_doc = 1
+    else:
+        n_doc = 1
+    codice_doc = f"DOC-{anno}-{n_doc:04d}"
+
     db.execute(
-        "INSERT INTO documents (asset_id, nome_file, tipo_mime, dimensione, percorso, caricato_da) VALUES (%s,%s,%s,%s,%s,%s)",
-        (asset_id, file.filename, file.content_type, len(contenuto), nome_finale, utente["username"])
+        "INSERT INTO documents (asset_id, nome_file, tipo_mime, dimensione, percorso, caricato_da, codice) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+        (asset_id, file.filename, file.content_type, len(contenuto), nome_finale, utente["username"], codice_doc)
     )
     db.commit()
     row = db.execute("SELECT * FROM documents WHERE asset_id=%s AND nome_file=%s ORDER BY id DESC LIMIT 1", (asset_id, file.filename)).fetchone()
@@ -1346,15 +1402,29 @@ def crea_scadenza(
     utente=Depends(richiedi_permesso("deadlines.create"))
 ):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Genera codice progressivo SCA-YYYY-NNNN
+    anno = datetime.now().year
+    ultimo_sca = db.execute(
+        "SELECT codice FROM deadlines WHERE codice LIKE %s ORDER BY id DESC LIMIT 1",
+        (f"SCA-{anno}-%",)
+    ).fetchone()
+    if ultimo_sca:
+        try:
+            n_sca = int(ultimo_sca["codice"].split("-")[2]) + 1
+        except (IndexError, ValueError):
+            n_sca = 1
+    else:
+        n_sca = 1
+    codice_sca = f"SCA-{anno}-{n_sca:04d}"
     db.execute("""
         INSERT INTO deadlines
-        (asset_id, titolo, descrizione, tipo, data_scadenza, stato, priorita, assegnatario, note, creato_da, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        (asset_id, titolo, descrizione, tipo, data_scadenza, stato, priorita, assegnatario, note, creato_da, created_at, codice)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     """, (
         payload.asset_id, payload.titolo, payload.descrizione,
         payload.tipo or "scadenza", payload.data_scadenza, "aperta",
         payload.priorita or "media", payload.assegnatario, payload.note,
-        utente["username"], now
+        utente["username"], now, codice_sca
     ))
     db.commit()
     row = db.execute("SELECT id FROM deadlines WHERE asset_id=%s AND titolo=%s ORDER BY id DESC LIMIT 1", (payload.asset_id, payload.titolo)).fetchone()

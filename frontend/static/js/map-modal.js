@@ -276,7 +276,8 @@ async function apriModaleAsset(id) {
         ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-folder-open-o"></i> Nessun documento allegato</p>'
         : docs.map(d => `<div class="mm-alarm-row">
             <i class="fa ${icona2(d.tipo_mime)}" style="color:#3498DB;font-size:16px;min-width:20px"></i>
-            <span style="flex:1;font-size:13px">${d.nome_file}</span>
+            <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
+            <span style="flex:1;font-size:13px;margin-left:8px">${d.nome_file}</span>
             <span style="font-size:11px;color:var(--text-secondary)">${fmtSize(d.dimensione)}</span>
             <a href="${API.getDocumentDownloadUrl(d.id)}" target="_blank" class="btn btn-secondary btn-sm" style="margin-left:8px;padding:2px 8px"><i class="fa fa-download"></i></a>
           </div>`).join('');
@@ -343,7 +344,8 @@ async function apriModaleAsset(id) {
             const giorniLabel = d.stato === 'completata' ? '' : giorni < 0 ? `<span style="color:var(--stato-inattivo);font-size:11px">${Math.abs(giorni)}gg scaduta</span>` : `<span style="color:var(--stato-man);font-size:11px">${giorni}gg</span>`;
             return `<div class="mm-alarm-row">
               <i class="fa ${iconaStato[statoEff] || 'fa-calendar'} " style="color:${coloreStato[statoEff] || '#aaa'};font-size:16px;min-width:20px"></i>
-              <span style="flex:1;font-size:13px">${d.titolo}</span>
+              <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
+              <span style="flex:1;font-size:13px;margin-left:8px">${d.titolo}</span>
               <span style="font-size:11px;color:var(--text-secondary);margin-right:8px">${d.tipo || ''}</span>
               <span style="font-size:11px;color:var(--text-secondary)">${d.data_scadenza || ''}</span>
               ${giorniLabel}
