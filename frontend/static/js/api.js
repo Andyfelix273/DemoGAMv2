@@ -223,6 +223,7 @@ const API = (() => {
 
   // ── Esposizione pubblica ─────────────────────────────────────
   return {
+    request,
     login, logout, me,
     isAuthenticated, isAdmin, getToken, getRole, getNome,
     can, getPermissions,
