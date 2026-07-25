@@ -733,8 +733,7 @@ function renderDettaglio(data, container) {
   }
 
   // ── Link BIM Viewer (solo se l'asset ha dati planimetrici) ──────────
-  const BIM_ASSET_IDS = [1, 2, 6, 7];
-  if (BIM_ASSET_IDS.includes(a.id)) {
+  if ((GAM_CONFIG.BIM_ASSET_IDS || []).includes(a.id)) {
     html += `<div class="section">
       <div class="section-title" style="border-left-color:#00A3E0;background:rgba(0,163,224,0.06);">
         <i class="fas fa-building"></i> BIM Viewer
