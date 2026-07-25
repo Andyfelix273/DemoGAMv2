@@ -2685,6 +2685,78 @@ def bim_delete_svg(asset_id: int, floor_id: str, db=Depends(get_db), _=Depends(r
     return {"ok": True}
 
 
+# ── Gestione Utenti (solo admin) ────────────────────────────────────────────
+
+@app.get("/api/users")
+def lista_utenti(db=Depends(get_db), _=Depends(richiedi_permesso("users.read"))):
+    """Restituisce la lista di tutti gli utenti. Richiede permesso users.read (admin)."""
+    rows = db.execute(
+        "SELECT id, username, role, nome_completo, email FROM users ORDER BY username"
+    ).fetchall()
+    return [{"id": r["id"], "username": r["username"], "role": r["role"],
+             "nome_completo": r["nome_completo"], "email": r["email"]} for r in rows]
+
+
+@app.post("/api/users")
+def crea_utente(body: dict, db=Depends(get_db), _=Depends(richiedi_permesso("users.create"))):
+    """Crea un nuovo utente. Richiede permesso users.create (admin)."""
+    username = body.get("username", "").strip()
+    password = body.get("password", "").strip()
+    role = body.get("role", "viewer")
+    nome_completo = body.get("nome_completo", "").strip()
+    email = body.get("email", "").strip()
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username e password obbligatori")
+    existing = db.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
+    if existing:
+        raise HTTPException(status_code=409, detail="Username già esistente")
+    hashed = pwd_context.hash(password)
+    db.execute(
+        "INSERT INTO users (username, password_hash, role, nome_completo, email) VALUES (%s,%s,%s,%s,%s)",
+        (username, hashed, role, nome_completo, email)
+    )
+    db.commit()
+    return {"ok": True, "username": username, "role": role}
+
+
+@app.put("/api/users/{username}")
+def aggiorna_utente(username: str, body: dict, db=Depends(get_db), _=Depends(richiedi_permesso("users.update"))):
+    """Aggiorna un utente esistente. Richiede permesso users.update (admin)."""
+    row = db.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    updates = []
+    params = []
+    if "role" in body:
+        updates.append("role=%s"); params.append(body["role"])
+    if "nome_completo" in body:
+        updates.append("nome_completo=%s"); params.append(body["nome_completo"])
+    if "email" in body:
+        updates.append("email=%s"); params.append(body["email"])
+    if "password" in body and body["password"]:
+        updates.append("password_hash=%s"); params.append(pwd_context.hash(body["password"]))
+    if not updates:
+        raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
+    params.append(username)
+    db.execute(f"UPDATE users SET {', '.join(updates)} WHERE username=%s", params)
+    db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/users/{username}")
+def elimina_utente(username: str, utente=Depends(get_utente_corrente), db=Depends(get_db),
+                   _=Depends(richiedi_permesso("users.delete"))):
+    """Elimina un utente. Richiede permesso users.delete (admin). Non può eliminare se stesso."""
+    if utente["username"] == username:
+        raise HTTPException(status_code=400, detail="Non puoi eliminare il tuo account")
+    row = db.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    db.execute("DELETE FROM users WHERE username=%s", (username,))
+    db.commit()
+    return {"ok": True}
+
+
 # ── Redirect root → login ────────────────────────────────────────────────────
 
 # ── Startup: Asset Efficiency simulatori ────────────────────────────────────
