@@ -58,39 +58,44 @@ random.seed(42)
 
 
 def genera_pdf(percorso: str, asset: dict, tipologia: tuple, anno: int, revisione: int):
-    """Genera un PDF con copertina metadati + pagina Lorem Ipsum."""
+    """Genera un PDF con copertina metadati + pagina Lorem Ipsum. Sfondo bianco, testo scuro."""
     cod_tipo, nome_tipo, tipo_doc = tipologia
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # ── Copertina ────────────────────────────────────────────────────────────
-    pdf.add_page()
-    pdf.set_fill_color(13, 27, 42)
-    pdf.rect(0, 0, 210, 297, 'F')
-
-    # Intestazione
-    pdf.set_font("Helvetica", "B", 22)
-    pdf.set_text_color(0, 180, 216)
-    pdf.set_y(40)
-    pdf.cell(0, 12, nome_tipo, ln=True, align="C")
-
-    pdf.set_font("Helvetica", "", 13)
-    pdf.set_text_color(224, 240, 255)
-    pdf.ln(6)
-    nome_safe = asset["nome"].replace('\u2014', '-').replace('\u2013', '-')
-    pdf.cell(0, 8, nome_safe, ln=True, align="C")
-
-    # Linea separatrice
-    pdf.set_draw_color(30, 58, 95)
-    pdf.set_line_width(0.5)
-    pdf.line(20, pdf.get_y() + 6, 190, pdf.get_y() + 6)
-    pdf.ln(14)
-
     def safe(s):
         """Rimuove caratteri non supportati da Helvetica (fuori latin-1)."""
-        return s.encode('latin-1', errors='replace').decode('latin-1')
+        return str(s).encode('latin-1', errors='replace').decode('latin-1')
 
-    # Metadati
+    # ── Copertina ────────────────────────────────────────────────────────────
+    pdf.add_page()
+    # Sfondo bianco (default FPDF)
+    pdf.set_fill_color(255, 255, 255)
+    pdf.rect(0, 0, 210, 297, 'F')
+
+    # Banda colorata in cima (blu istituzionale)
+    pdf.set_fill_color(10, 60, 120)
+    pdf.rect(0, 0, 210, 45, 'F')
+
+    # Titolo documento (su banda blu)
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(14)
+    pdf.cell(0, 10, safe(nome_tipo), ln=True, align="C")
+
+    # Sottotitolo asset (su banda blu)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(200, 220, 255)
+    nome_safe = safe(asset["nome"])
+    pdf.cell(0, 7, nome_safe, ln=True, align="C")
+
+    # Linea separatrice sotto la banda
+    pdf.set_draw_color(10, 60, 120)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 50, 190, 50)
+    pdf.set_y(58)
+
+    # Metadati (testo scuro su sfondo bianco)
     meta = [
         ("Codice asset",   safe(asset["codice"])),
         ("Tipo asset",     safe(asset["tipo"])),
@@ -104,50 +109,68 @@ def genera_pdf(percorso: str, asset: dict, tipologia: tuple, anno: int, revision
     ]
     pdf.set_font("Helvetica", "", 10)
     for label, valore in meta:
-        pdf.set_text_color(123, 175, 196)
-        pdf.cell(55, 7, label + ":", ln=False)
-        pdf.set_text_color(224, 240, 255)
-        pdf.cell(0, 7, valore, ln=True)
+        pdf.set_text_color(80, 100, 130)   # grigio-blu per le etichette
+        pdf.cell(55, 8, label + ":", ln=False)
+        pdf.set_text_color(20, 30, 50)     # quasi nero per i valori
+        pdf.cell(0, 8, valore, ln=True)
 
     # Footer copertina
-    pdf.set_y(270)
+    pdf.set_y(278)
+    pdf.set_draw_color(200, 210, 220)
+    pdf.set_line_width(0.3)
+    pdf.line(20, 277, 190, 277)
     pdf.set_font("Helvetica", "I", 8)
-    pdf.set_text_color(123, 175, 196)
-    pdf.cell(0, 5, f"Documento generato automaticamente - {asset['codice']} - {anno}", align="C")
+    pdf.set_text_color(140, 150, 165)
+    pdf.cell(0, 5, safe(f"Documento generato automaticamente - {asset['codice']} - {anno}"), align="C")
 
     # ── Pagina 1 — Lorem Ipsum ───────────────────────────────────────────────
     pdf.add_page()
-    pdf.set_fill_color(13, 27, 42)
+    pdf.set_fill_color(255, 255, 255)
     pdf.rect(0, 0, 210, 297, 'F')
 
-    def safe_p(s):
-        return s.encode('latin-1', errors='replace').decode('latin-1')
-
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.set_text_color(0, 180, 216)
+    # Intestazione pagina
+    pdf.set_fill_color(10, 60, 120)
+    pdf.rect(0, 0, 210, 14, 'F')
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(200, 220, 255)
+    pdf.set_y(4)
+    pdf.cell(0, 6, safe(f"{nome_tipo} - {asset['codice']} - Rev. {revisione:02d}/{anno}"), align="C")
     pdf.set_y(20)
+
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(10, 60, 120)
     pdf.cell(0, 8, "1. Premessa e ambito di applicazione", ln=True)
-    pdf.ln(4)
+    pdf.ln(3)
 
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(224, 240, 255)
+    pdf.set_text_color(20, 30, 50)
     pdf.set_x(15)
-    pdf.multi_cell(180, 6, safe_p(LOREM))
+    pdf.multi_cell(180, 6, safe(LOREM))
 
     pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(0, 180, 216)
-    pdf.ln(6)
+    pdf.set_text_color(10, 60, 120)
+    pdf.ln(5)
     pdf.cell(0, 8, "2. Riferimenti normativi", ln=True)
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(224, 240, 255)
+    pdf.set_text_color(20, 30, 50)
     pdf.set_x(15)
-    pdf.multi_cell(180, 6, safe_p(
+    pdf.multi_cell(180, 6, safe(
         "Il presente documento e' redatto in conformita' alle disposizioni vigenti in materia "
         "di sicurezza e gestione degli immobili, con particolare riferimento al D.Lgs. 81/2008, "
         "al D.P.R. 151/2011, alla norma UNI EN ISO 9001:2015 e alle Linee Guida ENEA per "
         "la certificazione energetica degli edifici."
     ))
+
+    # Footer pagina
+    pdf.set_y(278)
+    pdf.set_draw_color(200, 210, 220)
+    pdf.set_line_width(0.3)
+    pdf.line(20, 277, 190, 277)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(140, 150, 165)
+    pdf.cell(95, 5, safe(f"{nome_tipo} - {asset['codice']}"), align="L")
+    pdf.cell(95, 5, "Pagina 1", align="R")
 
     pdf.output(percorso)
 

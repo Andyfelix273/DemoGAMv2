@@ -173,8 +173,7 @@ function renderTabella() {
     return `<tr>
       <td class="doc-codice">${d.codice || '–'}</td>
       <td class="doc-nome">
-        ${mimeBadge(d.tipo_mime, d.nome_file)}
-        <span style="margin-left:6px;">${d.nome_file || '–'}</span>
+        <span>${d.nome_file || '–'}</span>
       </td>
       <td>
         ${d.asset_id
