@@ -368,7 +368,7 @@ function renderDettaglio(data, container) {
         : [];
       if (!woEl) return;
       if (items.length === 0) {
-        woEl.innerHTML = '<span style="color:var(--stato-attivo);"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Nessun WO aperto</span>';
+        woEl.innerHTML = '<span style="color:var(--stato-attivo);"><i class="fas fa-circle-check" style="margin-right:4px;"></i>Nessun WO aperto</span>';
       } else {
         woEl.innerHTML = items.map(w => {
           const priCol = w.priorita === 'critica' ? '#E74C3C' : w.priorita === 'alta' ? '#F39C12' : 'var(--text-secondary)';
@@ -400,7 +400,7 @@ function renderDettaglio(data, container) {
         : [];
       if (!scEl) return;
       if (items.length === 0) {
-        scEl.innerHTML = '<span style="color:var(--stato-attivo);"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Nessuna scadenza aperta</span>';
+        scEl.innerHTML = '<span style="color:var(--stato-attivo);"><i class="fas fa-circle-check" style="margin-right:4px;"></i>Nessuna scadenza aperta</span>';
       } else {
         const dl = items[0];
         const oggi = new Date().toISOString().split('T')[0];
@@ -591,7 +591,7 @@ async function caricaStats() {
       }
     } else {
       html += `<div style="margin-top:16px;padding:10px;background:var(--bg-card);border:1px solid var(--border);font-size:11px;color:var(--text-secondary);">
-        <i class="fas fa-check-circle" style="color:var(--stato-attivo);margin-right:6px;"></i>
+        <i class="fas fa-circle-check" style="color:var(--stato-attivo);margin-right:6px;"></i>
         ${i18n.t('mappa.nessuna_critica')}
       </div>`;
     }

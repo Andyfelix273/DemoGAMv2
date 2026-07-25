@@ -115,6 +115,7 @@
     .scaduto-row:hover { background:rgba(248,81,73,0.08) !important; }
     .scaduto-label { font-size:10px; color:var(--accent-red); font-weight:600; margin-left:4px; }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body class="app-layout">
 
@@ -209,7 +210,7 @@
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title" id="modal-form-title">Nuovo Work Order</span>
-      <button class="btn-icon" onclick="chiudiModal('modal-form')"><i class="fa fa-times"></i></button>
+      <button class="btn-icon" onclick="chiudiModal('modal-form')"><i class="fa fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-grid">
@@ -254,7 +255,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="chiudiModal('modal-form')">Annulla</button>
-      <button class="btn btn-primary" onclick="salvaWO()"><i class="fa fa-save"></i> Salva</button>
+      <button class="btn btn-primary" onclick="salvaWO()"><i class="fa fa-floppy-disk"></i> Salva</button>
     </div>
   </div>
 </div>
@@ -264,7 +265,7 @@
   <div class="modal" style="width:680px">
     <div class="modal-header">
       <span class="modal-title" id="det-codice">WO-0000</span>
-      <button class="btn-icon" onclick="chiudiModal('modal-dettaglio')"><i class="fa fa-times"></i></button>
+      <button class="btn-icon" onclick="chiudiModal('modal-dettaglio')"><i class="fa fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
@@ -310,7 +311,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="chiudiModal('modal-dettaglio')">Chiudi</button>
-      <button class="btn btn-secondary" id="det-btn-modifica" onclick="apriModificaDaDettaglio()" style="display:none"><i class="fa fa-pencil"></i> Modifica</button>
+      <button class="btn btn-secondary" id="det-btn-modifica" onclick="apriModificaDaDettaglio()" style="display:none"><i class="fa fa-pen"></i> Modifica</button>
       <button class="btn btn-primary" id="det-btn-stato" onclick="apriCambioStatoDaDettaglio()" style="display:none"><i class="fa fa-exchange"></i> Cambia stato</button>
     </div>
   </div>
@@ -321,7 +322,7 @@
   <div class="modal" style="width:440px">
     <div class="modal-header">
       <span class="modal-title">Cambia stato — <span id="stato-wo-codice"></span></span>
-      <button class="btn-icon" onclick="chiudiModal('modal-stato')"><i class="fa fa-times"></i></button>
+      <button class="btn-icon" onclick="chiudiModal('modal-stato')"><i class="fa fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="stato-options" id="stato-options"></div>
@@ -484,7 +485,7 @@ function renderTabella() {
         <div class="row-actions">
           <button class="btn-icon" title="Dettaglio" onclick="apriDettaglio(${wo.id})"><i class="fa fa-eye"></i></button>
           ${canStato ? `<button class="btn-icon" title="Cambia stato" onclick="apriCambioStato(${wo.id})"><i class="fa fa-exchange"></i></button>` : ''}
-          ${canEdit  ? `<button class="btn-icon" title="Modifica" onclick="apriModifica(${wo.id})"><i class="fa fa-pencil"></i></button>` : ''}
+          ${canEdit  ? `<button class="btn-icon" title="Modifica" onclick="apriModifica(${wo.id})"><i class="fa fa-pen"></i></button>` : ''}
           ${canDelete? `<button class="btn-icon danger" title="Elimina" onclick="eliminaWO(${wo.id})"><i class="fa fa-trash"></i></button>` : ''}
         </div>
       </td>

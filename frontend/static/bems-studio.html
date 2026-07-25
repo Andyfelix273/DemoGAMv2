@@ -265,6 +265,7 @@
     .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body>
 
@@ -276,7 +277,7 @@
   </div>
   <div class="header-spacer"></div>
   <span class="header-badge"><i class="fa fa-plug"></i> Modalità Integratore</span>
-  <button class="btn-save-session" onclick="salvaSessione()"><i class="fa fa-save"></i> Salva sessione</button>
+  <button class="btn-save-session" onclick="salvaSessione()"><i class="fa fa-floppy-disk"></i> Salva sessione</button>
   <a href="/static/index.html" style="color:var(--muted);font-size:11px;text-decoration:none;margin-left:8px;"><i class="fa fa-arrow-left"></i> Dashboard</a>
 </div>
 
@@ -365,7 +366,7 @@
             <div style="padding:12px;border-bottom:1px solid var(--border);">
               <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Zone selezionate</div>
               <button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:4px;" onclick="selezionaTutte()">
-                <i class="fa fa-square-check"></i> Seleziona tutte
+                <i class="fa fa-circle-check"></i> Seleziona tutte
               </button>
               <button class="btn btn-outline btn-sm" style="width:100%;" onclick="deselezionaTutte()">
                 <i class="fa fa-square"></i> Deseleziona tutte
@@ -404,7 +405,7 @@
 
     <!-- Nuovi sensori da catalogo -->
     <div class="panel">
-      <div class="panel-header"><i class="fa fa-plus-circle"></i> Aggiungi nuovi sensori — Catalogo</div>
+      <div class="panel-header"><i class="fa fa-plus"></i> Aggiungi nuovi sensori — Catalogo</div>
       <div class="panel-body">
         <p class="text-sm text-muted" style="margin-bottom:12px;">
           Seleziona i sensori dal catalogo e assegnali alle zone monitorate.
@@ -491,7 +492,7 @@
     <div class="step-nav">
       <button class="btn btn-outline" onclick="vaiStep(2)"><i class="fa fa-arrow-left"></i> Indietro</button>
       <button class="btn btn-success" onclick="salvaMQTTeSensori()">
-        <i class="fa fa-save"></i> Salva configurazione MQTT
+        <i class="fa fa-floppy-disk"></i> Salva configurazione MQTT
       </button>
       <button class="btn btn-primary" onclick="vaiStep(4)">
         Avanti: Export Documento <i class="fa fa-arrow-right"></i>
@@ -588,7 +589,7 @@ async function apiPut(url, body) {
 // ── Toast ────────────────────────────────────────────────────────────────────
 function showToast(msg, type='info') {
   const t = document.getElementById('toast');
-  const icons = {info:'fa-info-circle', success:'fa-check-circle', error:'fa-times-circle'};
+  const icons = {info:'fa-info-circle', success:'fa-circle-check', error:'fa-xmark'};
   const colors = {info:'var(--blue)', success:'var(--green)', error:'var(--red)'};
   t.innerHTML = `<i class="fa ${icons[type]}" style="color:${colors[type]};"></i> ${msg}`;
   t.className = 'toast show ' + type;
@@ -995,7 +996,7 @@ function renderExistingSensors() {
               </td>
               <td>
                 <button class="btn btn-outline btn-sm" onclick="apriMQTTEditor('${p.plant_id}')">
-                  <i class="fa fa-edit"></i> Modifica MQTT
+                  <i class="fa fa-pen"></i> Modifica MQTT
                 </button>
               </td>
             </tr>
@@ -1068,7 +1069,7 @@ function renderMQTTEditor(plant) {
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-success btn-sm" onclick="salvaMQTTSingolo('${plant.plant_id}')">
-          <i class="fa fa-save"></i> Salva
+          <i class="fa fa-floppy-disk"></i> Salva
         </button>
         <button class="btn btn-outline btn-sm" onclick="chiudiMQTTEditor('${plant.plant_id}')">
           Annulla
@@ -1374,7 +1375,8 @@ function stampaDocumento() {
       .kbz-meta { font-size: 10px; color: #666; text-align: right; }
       @media print { body { padding: 0; } }
     </style>
-  </head><body>${content}</body></html>`);
+    <link rel="stylesheet" href="/static/css/icons.css">
+</head><body>${content}</body></html>`);
   win.document.close();
   setTimeout(() => win.print(), 500);
 }

@@ -137,6 +137,7 @@
       .kpi-val { font-size: 22px; }
     }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
@@ -317,7 +318,7 @@
 
   const PRIO_COLOR = { critica:'var(--accent-red)', alta:'var(--accent-orange)', media:'var(--accent-blue)', bassa:'var(--text-muted)' };
   const STATO_COLOR = { aperta:'var(--accent-blue)', chiusa:'var(--accent-green)', scaduta:'var(--accent-red)' };
-  const TIPO_ICON = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-square-check', contratto:'fa-file-lines', scadenza:'fa-clock' };
+  const TIPO_ICON = { normativa:'fa-gavel', manutenzione:'fa-wrench', collaudo:'fa-circle-check', contratto:'fa-file-lines', scadenza:'fa-clock' };
 
   // ── Caricamento dati ────────────────────────────────────────────────────────
   async function caricaTutto() {
@@ -403,7 +404,7 @@
         </div>
         <div class="dl-actions">
           ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi scadenza" onclick="chiudiScadenza(${d.id})"><i class="fa fa-check"></i></button>` : ''}
-          ${canEdit  ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="apriModifica(${d.id})"><i class="fa fa-pencil"></i></button>` : ''}
+          ${canEdit  ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="apriModifica(${d.id})"><i class="fa fa-pen"></i></button>` : ''}
           ${canDelete? `<button class="btn btn-danger btn-sm" title="Elimina" onclick="eliminaScadenza(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
         </div>
       </div>`;

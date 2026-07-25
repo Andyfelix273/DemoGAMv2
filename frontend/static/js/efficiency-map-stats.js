@@ -212,7 +212,7 @@ async function caricaStats() {
       }
     } else {
       html += `<div style="margin-top:16px;padding:10px;background:var(--bg-card);border:1px solid var(--border);font-size:11px;color:var(--text-secondary);">
-        <i class="fas fa-check-circle" style="color:var(--stato-attivo);margin-right:6px;"></i>
+        <i class="fas fa-circle-check" style="color:var(--stato-attivo);margin-right:6px;"></i>
         Nessuna anomalia energetica rilevata
       </div>`;
     }

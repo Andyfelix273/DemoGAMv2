@@ -98,6 +98,7 @@
     .kpi-val { font-size:24px; font-weight:700; color:var(--accent-blue); }
     .kpi-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
@@ -134,7 +135,7 @@
         </div>
         <div id="soglie-actions" style="display:none;margin-top:16px">
           <button class="btn btn-primary" id="btn-salva-soglie">
-            <i class="fa fa-save"></i> Salva soglie
+            <i class="fa fa-floppy-disk"></i> Salva soglie
           </button>
         </div>
       </div>
@@ -259,7 +260,7 @@
     if (attive.length === 0) {
       el.innerHTML = `
         <div style="text-align:center;padding:48px;color:var(--text-muted)">
-          <i class="fa fa-check-circle" style="font-size:40px;color:var(--accent-green);display:block;margin-bottom:12px"></i>
+          <i class="fa fa-circle-check" style="font-size:40px;color:var(--accent-green);display:block;margin-bottom:12px"></i>
           <p>Nessuna anomalia energetica attiva</p>
         </div>`;
       return;
@@ -305,7 +306,7 @@
     }
     el.innerHTML = acked.map(a => `
       <div class="alarm-row acked">
-        <i class="fa fa-check-circle" style="color:var(--accent-green);font-size:18px;flex-shrink:0"></i>
+        <i class="fa fa-circle-check" style="color:var(--accent-green);font-size:18px;flex-shrink:0"></i>
         <div class="alarm-info">
           <div class="alarm-asset">${a.nome || a.asset_nome || 'Asset'}</div>
           <div class="alarm-campo">${a.vettore || a.tipo || 'Energia'} · ${a.tipo_anomalia || 'Consumo anomalo'}</div>

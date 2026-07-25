@@ -1,0 +1,34 @@
+/*
+ * BEMS – Set Iconografico Ufficiale
+ * ──────────────────────────────────────────────────────────────
+ * Tutte le icone CRUD della piattaforma devono usare ESCLUSIVAMENTE
+ * le classi definite in questo file. Non usare classi FA dirette
+ * nei template HTML/JS: usare sempre le classi semantiche .bems-icon-*.
+ *
+ * Font Awesome 6.4.0 (solid) è il font di riferimento.
+ *
+ * Set ufficiale:
+ *   Modifica           → fa-pen
+ *   Elimina            → fa-trash
+ *   Visualizza         → fa-eye
+ *   Aggiungi           → fa-plus
+ *   Salva              → fa-floppy-disk
+ *   Scarica            → fa-download
+ *   Carica             → fa-upload
+ *   Annulla/Chiudi     → fa-xmark
+ *   Conferma/Approva   → fa-circle-check
+ *   Apri esternamente  → fa-arrow-up-right-from-square
+ * ──────────────────────────────────────────────────────────────
+ */
+
+/* Classi semantiche – alias delle icone FA6 */
+.bems-icon-edit::before        { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f303"; } /* fa-pen */
+.bems-icon-delete::before      { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f1f8"; } /* fa-trash */
+.bems-icon-view::before        { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f06e"; } /* fa-eye */
+.bems-icon-add::before         { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\2b";   } /* fa-plus */
+.bems-icon-save::before        { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f0c7"; } /* fa-floppy-disk */
+.bems-icon-download::before    { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f019"; } /* fa-download */
+.bems-icon-upload::before      { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f093"; } /* fa-upload */
+.bems-icon-close::before       { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f00d"; } /* fa-xmark */
+.bems-icon-confirm::before     { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f058"; } /* fa-circle-check */
+.bems-icon-external::before    { font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\f35d"; } /* fa-arrow-up-right-from-square */

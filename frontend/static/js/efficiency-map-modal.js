@@ -290,7 +290,7 @@ async function caricaAllarmiEnergy(assetId, nomeAsset) {
     }
 
     if (lista.length === 0) {
-      panel.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;padding:20px;text-align:center;"><i class="fas fa-check-circle" style="color:#27AE60;margin-right:5px;"></i>Nessuna anomalia energetica rilevata.</p>`;
+      panel.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;padding:20px;text-align:center;"><i class="fas fa-circle-check" style="color:#27AE60;margin-right:5px;"></i>Nessuna anomalia energetica rilevata.</p>`;
       return;
     }
 
@@ -366,7 +366,7 @@ async function caricaEsgEnergy(assetId) {
           Anomalia di consumo rilevata — verificare i vettori energetici
         </div>` : `
         <div style="margin-top:12px;padding:8px 12px;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:6px;font-size:12px;color:#27AE60;">
-          <i class="fas fa-check-circle" style="margin-right:5px;"></i>
+          <i class="fas fa-circle-check" style="margin-right:5px;"></i>
           Consumi nella norma — nessuna anomalia rilevata
         </div>`}
       </div>`;

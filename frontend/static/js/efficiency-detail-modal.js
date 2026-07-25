@@ -454,7 +454,7 @@ async function _edmCaricaAllarmi(assetId, nomeAsset) {
     }
     if (lista.length === 0) {
       el.innerHTML = `<p style="color:#27AE60;font-size:13px;padding:20px;text-align:center;">
-        <i class="fa fa-check-circle" style="margin-right:5px;"></i>Nessuna anomalia energetica rilevata.</p>`;
+        <i class="fa fa-circle-check" style="margin-right:5px;"></i>Nessuna anomalia energetica rilevata.</p>`;
       return;
     }
     const sevColor = { alta:'#E74C3C', media:'#F39C12', bassa:'#F39C12' };
@@ -505,7 +505,7 @@ async function _edmCaricaEsg(assetId) {
         ? `<div style="margin-top:12px;padding:8px 12px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#E74C3C;">
              <i class="fa fa-exclamation-triangle" style="margin-right:5px;"></i>Anomalia di consumo rilevata — verificare i vettori energetici</div>`
         : `<div style="margin-top:12px;padding:8px 12px;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:6px;font-size:12px;color:#27AE60;">
-             <i class="fa fa-check-circle" style="margin-right:5px;"></i>Consumi nella norma — nessuna anomalia rilevata</div>`}`;
+             <i class="fa fa-circle-check" style="margin-right:5px;"></i>Consumi nella norma — nessuna anomalia rilevata</div>`}`;
   } catch(e) {
     if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Dati di efficienza energetica non disponibili</p>`;
   }
@@ -670,11 +670,11 @@ function _edmRenderReferenti(referenti, assetId, canEdit) {
     const hasRef = r.referente_id !== null;
     const editBtn = canEdit
       ? `<button class="mm-ref-edit-btn" onclick="_edmApriModaleEditReferente(${assetId}, '${r.ruolo}', ${r.referente_id || 'null'})" title="${hasRef ? 'Modifica' : 'Assegna'}">
-           <i class="fas ${hasRef ? 'fa-pencil-alt' : 'fa-plus-circle'}"></i>
+           <i class="fas ${hasRef ? 'fa-pen' : 'fa-plus'}"></i>
          </button>`
       : '';
     const removeBtn = (canEdit && hasRef)
-      ? `<button class="mm-ref-remove-btn" onclick="_edmRimuoviReferente(${assetId}, '${r.ruolo}')" title="Rimuovi"><i class="fas fa-times"></i></button>`
+      ? `<button class="mm-ref-remove-btn" onclick="_edmRimuoviReferente(${assetId}, '${r.ruolo}')" title="Rimuovi"><i class="fas fa-xmark"></i></button>`
       : '';
 
     if (!hasRef) {

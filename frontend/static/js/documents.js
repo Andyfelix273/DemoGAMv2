@@ -300,7 +300,7 @@ async function apriViewerPdf(docId, nomeFile) {
            style="display:inline-block;margin-top:14px;padding:6px 16px;
                   background:rgba(0,180,216,0.15);border:1px solid #00B4D8;
                   border-radius:5px;color:#00B4D8;font-size:12px;text-decoration:none;">
-          <i class="fa fa-external-link"></i> Apri in nuova scheda
+          <i class="fa fa-arrow-up-right-from-square"></i> Apri in nuova scheda
         </a>
       </div>`;
     }

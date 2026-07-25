@@ -214,7 +214,7 @@ async function apriModaleAsset(id) {
     // Tab Allarmi
     let allHtml = '';
     if (allarmi.length === 0) {
-      allHtml = '<p style="color:#27AE60;font-size:13px"><i class="fa fa-check-circle"></i> Nessun allarme attivo</p>';
+      allHtml = '<p style="color:#27AE60;font-size:13px"><i class="fa fa-circle-check"></i> Nessun allarme attivo</p>';
     } else {
       allHtml = allarmi.map(al => {
         const col = al.livello === 'alarm' ? '#E74C3C' : '#F39C12';
@@ -239,7 +239,7 @@ async function apriModaleAsset(id) {
       const prioColor2  = { bassa:'#95A5A6', media:'#3498DB', alta:'#F39C12', critica:'#E74C3C' };
       let woHtml = '';
       if (woList.length === 0) {
-        woHtml = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-check-circle"></i> Nessun work order per questo asset</p>';
+        woHtml = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-circle-check"></i> Nessun work order per questo asset</p>';
       } else {
         woHtml = woList.map(w => `
           <div class="mm-alarm-row" style="cursor:pointer" onclick="window.location.href='/static/workorders.html'">
@@ -345,7 +345,7 @@ async function apriModaleAsset(id) {
         if (dlBadge) dlBadge.innerHTML = ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperte.length}</span>`;
       }
       const coloreStato = { 'aperta': 'var(--stato-man)', 'in_corso': '#3498DB', 'completata': 'var(--stato-ok)', 'scaduta': 'var(--stato-inattivo)' };
-      const iconaStato  = { 'aperta': 'fa-clock', 'in_corso': 'fa-spinner', 'completata': 'fa-check-circle', 'scaduta': 'fa-exclamation-circle' };
+      const iconaStato  = { 'aperta': 'fa-clock', 'in_corso': 'fa-spinner', 'completata': 'fa-circle-check', 'scaduta': 'fa-exclamation-circle' };
       let dlHtml = deadlines.length === 0
         ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-calendar-check"></i> Nessuna scadenza registrata</p>'
         : deadlines.map(d => {
@@ -517,7 +517,7 @@ async function _mmApriViewerPdf(docId, nomeFile) {
            style="display:inline-block;margin-top:14px;padding:6px 16px;
                   background:rgba(0,180,216,0.15);border:1px solid #00B4D8;
                   border-radius:5px;color:#00B4D8;font-size:12px;text-decoration:none;">
-          <i class="fa fa-external-link"></i> Apri in nuova scheda
+          <i class="fa fa-arrow-up-right-from-square"></i> Apri in nuova scheda
         </a>
       </div>`;
     }
@@ -709,11 +709,11 @@ function _renderReferenti(referenti, assetId, canEdit) {
     const hasRef = r.referente_id !== null;
     const editBtn = canEdit
       ? `<button class="mm-ref-edit-btn" onclick="_apriModaleEditReferente(${assetId}, '${r.ruolo}', ${r.referente_id || 'null'})" title="${hasRef ? 'Modifica' : 'Assegna'}">
-           <i class="fas ${hasRef ? 'fa-pencil-alt' : 'fa-plus-circle'}"></i>
+           <i class="fas ${hasRef ? 'fa-pen' : 'fa-plus'}"></i>
          </button>`
       : '';
     const removeBtn = (canEdit && hasRef)
-      ? `<button class="mm-ref-remove-btn" onclick="_rimuoviReferente(${assetId}, '${r.ruolo}')" title="Rimuovi"><i class="fas fa-times"></i></button>`
+      ? `<button class="mm-ref-remove-btn" onclick="_rimuoviReferente(${assetId}, '${r.ruolo}')" title="Rimuovi"><i class="fas fa-xmark"></i></button>`
       : '';
 
     if (!hasRef) {

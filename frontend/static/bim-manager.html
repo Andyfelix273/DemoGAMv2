@@ -120,6 +120,7 @@
     /* Permesso negato */
     .no-permission { padding:20px; text-align:center; color:var(--text-muted); font-size:13px; }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body>
   <nav class="sidebar" id="sidebar"></nav>
@@ -295,8 +296,8 @@
           <div class="upload-label">File IFC per il viewer 3D</div>
           <div class="upload-status ${a.has_modello_3d ? 'has' : 'none'}">
             ${a.has_modello_3d
-              ? `<i class="fa fa-check-circle"></i> ${a.modello_3d_file ? a.modello_3d_file.split('/').pop() : 'File presente'}`
-              : '<i class="fa fa-times-circle"></i> Nessun file'}
+              ? `<i class="fa fa-circle-check"></i> ${a.modello_3d_file ? a.modello_3d_file.split('/').pop() : 'File presente'}`
+              : '<i class="fa fa-xmark"></i> Nessun file'}
           </div>
           <label class="btn-upload">
             <i class="fa fa-upload"></i> Carica IFC
@@ -348,8 +349,8 @@
                   <td>${f.quota_m != null ? f.quota_m + ' m' : '—'}</td>
                   <td>
                     ${f.svg_file
-                      ? `<span style="color:var(--accent-green,#2ecc71);font-size:12px"><i class="fa fa-check-circle"></i> ${f.svg_file.split('/').pop()}</span>`
-                      : `<span style="color:var(--text-muted);font-size:12px"><i class="fa fa-times-circle"></i> Nessun SVG</span>`}
+                      ? `<span style="color:var(--accent-green,#2ecc71);font-size:12px"><i class="fa fa-circle-check"></i> ${f.svg_file.split('/').pop()}</span>`
+                      : `<span style="color:var(--text-muted);font-size:12px"><i class="fa fa-xmark"></i> Nessun SVG</span>`}
                   </td>
                   <td>
                     <div style="display:flex;gap:4px">
@@ -362,7 +363,7 @@
                         <i class="fa fa-trash"></i>
                       </button>` : ''}
                       <button class="btn-upload danger" onclick="eliminaPiano('${f.floor_id}')" title="Elimina piano">
-                        <i class="fa fa-times"></i>
+                        <i class="fa fa-xmark"></i>
                       </button>
                     </div>
                   </td>
@@ -379,7 +380,7 @@
           <input type="number" id="new-floor-level" placeholder="Livello" value="0" style="width:70px">
           <input type="number" id="new-floor-quota" placeholder="Quota (m)" value="0" step="0.1" style="width:90px">
           <button class="btn-upload" onclick="aggiungiPiano()"><i class="fa fa-check"></i> Salva</button>
-          <button class="btn-upload" onclick="toggleAddFloor()"><i class="fa fa-times"></i></button>
+          <button class="btn-upload" onclick="toggleAddFloor()"><i class="fa fa-xmark"></i></button>
         </div>
       </div>
 

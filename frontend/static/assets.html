@@ -69,6 +69,7 @@
     .import-zone.drag-over { border-color:var(--accent-blue); background:rgba(88,166,255,0.05); }
     .import-result { margin-top:12px; font-size:13px; }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
@@ -415,7 +416,7 @@
           </button>
           ${canEdit ? `
             <button class="btn btn-ghost btn-sm" onclick="apriModifica(${a.id})" title="${i18n.t('ana.modifica')}">
-              <i class="fa fa-pencil"></i>
+              <i class="fa fa-pen"></i>
             </button>
             ` : ''}
           ${canDelete ? `
@@ -651,7 +652,7 @@
       // Tab Allarmi
       let allHtml = '';
       if (allarmi.length === 0) {
-        allHtml = '<p style="color:var(--accent-green);font-size:13px"><i class="fa fa-check-circle"></i> Nessun allarme attivo</p>';
+        allHtml = '<p style="color:var(--accent-green);font-size:13px"><i class="fa fa-circle-check"></i> Nessun allarme attivo</p>';
       } else {
         allHtml = allarmi.map(al => {
           const col = al.livello === 'alarm' ? 'var(--accent-red)' : 'var(--accent-orange)';
@@ -677,7 +678,7 @@
         const prioColor  = { bassa:'var(--text-muted)', media:'var(--accent-blue)', alta:'var(--accent-orange)', critica:'var(--accent-red)' };
         let woHtml = '';
         if (woList.length === 0) {
-          woHtml = '<p style="color:var(--text-muted);font-size:13px"><i class="fa fa-check-circle"></i> Nessun work order per questo asset</p>';
+          woHtml = '<p style="color:var(--text-muted);font-size:13px"><i class="fa fa-circle-check"></i> Nessun work order per questo asset</p>';
           if (API.can('work_orders.create')) {
             woHtml += `<a href="/static/workorders.html?asset_id=${id}" class="btn btn-primary btn-sm" style="margin-top:8px"><i class="fa fa-plus"></i> Crea Work Order</a>`;
           }
@@ -823,7 +824,7 @@
       resultEl.innerHTML = html;
       await caricaAssets();
     } catch (err) {
-      resultEl.innerHTML = `<p style="color:var(--accent-red)"><i class="fa fa-times"></i> ${err.message}</p>`;
+      resultEl.innerHTML = `<p style="color:var(--accent-red)"><i class="fa fa-xmark"></i> ${err.message}</p>`;
     }
   }
 

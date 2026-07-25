@@ -185,7 +185,7 @@ async function caricaHUD() {
       if (woEl) woEl.innerHTML =
         opKpi('fa-exclamation-circle', d.wo_urgenti,         'WO Urgenti',      'Priorità critica/alta aperti',  woUrgClass,  '/static/workorders.html') +
         opKpi('fa-wrench',             d.wo_aperti,          'WO Aperti',       'Work order non completati',     woApertiClr, '/static/workorders.html') +
-        opKpi('fa-check-circle',       d.wo_completati_mese, 'Completati/mese', 'WO chiusi nel mese corrente',   compClr,     '/static/workorders.html');
+        opKpi('fa-circle-check',       d.wo_completati_mese, 'Completati/mese', 'WO chiusi nel mese corrente',   compClr,     '/static/workorders.html');
 
       const scadTotClr  = d.scadenze_totali_aperte > 0 ? 'var(--accent)' : 'var(--text-secondary)';
       const inattClr    = d.asset_inattivi > 0 ? 'var(--text-secondary)' : '#27AE60';

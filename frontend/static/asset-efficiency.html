@@ -216,6 +216,7 @@
       .kpi-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
+  <link rel="stylesheet" href="/static/css/icons.css">
 </head>
 <body>
   <!-- SIDEBAR (popolata da renderSidebar) -->
@@ -693,7 +694,7 @@
       if (!anomalies.length) {
         container.innerHTML = `
           <div class="spinner-wrap" style="color:var(--accent-green)">
-            <i class="fa fa-check-circle" style="font-size:32px"></i>
+            <i class="fa fa-circle-check" style="font-size:32px"></i>
             <div>
               <div style="font-size:15px;font-weight:600">Nessuna anomalia rilevata</div>
               <div style="font-size:12px;color:var(--text-muted)">Tutti gli asset mostrano consumi nella norma</div>
