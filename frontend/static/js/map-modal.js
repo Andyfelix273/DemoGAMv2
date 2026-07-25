@@ -101,23 +101,10 @@ async function apriModaleAsset(id) {
     const _btnAnagrafica = document.getElementById('mm-btn-anagrafica');
     if (_btnAnagrafica) _btnAnagrafica.href = '/static/assets.html';
 
-    // Tab Planimetria, BIM e Modello 3D: visibili solo per asset con dati BIM
-    const tabPlani    = document.querySelector('.mm-tab-planimetria');
-    const tabBim      = document.querySelector('.mm-tab-bim');
-    const tabViewer3d = document.querySelector('.mm-tab-viewer3d');
-    if (BIM_ASSET_IDS_MODAL.includes(a.id)) {
-      tabPlani.style.display    = 'inline-block';
-      tabBim.style.display      = 'inline-block';
-      if (tabViewer3d) tabViewer3d.style.display = 'inline-block';
-      // Pre-carica dati planimetria
-      mmCaricaPlanimetria(a.id);
-      // Pre-carica dati BIM IFC
-      mmCaricaBIM(a.id);
-    } else {
-      tabPlani.style.display = 'none';
-      tabBim.style.display   = 'none';
-      if (tabViewer3d) tabViewer3d.style.display = 'none';
-    }
+    // Tab Planimetria, BIM e Modello 3D: sempre visibili
+    // Se non ci sono dati, i moduli mostreranno il messaggio "Nessun elemento da visualizzare"
+    mmCaricaPlanimetria(a.id);
+    mmCaricaBIM(a.id);
 
     // Badge allarmi
     const alarmBadge = document.getElementById('mm-alarm-badge');

@@ -313,19 +313,16 @@ function renderDettaglio(data, container) {
     </div>`;
   }
 
-  // ── Link BIM Viewer (solo se l'asset ha dati planimetrici) ──────────
-  // Lista asset con BIM letta dalla configurazione centralizzata (config.js)
-  if (GAM_CONFIG.BIM_ASSET_IDS.includes(a.id)) {
-    html += `<div class="section">
-      <div class="section-title" style="border-left-color:#00A3E0;background:rgba(0,163,224,0.06);">
-        <i class="fas fa-building"></i> BIM Viewer
-        <a href="/static/bim.html?asset_id=${a.id}" style="margin-left:auto;font-size:10px;color:var(--accent);text-decoration:none;font-weight:600;">Apri planimetria ›</a>
-      </div>
-      <div style="font-size:11px;color:var(--text-secondary);padding:6px 0;">
-        Planimetria interattiva disponibile &mdash; visualizza locali e stato operativo per piano.
-      </div>
-    </div>`;
-  }
+  // ── Link BIM Viewer (sempre visibile) ──────────
+  html += `<div class="section">
+    <div class="section-title" style="border-left-color:#00A3E0;background:rgba(0,163,224,0.06);">
+      <i class="fas fa-building"></i> BIM Viewer
+      <a href="/static/bim.html?asset_id=${a.id}" style="margin-left:auto;font-size:10px;color:var(--accent);text-decoration:none;font-weight:600;">Apri planimetria ›</a>
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary);padding:6px 0;">
+      Planimetria interattiva &mdash; visualizza locali e stato operativo per piano.
+    </div>
+  </div>`;
 
   // ── Sezione Meteo (placeholder, popolato async) ─────────────
   html += `<div class="section" id="meteo-section-${a.id}">

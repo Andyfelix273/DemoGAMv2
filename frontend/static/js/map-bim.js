@@ -62,10 +62,10 @@ async function mmCaricaPlanimetria(assetId) {
   } catch(e) {
     console.warn('[mmCaricaPlanimetria] Impossibile caricare la planimetria per asset', assetId, ':', e.message);
     document.getElementById('mm-panel-planimetria').innerHTML =
-      `<div style="text-align:center;padding:20px;color:var(--stato-inattivo)">
-         <i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>
-         <div style="font-size:13px">Planimetria non disponibile.</div>
-         <div style="font-size:11px;margin-top:4px;color:var(--text-secondary)">${e.message}</div>
+      `<div style="text-align:center;padding:32px 20px;color:var(--text-secondary)">
+         <i class="fa fa-map" style="font-size:32px;margin-bottom:12px;display:block;opacity:0.35"></i>
+         <div style="font-size:13px;font-weight:600;margin-bottom:4px">Nessuna planimetria disponibile</div>
+         <div style="font-size:11px">La planimetria non è stata ancora associata a questo asset.</div>
        </div>`;
   }
 }
@@ -332,7 +332,12 @@ let _mmBimData = null;
 async function mmCaricaBIM(assetId) {
   document.getElementById('mm-panel-bim').innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
   if (assetId !== BIM_IFC_ASSET_ID) {
-    document.getElementById('mm-panel-bim').innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-info-circle"></i> Modello IFC non disponibile per questo asset. Disponibile per: Sede Centrale Roma.</p>';
+    document.getElementById('mm-panel-bim').innerHTML =
+      `<div style="text-align:center;padding:32px 20px;color:var(--text-secondary)">
+         <i class="fa fa-cube" style="font-size:32px;margin-bottom:12px;display:block;opacity:0.35"></i>
+         <div style="font-size:13px;font-weight:600;margin-bottom:4px">Nessun modello BIM disponibile</div>
+         <div style="font-size:11px">Il modello IFC non è stato ancora associato a questo asset.</div>
+       </div>`;
     return;
   }
   try {
