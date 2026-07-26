@@ -322,15 +322,12 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         # Allarmi energetici attivi per severità (E-4)
         cur.execute("""
             SELECT
-                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('CRITICAL','CRITICO','HIGH','ALTA') THEN 1 ELSE 0 END), 0) AS n_critical,
-                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('MEDIUM','MEDIO','MEDIA') THEN 1 ELSE 0 END), 0) AS n_medium,
-                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('LOW','BASSO','BASSA') THEN 1 ELSE 0 END), 0) AS n_low,
+                COALESCE(SUM(CASE WHEN UPPER(severity) IN ('CRITICAL','HIGH') THEN 1 ELSE 0 END), 0) AS n_critical,
+                COALESCE(SUM(CASE WHEN UPPER(severity) IN ('MEDIUM','WARNING') THEN 1 ELSE 0 END), 0) AS n_medium,
+                COALESCE(SUM(CASE WHEN UPPER(severity) IN ('LOW','INFO') THEN 1 ELSE 0 END), 0) AS n_low,
                 COUNT(*) AS n_totale
-            FROM alarms
-            WHERE asset_id=%s AND ack_at IS NULL
-              AND (campo ILIKE '%%energia%%' OR campo ILIKE '%%consumo%%'
-                   OR campo ILIKE '%%potenza%%' OR campo ILIKE '%%kwh%%'
-                   OR campo ILIKE '%%efficien%%')
+            FROM energy_alarms
+            WHERE asset_id=%s AND acknowledged = FALSE
         """, (asset_id,))
         allarmi_row = cur.fetchone()
         n_allarmi_critical = int(allarmi_row["n_critical"] or 0)
@@ -720,27 +717,21 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         # Anomalie totali portafoglio per severità (P-3)
         cur.execute("""
             SELECT
-                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('CRITICAL','CRITICO','HIGH','ALTA') THEN 1 ELSE 0 END), 0) AS n_critical,
-                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('MEDIUM','MEDIO','MEDIA') THEN 1 ELSE 0 END), 0) AS n_medium,
-                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('LOW','BASSO','BASSA') THEN 1 ELSE 0 END), 0) AS n_low,
+                COALESCE(SUM(CASE WHEN UPPER(severity) IN ('CRITICAL','HIGH') THEN 1 ELSE 0 END), 0) AS n_critical,
+                COALESCE(SUM(CASE WHEN UPPER(severity) IN ('MEDIUM','WARNING') THEN 1 ELSE 0 END), 0) AS n_medium,
+                COALESCE(SUM(CASE WHEN UPPER(severity) IN ('LOW','INFO') THEN 1 ELSE 0 END), 0) AS n_low,
                 COUNT(*) AS n_totale
-            FROM alarms
-            WHERE ack_at IS NULL
-              AND (campo ILIKE '%%energia%%' OR campo ILIKE '%%consumo%%'
-                   OR campo ILIKE '%%potenza%%' OR campo ILIKE '%%kwh%%'
-                   OR campo ILIKE '%%efficien%%')
+            FROM energy_alarms
+            WHERE acknowledged = FALSE
         """)
         allarmi_portfolio = cur.fetchone()
 
         # Top 3 asset per numero di anomalie (P-3)
         cur.execute("""
             SELECT a.id, a.nome, COUNT(al.id) AS n_allarmi
-            FROM alarms al
+            FROM energy_alarms al
             JOIN assets a ON a.id = al.asset_id
-            WHERE al.ack_at IS NULL
-              AND (al.campo ILIKE '%%energia%%' OR al.campo ILIKE '%%consumo%%'
-                   OR al.campo ILIKE '%%potenza%%' OR al.campo ILIKE '%%kwh%%'
-                   OR al.campo ILIKE '%%efficien%%')
+            WHERE al.acknowledged = FALSE
             GROUP BY a.id, a.nome
             ORDER BY n_allarmi DESC
             LIMIT 3
