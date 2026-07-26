@@ -86,7 +86,7 @@
 .edm-tab:hover { color:var(--text-primary,#E0F0FF); }
 .edm-tab.active { color:var(--accent,#00B4D8);border-bottom-color:var(--accent,#00B4D8); }
 .edm-panel { display:none; }
-.edm-panel.active { display:block;flex:1;min-height:0; }
+.edm-panel.active { display:block; }
 .edm-btn {
   display:inline-flex;align-items:center;gap:6px;
   padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;
