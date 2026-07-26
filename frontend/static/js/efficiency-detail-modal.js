@@ -1145,11 +1145,12 @@ async function _edmCaricaBollette(assetId) {
       <div class="edm-inv-table-wrap">
         <table class="edm-inv-table">
           <thead><tr>
-            <th>Commodity</th><th>Periodo</th>
-            <th title="Importo totale della bolletta (IVA inclusa)">Importo totale</th>
-            <th title="Costi diversi dalla quota materia prima: trasporto, distribuzione, oneri generali, accise, imposte">Quota oneri</th>
-            <th>Consumo</th><th>€/Unità</th><th>Fornitore</th>
-            <th>Metodo</th><th>Stato</th>
+            <th>Commodity</th>
+            <th>Periodo</th>
+            <th title="Importo totale della bolletta (IVA inclusa)">Importo</th>
+            <th>Fornitore</th>
+            <th>Metodo</th>
+            <th>Stato</th>
             ${canManage ? '<th></th>' : ''}
           </tr></thead>
           <tbody>
@@ -1161,10 +1162,7 @@ async function _edmCaricaBollette(assetId) {
               return `<tr>
                 <td><i class="fa ${meta.icon || 'fa-bolt'}" style="color:${meta.color || ''};margin-right:4px"></i>${meta.label || i.commodity}</td>
                 <td style="white-space:nowrap">${periodo}</td>
-                <td style="white-space:nowrap" title="Importo totale bolletta IVA inclusa">${i.total_amount_eur ? '€ ' + fmtNum(i.total_amount_eur) : '–'}</td>
-                <td style="white-space:nowrap" title="Costi diversi dalla quota materia prima">${i.quota_oneri_eur != null ? '€ ' + fmtNum(i.quota_oneri_eur) : '–'}</td>
-                <td style="white-space:nowrap">${i.consumption_quantity ? fmtNum(i.consumption_quantity, 0) + ' ' + (i.consumption_unit || '') : '–'}</td>
-                <td style="white-space:nowrap">${fmtEur(i.unit_cost_eur)}</td>
+                <td style="white-space:nowrap;font-weight:600">${i.total_amount_eur ? '€ ' + fmtNum(i.total_amount_eur) : '–'}</td>
                 <td>${i.supplier_name || '–'}</td>
                 <td>${methodBadge(i.extraction_method)}</td>
                 <td>${statusBadge(i.extraction_status)}</td>
