@@ -24,7 +24,7 @@ from typing import Optional
 
 import psycopg2
 import psycopg2.extras
-from fastapi import HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -784,9 +784,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
     # ── Fornitori ─────────────────────────────────────────────────────────────
 
     @app.get("/api/bems/buildings/{asset_id}/suppliers", tags=["invoices"])
-    def lista_fornitori(asset_id: int, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def lista_fornitori(asset_id: int, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         _get_asset_or_404(cur, asset_id)
         cur.execute("""
@@ -801,9 +799,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"suppliers": [dict(r) for r in cur.fetchall()]}
 
     @app.post("/api/bems/buildings/{asset_id}/suppliers", tags=["invoices"])
-    def crea_fornitore(asset_id: int, body: SupplierCreate, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def crea_fornitore(asset_id: int, body: SupplierCreate, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         _get_asset_or_404(cur, asset_id)
         cur.execute("""
@@ -815,9 +811,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"supplier": dict(cur.fetchone())}
 
     @app.put("/api/bems/buildings/{asset_id}/suppliers/{supplier_id}", tags=["invoices"])
-    def modifica_fornitore(asset_id: int, supplier_id: str, body: SupplierUpdate, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def modifica_fornitore(asset_id: int, supplier_id: str, body: SupplierUpdate, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM suppliers WHERE supplier_id=%s AND asset_id=%s",
                     (supplier_id, asset_id))
@@ -833,9 +827,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"supplier": dict(cur.fetchone())}
 
     @app.delete("/api/bems/buildings/{asset_id}/suppliers/{supplier_id}", tags=["invoices"])
-    def elimina_fornitore(asset_id: int, supplier_id: str, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def elimina_fornitore(asset_id: int, supplier_id: str, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT COUNT(*) AS n FROM supply_points WHERE supplier_id=%s", (supplier_id,))
         if cur.fetchone()["n"] > 0:
@@ -850,9 +842,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
 
     @app.get("/api/bems/buildings/{asset_id}/supply-points", tags=["invoices"])
     def lista_forniture(asset_id: int, commodity: Optional[str] = None,
-                        is_active: Optional[bool] = None, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+                        is_active: Optional[bool] = None, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         _get_asset_or_404(cur, asset_id)
         where = ["sp.asset_id=%s"]
@@ -876,9 +866,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"supply_points": [dict(r) for r in cur.fetchall()]}
 
     @app.post("/api/bems/buildings/{asset_id}/supply-points", tags=["invoices"])
-    def crea_fornitura(asset_id: int, body: SupplyPointCreate, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def crea_fornitura(asset_id: int, body: SupplyPointCreate, db=Depends(get_db), _=Depends(get_utente_corrente)):
         if body.commodity.upper() not in COMMODITIES:
             raise HTTPException(status_code=400, detail=f"Commodity non valida: {body.commodity}")
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -899,9 +887,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
                 detail="Il codice POD/PDR è già associato a un'altra fornitura di questo asset")
 
     @app.put("/api/bems/buildings/{asset_id}/supply-points/{sp_id}", tags=["invoices"])
-    def modifica_fornitura(asset_id: int, sp_id: str, body: SupplyPointUpdate, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def modifica_fornitura(asset_id: int, sp_id: str, body: SupplyPointUpdate, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM supply_points WHERE supply_point_id=%s AND asset_id=%s",
                     (sp_id, asset_id))
@@ -917,9 +903,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"supply_point": dict(cur.fetchone())}
 
     @app.patch("/api/bems/buildings/{asset_id}/supply-points/{sp_id}/deactivate", tags=["invoices"])
-    def disattiva_fornitura(asset_id: int, sp_id: str, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def disattiva_fornitura(asset_id: int, sp_id: str, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
             UPDATE supply_points
@@ -937,9 +921,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
     @app.get("/api/bems/buildings/{asset_id}/invoices", tags=["invoices"])
     def lista_bollette(asset_id: int, commodity: Optional[str] = None,
                        supply_point_id: Optional[str] = None,
-                       year: Optional[int] = None, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+                       year: Optional[int] = None, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         _get_asset_or_404(cur, asset_id)
         where = ["i.asset_id=%s"]
@@ -981,10 +963,8 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         background_tasks: BackgroundTasks,
         file: UploadFile = File(...),
         supply_point_id: Optional[str] = Form(None),
-        db=None, utente=None
+        db=Depends(get_db), _=Depends(get_utente_corrente)
     ):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         _get_asset_or_404(cur, asset_id)
 
@@ -1066,9 +1046,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"invoice_id": invoice_id, "status": "processing"}
 
     @app.get("/api/bems/buildings/{asset_id}/invoices/{invoice_id}", tags=["invoices"])
-    def dettaglio_bolletta(asset_id: int, invoice_id: str, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def dettaglio_bolletta(asset_id: int, invoice_id: str, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
             SELECT i.*,
@@ -1092,9 +1070,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"invoice": d, "status": d.get("extraction_status")}
 
     @app.put("/api/bems/buildings/{asset_id}/invoices/{invoice_id}", tags=["invoices"])
-    def aggiorna_bolletta(asset_id: int, invoice_id: str, body: InvoiceUpdate, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def aggiorna_bolletta(asset_id: int, invoice_id: str, body: InvoiceUpdate, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM invoices WHERE invoice_id=%s AND asset_id=%s",
                     (invoice_id, asset_id))
@@ -1125,9 +1101,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
     @app.post("/api/bems/buildings/{asset_id}/invoices/{invoice_id}/confirm-disambiguation",
               tags=["invoices"])
     def conferma_disambiguazione(asset_id: int, invoice_id: str,
-                                 body: DisambiguationConfirm, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+                                 body: DisambiguationConfirm, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         for assignment in body.assignments:
             iid = assignment.get("invoice_id")
@@ -1146,9 +1120,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"ok": True}
 
     @app.delete("/api/bems/buildings/{asset_id}/invoices/{invoice_id}", tags=["invoices"])
-    def elimina_bolletta(asset_id: int, invoice_id: str, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def elimina_bolletta(asset_id: int, invoice_id: str, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM invoices WHERE invoice_id=%s AND asset_id=%s",
                     (invoice_id, asset_id))
@@ -1175,9 +1147,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"ok": True}
 
     @app.get("/api/bems/buildings/{asset_id}/invoices/{invoice_id}/file", tags=["invoices"])
-    def download_bolletta(asset_id: int, invoice_id: str, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def download_bolletta(asset_id: int, invoice_id: str, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT file_path, original_filename FROM invoices WHERE invoice_id=%s AND asset_id=%s",
                     (invoice_id, asset_id))
@@ -1196,9 +1166,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
     # ── Costi unitari aggregati ───────────────────────────────────────────────
 
     @app.get("/api/bems/buildings/{asset_id}/energy-costs", tags=["invoices"])
-    def costi_unitari(asset_id: int, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def costi_unitari(asset_id: int, db=Depends(get_db), _=Depends(get_utente_corrente)):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         _get_asset_or_404(cur, asset_id)
         cur.execute("""
@@ -1220,9 +1188,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         return {"energy_costs": result}
 
     @app.get("/api/bems/buildings/{asset_id}/energy-costs/{commodity}", tags=["invoices"])
-    def costo_unitario_commodity(asset_id: int, commodity: str, db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def costo_unitario_commodity(asset_id: int, commodity: str, db=Depends(get_db), _=Depends(get_utente_corrente)):
         commodity = commodity.upper()
         if commodity not in COMMODITIES:
             raise HTTPException(status_code=400, detail="Commodity non valida")
@@ -1266,10 +1232,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         }
 
     @app.put("/api/bems/buildings/{asset_id}/energy-costs/{commodity}", tags=["invoices"])
-    def override_costo_unitario(asset_id: int, commodity: str, body: UnitCostOverride,
-                                db=None, utente=None):
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
+    def override_costo_unitario(asset_id: int, commodity: str, body: UnitCostOverride, db=Depends(get_db), _=Depends(get_utente_corrente)):
         commodity = commodity.upper()
         if commodity not in COMMODITIES:
             raise HTTPException(status_code=400, detail="Commodity non valida")
@@ -1286,10 +1249,8 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
     # ── Dashboard aggregata asset ─────────────────────────────────────────────
 
     @app.get("/api/bems/assets/energy-costs", tags=["invoices"])
-    def costi_asset(commodity: Optional[str] = None, db=None, utente=None):
+    def costi_asset(commodity: Optional[str] = None, db=Depends(get_db), _=Depends(get_utente_corrente)):
         """Restituisce i costi unitari aggregati per tutti gli asset degli asset."""
-        db = db or next(get_db())
-        utente = utente or get_utente_corrente()
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         where = []
         params = []
