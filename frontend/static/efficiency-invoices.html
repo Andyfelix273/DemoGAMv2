@@ -20,70 +20,90 @@
     <!-- HEADER PAGINA -->
     <div class="page-header">
       <h1 class="page-title">
-        <i class="fa fa-file-invoice-dollar" style="margin-right:8px;color:var(--accent-blue)"></i>Tariffe &amp; Bollette
+        <i class="fa fa-file-invoice-dollar"></i>Tariffe &amp; Bollette
       </h1>
-      <div class="page-actions">
-        <select id="filter-commodity" class="btn btn-secondary btn-sm">
-          <option value="">Tutte le commodity</option>
-          <!-- Popolato dinamicamente da JS -->
+    </div>
+
+    <!-- KPI STRIP -->
+    <div class="page-body" style="padding-bottom:0">
+      <div class="kpi-strip" id="kpi-strip">
+        <div class="kpi-card info">
+          <div class="kpi-val" id="kpi-tot">–</div>
+          <div class="kpi-lbl">Bollette totali</div>
+        </div>
+        <div class="kpi-card" id="kpi-disambig-card">
+          <div class="kpi-val" id="kpi-disambig">–</div>
+          <div class="kpi-lbl">Da abbinare</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpi-assets">–</div>
+          <div class="kpi-lbl">Asset con bollette</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpi-importo">–</div>
+          <div class="kpi-lbl">Importo totale (€)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BARRA FILTRI -->
+    <div class="page-body" style="padding-top:8px;padding-bottom:8px">
+      <div class="filter-bar">
+        <select id="filter-commodity">
+          <option value="">Tutte le forniture</option>
+          <option value="ELECTRICITY">Elettricità</option>
+          <option value="GAS_METHANE">Gas Metano</option>
+          <option value="GAS_GPL">GPL</option>
+          <option value="WATER">Acqua</option>
+          <option value="HEATING_OIL">Gasolio riscaldamento</option>
+          <option value="DIESEL">Gasolio autotrazione</option>
+          <option value="PETROL">Benzina</option>
         </select>
-        <select id="filter-tipo" class="btn btn-secondary btn-sm">
-          <option value="">Tutti i tipi</option>
+        <select id="filter-categoria">
+          <option value="">Tutte le categorie</option>
           <option value="stabilimento">Stabilimento</option>
           <option value="ufficio">Ufficio</option>
           <option value="magazzino">Magazzino</option>
           <option value="deposito">Deposito</option>
         </select>
-        <input type="text" id="search-input" placeholder="Cerca asset…" class="filtri-input">
+        <select id="filter-stato">
+          <option value="">Tutti gli stati</option>
+          <option value="ready">Pronto</option>
+          <option value="needs_disambiguation">Da abbinare</option>
+          <option value="wrong_asset">Asset errato</option>
+          <option value="error">Errore</option>
+          <option value="processing">In elaborazione</option>
+        </select>
+        <div class="search-wrap">
+          <i class="fa fa-search"></i>
+          <input type="text" id="search-input" placeholder="Cerca asset, codice bolletta, fornitore…">
+        </div>
+        <span class="record-count" id="record-count"></span>
       </div>
     </div>
 
-    <!-- KPI STRIP (generata dinamicamente) -->
-    <div class="kpi-strip" id="kpi-strip">
-      <div class="kpi-card">
-        <div class="kpi-icon"><i class="fa fa-file-invoice"></i></div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="kpi-tot-bollette">–</div>
-          <div class="kpi-lbl">Bollette totali caricate</div>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon" style="color:var(--accent-orange)"><i class="fa fa-exclamation-triangle"></i></div>
-        <div class="kpi-body">
-          <div class="kpi-val" id="kpi-disambig">–</div>
-          <div class="kpi-lbl">Da abbinare</div>
-        </div>
-      </div>
-      <!-- Card commodity inserite dinamicamente in #kpi-commodity-cards -->
-      <template id="kpi-commodity-tpl">
-        <div class="kpi-card kpi-commodity-card" data-commodity="">
-          <div class="kpi-icon"></div>
-          <div class="kpi-body">
-            <div class="kpi-val">–</div>
-            <div class="kpi-lbl"></div>
-          </div>
-        </div>
-      </template>
-    </div>
-
-    <!-- TABELLA ASSET CON COSTI UNITARI -->
-    <div class="page-body">
+    <!-- TABELLA BOLLETTE -->
+    <div class="page-body" style="padding-top:0">
       <div class="table-wrap">
-        <table id="inv-table">
-          <thead id="inv-thead">
+        <table class="bems-table" id="inv-table">
+          <thead>
             <tr>
-              <th>Codice</th>
+              <th>Codice bolletta</th>
+              <th>Fornitura</th>
+              <th>Fornitore</th>
+              <th>Importo</th>
+              <th>Periodo da</th>
+              <th>Periodo a</th>
+              <th>Data fattura</th>
               <th>Asset</th>
-              <th>Tipo</th>
+              <th>Categoria</th>
               <th>Città</th>
-              <!-- Colonne commodity inserite dinamicamente -->
-              <th>Bollette</th>
-              <th>Ultima bolletta</th>
-              <th>Azioni</th>
+              <th>Stato</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="inv-tbody">
-            <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-secondary)">
+            <tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-secondary)">
               <span class="spinner"></span> Caricamento…
             </td></tr>
           </tbody>
@@ -98,241 +118,164 @@
   <script src="/static/js/api.js?v=8"></script>
   <script src="/static/js/utils.js?v=8"></script>
   <script>
-    // ── Costanti commodity (unica fonte di verità, allineata al backend) ────────
+    // ── Commodity meta (unica fonte di verità) ────────────────────────────────
     const COMMODITY_META = {
-      ELECTRICITY:  { label: 'Elettricità',          unit: 'kWh',   icon: 'fa-bolt',             color: 'var(--accent-blue,#00A3E0)' },
-      GAS_METHANE:  { label: 'Gas Metano',            unit: 'Smc',   icon: 'fa-fire',             color: 'var(--accent-orange,#F39C12)' },
-      GAS_GPL:      { label: 'GPL',                   unit: 'kg',    icon: 'fa-fire-flame-curved', color: '#E67E22' },
-      WATER:        { label: 'Acqua',                 unit: 'm³',    icon: 'fa-droplet',          color: '#3498DB' },
-      HEATING_OIL:  { label: 'Gasolio riscaldamento', unit: 'litri', icon: 'fa-oil-can',          color: '#8E44AD' },
-      DIESEL:       { label: 'Gasolio autotrazione',  unit: 'litri', icon: 'fa-gas-pump',         color: '#7F8C8D' },
-      PETROL:       { label: 'Benzina',               unit: 'litri', icon: 'fa-gas-pump',         color: '#27AE60' },
+      ELECTRICITY:  { label: 'Elettricità',          unit: 'kWh',   icon: 'fa-bolt',              color: 'var(--accent-blue,#00A3E0)' },
+      GAS_METHANE:  { label: 'Gas Metano',            unit: 'Smc',   icon: 'fa-fire',              color: 'var(--accent-orange,#F39C12)' },
+      GAS_GPL:      { label: 'GPL',                   unit: 'kg',    icon: 'fa-fire-flame-curved',  color: '#E67E22' },
+      WATER:        { label: 'Acqua',                 unit: 'm³',    icon: 'fa-droplet',           color: '#3498DB' },
+      HEATING_OIL:  { label: 'Gasolio riscaldamento', unit: 'litri', icon: 'fa-oil-can',           color: '#8E44AD' },
+      DIESEL:       { label: 'Gasolio autotrazione',  unit: 'litri', icon: 'fa-gas-pump',          color: '#7F8C8D' },
+      PETROL:       { label: 'Benzina',               unit: 'litri', icon: 'fa-gas-pump',          color: '#27AE60' },
     };
 
-    // Commodity effettivamente presenti nei dati (calcolato al caricamento)
-    let activeCommodities = [];
     let allRows = [];
 
     // ── Utility ───────────────────────────────────────────────────────────────
     function fmtEur(v) {
-      if (v == null) return '<span style="color:var(--text-muted)">–</span>';
-      return '€ ' + parseFloat(v).toFixed(4).replace('.', ',');
+      if (v == null) return '–';
+      return '€ ' + parseFloat(v).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     function fmtData(s) {
       if (!s) return '–';
-      return new Date(s).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+      return new Date(s).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
-
-    // ── Costruzione UI dinamica ───────────────────────────────────────────────
-    function buildDynamicUI(commodities) {
-      activeCommodities = commodities;
-
-      // Filtro commodity
-      const sel = document.getElementById('filter-commodity');
-      sel.innerHTML = '<option value="">Tutte le commodity</option>';
-      commodities.forEach(c => {
-        const m = COMMODITY_META[c] || { label: c };
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = m.label;
-        sel.appendChild(opt);
-      });
-
-      // KPI card commodity (inserite dopo le card fisse)
-      const strip = document.getElementById('kpi-strip');
-      strip.querySelectorAll('.kpi-commodity-card').forEach(el => el.remove());
-      commodities.forEach(c => {
-        const m = COMMODITY_META[c] || { label: c, unit: '', icon: 'fa-circle', color: '#888' };
-        const card = document.createElement('div');
-        card.className = 'kpi-card kpi-commodity-card';
-        card.dataset.commodity = c;
-        card.innerHTML = `
-          <div class="kpi-icon" style="color:${m.color}"><i class="fa ${m.icon}"></i></div>
-          <div class="kpi-body">
-            <div class="kpi-val" id="kpi-${c}-val">–</div>
-            <div class="kpi-lbl">€/${m.unit} ${m.label} (media)</div>
-          </div>`;
-        strip.appendChild(card);
-      });
-
-      // Intestazioni tabella commodity
-      const thead = document.getElementById('inv-thead').querySelector('tr');
-      thead.querySelectorAll('th.th-commodity').forEach(el => el.remove());
-      // Inserisci prima di "Bollette" (4° th fisso, indice 3 = dopo Città)
-      const thBollette = thead.querySelectorAll('th')[4];
-      commodities.forEach(c => {
-        const m = COMMODITY_META[c] || { label: c, unit: '', icon: 'fa-circle', color: '#888' };
-        const th = document.createElement('th');
-        th.className = 'th-commodity';
-        th.innerHTML = `<i class="fa ${m.icon}" style="color:${m.color}"></i> €/${m.unit}`;
-        th.title = m.label;
-        thead.insertBefore(th, thBollette);
-      });
+    function statusBadge(status) {
+      const map = {
+        ready:                '<span class="badge badge-completato">Pronto</span>',
+        processing:           '<span class="badge badge-in_corso">Elaborazione…</span>',
+        needs_disambiguation: '<span class="badge badge-manutenzione">Da abbinare</span>',
+        wrong_asset:          '<span class="badge badge-scaduta">Asset errato</span>',
+        error:                '<span class="badge badge-scaduta">Errore</span>',
+      };
+      return map[status] || `<span class="badge">${status}</span>`;
+    }
+    function commodityBadge(commodity) {
+      const m = COMMODITY_META[commodity];
+      if (!m) return `<span class="tipo-badge">${commodity}</span>`;
+      return `<span class="tipo-badge" style="color:${m.color}"><i class="fa ${m.icon}" style="margin-right:4px"></i>${m.label}</span>`;
     }
 
     // ── Caricamento dati ──────────────────────────────────────────────────────
     async function caricaDashboard() {
       const AUTH = { headers: { 'Authorization': 'Bearer ' + API.getToken() } };
 
-      // 1. Lista asset
+      // 1. Lista asset (GeoJSON)
       const rAssets = await fetch('/api/assets', AUTH);
-      if (!rAssets.ok) { renderErrore('Impossibile caricare gli asset'); return; }
+      if (!rAssets.ok) { renderErrore('Impossibile caricare gli asset (' + rAssets.status + ')'); return; }
       const geoJson = await rAssets.json();
-      const assets  = geoJson.features
-        ? geoJson.features.map(f => ({ id: f.properties.id, ...f.properties }))
-        : (geoJson.assets || []);
+      const assets = (geoJson.features || []).map(f => f.properties);
+      const assetMap = {};
+      assets.forEach(a => { assetMap[a.id] = a; });
 
-      // 2. Costi unitari per asset (richiesta parallela)
-      const costsPerAsset = {};
-      await Promise.all(assets.map(async a => {
-        try {
-          const r = await fetch(`/api/bems/buildings/${a.id}/energy-costs`, AUTH);
-          if (r.ok) costsPerAsset[a.id] = (await r.json()).energy_costs || [];
-        } catch { costsPerAsset[a.id] = []; }
-      }));
-
-      // 3. Bollette per asset (richiesta parallela)
-      const invPerAsset = {};
-      await Promise.all(assets.map(async a => {
-        try {
-          const r = await fetch(`/api/bems/buildings/${a.id}/invoices`, AUTH);
-          if (r.ok) invPerAsset[a.id] = (await r.json()).invoices || [];
-        } catch { invPerAsset[a.id] = []; }
-      }));
-
-      // ── Calcola commodity attive (presenti in almeno un asset) ───────────────
-      const commoditySet = new Set();
-      Object.values(costsPerAsset).forEach(costs =>
-        costs.forEach(c => commoditySet.add(c.commodity))
+      // 2. Bollette per ogni asset (richieste parallele)
+      const invoicesByAsset = await Promise.all(
+        assets.map(async a => {
+          try {
+            const r = await fetch(`/api/bems/buildings/${a.id}/invoices`, AUTH);
+            if (!r.ok) return [];
+            const d = await r.json();
+            return (d.invoices || []).map(inv => ({ ...inv, _asset: a }));
+          } catch { return []; }
+        })
       );
-      // Ordina secondo l'ordine canonico di COMMODITY_META
-      const orderedCommodities = Object.keys(COMMODITY_META).filter(c => commoditySet.has(c));
-      buildDynamicUI(orderedCommodities);
 
-      // ── KPI aggregati per commodity ──────────────────────────────────────────
-      const sumByCommodity = {};
-      const cntByCommodity = {};
-      Object.values(costsPerAsset).forEach(costs => {
-        costs.forEach(c => {
-          if (c.unit_cost_eur == null) return;
-          sumByCommodity[c.commodity] = (sumByCommodity[c.commodity] || 0) + parseFloat(c.unit_cost_eur);
-          cntByCommodity[c.commodity] = (cntByCommodity[c.commodity] || 0) + 1;
-        });
-      });
-      orderedCommodities.forEach(c => {
-        const el = document.getElementById(`kpi-${c}-val`);
-        if (!el) return;
-        const cnt = cntByCommodity[c] || 0;
-        el.textContent = cnt > 0
-          ? '€ ' + (sumByCommodity[c] / cnt).toFixed(4).replace('.', ',')
-          : '–';
-      });
+      // 3. Appiattisci: una riga per bolletta, solo asset con almeno una bolletta
+      allRows = invoicesByAsset.flat();
 
-      let totBollette = 0, totDisambig = 0;
-      Object.values(invPerAsset).forEach(inv => {
-        totBollette += inv.length;
-        totDisambig += inv.filter(i =>
-          i.extraction_status === 'needs_disambiguation' || i.extraction_status === 'wrong_asset'
-        ).length;
-      });
-      document.getElementById('kpi-tot-bollette').textContent = totBollette;
-      document.getElementById('kpi-disambig').textContent = totDisambig;
-      if (totDisambig > 0) {
-        document.getElementById('kpi-disambig').style.color = 'var(--accent-orange,#F39C12)';
+      // ── KPI ──────────────────────────────────────────────────────────────────
+      const assetsConBollette = new Set(allRows.map(r => r.asset_id));
+      const disambig = allRows.filter(r =>
+        r.extraction_status === 'needs_disambiguation' || r.extraction_status === 'wrong_asset'
+      ).length;
+      const totImporto = allRows
+        .filter(r => r.total_amount_eur != null)
+        .reduce((s, r) => s + parseFloat(r.total_amount_eur), 0);
+
+      document.getElementById('kpi-tot').textContent      = allRows.length;
+      document.getElementById('kpi-disambig').textContent = disambig;
+      document.getElementById('kpi-assets').textContent   = assetsConBollette.size;
+      document.getElementById('kpi-importo').textContent  = totImporto > 0
+        ? totImporto.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '–';
+      if (disambig > 0) {
+        document.getElementById('kpi-disambig-card').classList.add('warning');
       }
-
-      // ── Costruzione righe tabella ────────────────────────────────────────────
-      allRows = assets.map(a => {
-        const costs = costsPerAsset[a.id] || [];
-        const costsMap = {};
-        costs.forEach(c => { costsMap[c.commodity] = c.unit_cost_eur; });
-
-        const invoices    = invPerAsset[a.id] || [];
-        const lastInvoice = invoices
-          .filter(i => i.extraction_status === 'ready')
-          .sort((a, b) => new Date(b.issue_date || 0) - new Date(a.issue_date || 0))[0];
-
-        return {
-          id:           a.id,
-          codice:       a.codice || '',
-          nome:         a.nome   || '',
-          tipo:         a.tipo   || '',
-          citta:        a.citta  || '',
-          costsMap,
-          nBollette:    invoices.length,
-          nDisambig:    invoices.filter(i =>
-            i.extraction_status === 'needs_disambiguation' || i.extraction_status === 'wrong_asset'
-          ).length,
-          lastDate:     lastInvoice?.issue_date ?? null,
-          lastCommodity: lastInvoice?.commodity ?? null,
-        };
-      });
 
       applicaFiltri();
     }
 
+    // ── Filtri ────────────────────────────────────────────────────────────────
     function applicaFiltri() {
-      const q         = document.getElementById('search-input').value.toLowerCase();
+      const q         = (document.getElementById('search-input').value || '').toLowerCase();
       const commodity = document.getElementById('filter-commodity').value;
-      const tipo      = document.getElementById('filter-tipo').value;
+      const categoria = document.getElementById('filter-categoria').value;
+      const stato     = document.getElementById('filter-stato').value;
 
       const filtered = allRows.filter(r => {
-        const matchQ = !q || r.codice.toLowerCase().includes(q) ||
-                             r.nome.toLowerCase().includes(q) ||
-                             r.citta.toLowerCase().includes(q);
-        const matchT = !tipo || r.tipo === tipo;
-        const matchC = !commodity || r.costsMap[commodity] != null;
-        return matchQ && matchT && matchC;
+        const a = r._asset || {};
+        const matchC = !commodity || r.commodity === commodity;
+        const matchK = !categoria || (a.tipo || '') === categoria;
+        const matchS = !stato    || r.extraction_status === stato;
+        const matchQ = !q ||
+          (r.invoice_number || '').toLowerCase().includes(q) ||
+          (a.nome  || '').toLowerCase().includes(q) ||
+          (a.citta || '').toLowerCase().includes(q) ||
+          (r.supplier_name || '').toLowerCase().includes(q) ||
+          (r.point_code    || '').toLowerCase().includes(q);
+        return matchC && matchK && matchS && matchQ;
       });
+
+      document.getElementById('record-count').textContent =
+        filtered.length + ' / ' + allRows.length + ' bollette';
 
       renderTabella(filtered);
     }
 
+    // ── Render tabella ────────────────────────────────────────────────────────
     function renderTabella(rows) {
       const tbody = document.getElementById('inv-tbody');
-      const colspan = 4 + activeCommodities.length + 3;
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:30px;color:var(--text-secondary)">Nessun asset trovato.</td></tr>`;
+        const msg = allRows.length === 0
+          ? 'Nessuna bolletta caricata. Aprire un asset e caricare la prima bolletta dalla tab Tariffe &amp; Bollette.'
+          : 'Nessun risultato per i filtri selezionati.';
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-secondary)">${msg}</td></tr>`;
         return;
       }
 
       tbody.innerHTML = rows.map(r => {
-        const disambigBadge = r.nDisambig > 0
-          ? `<span class="badge badge-manutenzione" style="margin-left:4px" title="${r.nDisambig} da abbinare">${r.nDisambig}</span>`
+        const a    = r._asset || {};
+        const meta = COMMODITY_META[r.commodity] || {};
+        const isWrong = r.extraction_status === 'wrong_asset' || r.extraction_status === 'needs_disambiguation';
+        const rowCls  = isWrong ? ' style="border-left:3px solid var(--accent-orange)"' : '';
+        const numBolletta = r.invoice_number
+          ? `<code style="font-size:11px">${r.invoice_number}</code>`
+          : `<span style="color:var(--text-muted);font-size:11px">${r.invoice_id.substring(0,8).toUpperCase()}</span>`;
+        const dlBtn = r.file_path
+          ? `<a class="btn-icon" href="/api/bems/buildings/${r.asset_id}/invoices/${r.invoice_id}/file" target="_blank" title="Scarica PDF"><i class="fa fa-download"></i></a>`
           : '';
-        const lastStr = r.lastDate
-          ? `${fmtData(r.lastDate)}${r.lastCommodity
-              ? ' <span style="font-size:10px;color:var(--text-muted)">' +
-                (COMMODITY_META[r.lastCommodity]?.label || r.lastCommodity) + '</span>'
-              : ''}`
-          : '<span style="color:var(--text-muted)">–</span>';
+        const detailBtn = `<button class="btn-icon" title="Apri dettaglio asset" onclick="apriDettaglioAsset(${r.asset_id})"><i class="fa fa-eye"></i></button>`;
 
-        const commodityCells = activeCommodities
-          .map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${fmtEur(r.costsMap[c] ?? null)}</td>`)
-          .join('');
-
-        return `<tr>
-          <td><span class="asset-code">${r.codice}</span></td>
-          <td><a href="#" onclick="apriDettaglioAsset(${r.id});return false" class="link-accent">${r.nome}</a></td>
-          <td>${r.tipo}</td>
-          <td>${r.citta}</td>
-          ${commodityCells}
-          <td style="text-align:center">${r.nBollette}${disambigBadge}</td>
-          <td>${lastStr}</td>
-          <td>
-            <div class="actions-cell">
-              <button class="btn-icon" title="Apri dettaglio asset" onclick="apriDettaglioAsset(${r.id})">
-                <i class="fa fa-eye"></i>
-              </button>
-            </div>
-          </td>
+        return `<tr${rowCls}>
+          <td>${numBolletta}</td>
+          <td>${commodityBadge(r.commodity)}</td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.supplier_name || ''}">${r.supplier_name || '–'}</td>
+          <td style="text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">${fmtEur(r.total_amount_eur)}</td>
+          <td style="white-space:nowrap">${fmtData(r.period_from)}</td>
+          <td style="white-space:nowrap">${fmtData(r.period_to)}</td>
+          <td style="white-space:nowrap">${fmtData(r.issue_date)}</td>
+          <td><a href="#" onclick="apriDettaglioAsset(${r.asset_id});return false" style="color:var(--accent-blue);text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${a.nome || '–'}</a></td>
+          <td><span class="tipo-badge">${a.tipo || '–'}</span></td>
+          <td>${a.citta || '–'}</td>
+          <td>${statusBadge(r.extraction_status)}</td>
+          <td><div class="row-actions">${dlBtn}${detailBtn}</div></td>
         </tr>`;
       }).join('');
     }
 
     function renderErrore(msg) {
       document.getElementById('inv-tbody').innerHTML =
-        `<tr><td colspan="8" style="text-align:center;padding:30px;color:#E74C3C">
+        `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--accent-red)">
           <i class="fa fa-exclamation-triangle" style="margin-right:6px"></i>${msg}
         </td></tr>`;
     }
@@ -341,10 +284,12 @@
     requireAuth();
     renderSidebar('eff-bollette', 'efficiency');
     renderTopbar('eff-bollette', { titolo: 'Asset Efficiency', modulo: 'efficiency' });
+    i18n.apply();
 
     document.getElementById('search-input').addEventListener('input', applicaFiltri);
     document.getElementById('filter-commodity').addEventListener('change', applicaFiltri);
-    document.getElementById('filter-tipo').addEventListener('change', applicaFiltri);
+    document.getElementById('filter-categoria').addEventListener('change', applicaFiltri);
+    document.getElementById('filter-stato').addEventListener('change', applicaFiltri);
 
     caricaDashboard().catch(err => {
       console.error('caricaDashboard error:', err);
