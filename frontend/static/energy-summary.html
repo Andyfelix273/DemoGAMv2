@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
   <link rel="stylesheet" href="/static/css/icons.css">
-  <link rel="stylesheet" href="/static/css/bems-ui.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css?v=2">
   <link rel="stylesheet" href="/static/css/map.css">
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
@@ -174,43 +174,65 @@
           <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
         </div>` : ''}`;
 
-      // ── Trend portafoglio (aggregato dai singoli asset) ────────────────────
-      // Usa il trend del primo asset con telemetria come proxy portafoglio
-      // (in futuro si può sommare i trend di tutti gli asset)
+      // ── Trend portafoglio ─────────────────────────────────────────────────
       const trendAssetId = port.ranking_asset?.find(a => a.kwh_mese > 0)?.asset_id;
       if (trendAssetId) {
         const trendRes = await fetch(`/api/efficiency/${trendAssetId}/trend?mesi=${mesi}`, { headers: AUTH });
         if (trendRes.ok) {
           const trend = await trendRes.json();
           if (trend && trend.length) {
+            // Grafico kWh: linea + area fill
             Plotly.newPlot('chart-trend-kwh',
-              [{ type: 'bar', x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
-                 marker: { color: '#58A6FF' },
-                 hovertemplate: '<b>%{x}</b><br>%{y:.0f} kWh<extra></extra>' }],
-              plotLayout({ yaxis: { title: 'kWh' } }), plotCfg);
+              [{ type: 'scatter', mode: 'lines',
+                 x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
+                 name: 'kWh', line: { color: '#58A6FF', width: 2.5, shape: 'spline' },
+                 fill: 'tozeroy', fillcolor: 'rgba(88,166,255,0.12)',
+                 hovertemplate: '<b>%{x}</b><br>%{y:,.0f} kWh<extra></extra>' }],
+              plotLayout({
+                margin: { t: 10, r: 15, b: 45, l: 60 },
+                yaxis: { title: { text: 'kWh', standoff: 8 }, tickformat: ',.0f' },
+                xaxis: { tickangle: -30 },
+                showlegend: false
+              }), plotCfg);
 
+            // Grafico costi: linea + area fill
             Plotly.newPlot('chart-trend-cost',
-              [{ type: 'scatter', mode: 'lines+markers',
+              [{ type: 'scatter', mode: 'lines',
                  x: trend.map(r => r.mese), y: trend.map(r => r.costo_eur),
-                 line: { color: '#F39C12', width: 2 },
-                 marker: { color: '#F39C12', size: 5 },
-                 fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.1)',
-                 hovertemplate: '<b>%{x}</b><br>€ %{y:.2f}<extra></extra>' }],
-              plotLayout({ yaxis: { title: '€' } }), plotCfg);
+                 name: '€', line: { color: '#F39C12', width: 2.5, shape: 'spline' },
+                 fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.12)',
+                 hovertemplate: '<b>%{x}</b><br>€ %{y:,.2f}<extra></extra>' }],
+              plotLayout({
+                margin: { t: 10, r: 15, b: 45, l: 65 },
+                yaxis: { title: { text: '€', standoff: 8 }, tickformat: ',.0f' },
+                xaxis: { tickangle: -30 },
+                showlegend: false
+              }), plotCfg);
           }
         }
       }
 
-      // ── Ranking EUI bar chart ──────────────────────────────────────────────
-      const ranking = [...port.ranking_asset].reverse(); // migliori in cima
+      // ── Ranking EUI — scatter orizzontale con colore per classe ──────────────
+      const ranking = [...port.ranking_asset].sort((a,b) => b.eui - a.eui); // peggiori in cima
+      const rankH = Math.max(260, ranking.length * 28 + 60);
+      document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
       Plotly.newPlot('chart-ranking-eui',
-        [{ type: 'bar', orientation: 'h',
+        [{ type: 'scatter', mode: 'markers',
            y: ranking.map(r => r.nome),
            x: ranking.map(r => r.eui),
-           marker: { color: ranking.map(r => EUI_CLASS_COLOR[r.eui_class] || '#58A6FF') },
-           hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<extra></extra>' }],
-        plotLayout({ margin: { t: 10, r: 10, b: 40, l: 160 },
-                     xaxis: { title: 'kWh/m²/anno' } }), plotCfg);
+           marker: {
+             color: ranking.map(r => EUI_CLASS_COLOR[r.eui_class] || '#58A6FF'),
+             size: 12, symbol: 'circle',
+             line: { color: 'rgba(255,255,255,0.3)', width: 1 }
+           },
+           text: ranking.map(r => `Classe ${r.eui_class}`),
+           hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<br>%{text}<extra></extra>' }],
+        plotLayout({
+          margin: { t: 10, r: 20, b: 40, l: 160 },
+          xaxis: { title: { text: 'kWh/m²/anno', standoff: 8 }, gridcolor: 'rgba(30,58,95,0.5)' },
+          yaxis: { automargin: true, tickfont: { size: 11 } },
+          showlegend: false
+        }), plotCfg);
 
       // ── Distribuzione classi energetiche ──────────────────────────────────
       const classiCount = {};

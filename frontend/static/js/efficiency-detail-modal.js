@@ -1894,28 +1894,37 @@ async function _edmCaricaEfficienza(assetId) {
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-scatter"></i>Dati non disponibili</div>';
     }
 
-    // Trend kWh
+    // Trend kWh — linea + area fill
     if (trend && trend.length) {
       Plotly.newPlot(`ee-chart-trend-kwh-${assetId}`,
-        [{ type: 'bar', x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
-           marker: { color: '#58A6FF' },
-           hovertemplate: '<b>%{x}</b><br>%{y:.0f} kWh<extra></extra>' }],
-        plotLayout({ yaxis: { title: 'kWh' } }), plotCfg);
+        [{ type: 'scatter', mode: 'lines',
+           x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
+           name: 'kWh', line: { color: '#58A6FF', width: 2.5, shape: 'spline' },
+           fill: 'tozeroy', fillcolor: 'rgba(88,166,255,0.12)',
+           hovertemplate: '<b>%{x}</b><br>%{y:,.0f} kWh<extra></extra>' }],
+        plotLayout({
+          margin: { t: 8, r: 12, b: 35, l: 50 },
+          yaxis: { title: { text: 'kWh', standoff: 6 }, tickformat: ',.0f' },
+          xaxis: { tickangle: -30 }, showlegend: false
+        }), plotCfg);
     } else {
       const el2 = document.getElementById(`ee-chart-trend-kwh-${assetId}`);
-      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-bar"></i>Dati non disponibili</div>';
+      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-line"></i>Dati non disponibili</div>';
     }
 
-    // Trend costi
+    // Trend costi — linea + area fill
     if (trend && trend.length) {
       Plotly.newPlot(`ee-chart-trend-cost-${assetId}`,
-        [{ type: 'scatter', mode: 'lines+markers',
+        [{ type: 'scatter', mode: 'lines',
            x: trend.map(r => r.mese), y: trend.map(r => r.costo_eur),
-           line: { color: '#F39C12', width: 2 },
-           marker: { color: '#F39C12', size: 5 },
-           fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.1)',
-           hovertemplate: '<b>%{x}</b><br>€ %{y:.2f}<extra></extra>' }],
-        plotLayout({ yaxis: { title: '€' } }), plotCfg);
+           name: '€', line: { color: '#F39C12', width: 2.5, shape: 'spline' },
+           fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.12)',
+           hovertemplate: '<b>%{x}</b><br>€ %{y:,.2f}<extra></extra>' }],
+        plotLayout({
+          margin: { t: 8, r: 12, b: 35, l: 55 },
+          yaxis: { title: { text: '€', standoff: 6 }, tickformat: ',.0f' },
+          xaxis: { tickangle: -30 }, showlegend: false
+        }), plotCfg);
     } else {
       const el2 = document.getElementById(`ee-chart-trend-cost-${assetId}`);
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-line"></i>Dati non disponibili</div>';
