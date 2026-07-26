@@ -112,6 +112,23 @@
       flex-wrap: wrap;
       margin-bottom: 14px;
     }
+    /* Separatore categoria nella KPI strip */
+    .es-kpi-sep {
+      flex: 0 0 100%;
+      width: 100%;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent-blue, #58A6FF);
+      padding: 4px 0 2px;
+      border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.4));
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .es-kpi-sep:first-child { padding-top: 0; }
     .es-kpi-card {
       flex: 1 1 130px;
       min-width: 120px;
@@ -143,6 +160,15 @@
     /* Grafici trend compressi */
     .es-trend-chart { width:100%; height:200px; }
     .es-trend-chart-sm { width:100%; height:160px; }
+    /* Riga a 3 colonne per trend mensile + YoY + commodity */
+    .es-row-3 {
+      display: grid;
+      grid-template-columns: 2fr 2fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+      align-items: stretch;
+    }
+    .es-chart-compact { width:100%; height:160px; }
   </style>
 </head>
 <body class="app-layout">
@@ -186,23 +212,22 @@
         </div>
       </div>
 
-      <!-- Grafico trend consumi — full width, multi-linea per impianto -->
-      <div class="es-section">
-        <div class="es-section-title">
-          <i class="fa fa-bolt"></i>Trend consumi mensili — asset con telemetria IoT (kWh)
-          <span id="trend-letture" style="font-weight:400;color:var(--text-muted);margin-left:8px;font-size:10px;"></span>
-        </div>
-        <div class="es-trend-chart" id="chart-trend-kwh"></div>
-      </div>
-
-      <!-- Riga 1b: Trend YoY (P-8) + Commodity (P-9) -->
-      <div class="es-row-2" style="margin-bottom:14px;">
+      <!-- Riga grafici trend: Consumi mensili + YoY + Commodity su una riga -->
+      <div class="es-row-3">
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-calendar-alt"></i>Trend consumi anno su anno (kWh) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-8</span></div>
-          <div class="es-trend-chart" id="chart-trend-yoy"></div>
+          <div class="es-section-title">
+            <i class="fa fa-bolt"></i>Trend consumi mensili (kWh)
+            <span id="trend-letture" style="font-weight:400;color:var(--text-muted);margin-left:8px;font-size:10px;"></span>
+            <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-7b</span>
+          </div>
+          <div class="es-chart-compact" id="chart-trend-kwh"></div>
         </div>
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-layer-group"></i>Costo per commodity (€) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-9</span></div>
+          <div class="es-section-title"><i class="fa fa-calendar-alt"></i>Trend anno su anno (kWh) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-8</span></div>
+          <div class="es-chart-compact" id="chart-trend-yoy"></div>
+        </div>
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-layer-group"></i>Commodity (€) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-9</span></div>
           <div id="chart-commodity-list" style="padding:4px 0;"></div>
         </div>
       </div>
@@ -308,9 +333,12 @@
       if (!portRes.ok) throw new Error('HTTP ' + portRes.status);
       const port = await portRes.json();
 
-      // ── KPI Strip ────────────────────────────────────────────────────────────
+      // ── KPI Strip con separatori categoria ─────────────────────────────────
       const strip = document.getElementById('kpi-strip');
+      // Separatore visivo: elemento full-width nella grid che occupa tutta la riga
+      const _sep = (label, icon) => `<div class="es-kpi-sep"><i class="fa ${icon}"></i>${label}</div>`;
       strip.innerHTML = `
+        ${_sep('Consumi & Costi', 'fa-bolt')}
         <div class="es-kpi-card">
           <div class="es-kpi-label">Consumi mese (portafoglio)</div>
           <div class="es-kpi-value">${fmtInt(port.kwh_mese_totale)}</div>
@@ -327,6 +355,7 @@
           <div class="es-kpi-value">${fmtInt(port.co2_kg_mese)}</div>
           <div class="es-kpi-unit">kg CO₂</div>
         </div>
+        ${_sep('Efficienza Energetica', 'fa-leaf')}
         <div class="es-kpi-card">
           <div class="es-kpi-label">EUI medio portafoglio</div>
           <div class="es-kpi-value">${fmt(port.eui_medio)}</div>
@@ -337,6 +366,13 @@
           <div class="es-kpi-value">${port.n_asset_attivi}</div>
           <div class="es-kpi-unit">${port.n_asset_telemetria || 0} con telemetria IoT</div>
         </div>
+        ${port.allarmi_critical > 0 || port.allarmi_medium > 0 ? `
+        ${_sep('Anomalie', 'fa-exclamation-triangle')}
+        <div class="es-kpi-card" style="border-color:rgba(231,76,60,0.35)">
+          <div class="es-kpi-label">Allarmi critici</div>
+          <div class="es-kpi-value" style="color:#E74C3C">${port.allarmi_critical || 0}</div>
+          <div class="es-kpi-unit">${port.allarmi_medium || 0} medi · ${port.allarmi_low || 0} bassi</div>
+        </div>` : ''}
       `;
 
       // ── P-4/P-5: Top efficienti / Da migliorare per categoria — liste compatte ──
@@ -395,12 +431,13 @@
 
         Plotly.newPlot('chart-trend-kwh', traces,
           Object.assign({}, baseLayout, {
-            margin: { t: 6, r: 10, b: 55, l: 52 },
+            margin: { t: 4, r: 8, b: 42, l: 46 },
             yaxis: Object.assign({}, baseLayout.yaxis, {
-              title: { text: 'kWh', font: { size: 10 }, standoff: 4 },
-              tickformat: ',.0f', tickfont: { size: 9 }
+              title: { text: 'kWh', font: { size: 9 }, standoff: 2 },
+              tickformat: ',.0f', tickfont: { size: 8 }
             }),
-            xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30, tickfont: { size: 9 } }),
+            xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -45, tickfont: { size: 8 } }),
+            legend: { orientation: 'h', y: -0.35, x: 0, font: { size: 8 }, bgcolor: 'transparent' },
           }), plotCfg);
       } else {
         document.getElementById('chart-trend-kwh').innerHTML =
@@ -488,12 +525,12 @@
             Plotly.newPlot('chart-trend-yoy', yoyTraces,
               Object.assign({}, baseLayout, {
                 barmode: 'group',
-                bargap: 0.15,
-                bargroupgap: 0.05,
-                margin: { t: 6, r: 10, b: 55, l: 52 },
-                yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: 'kWh', font: { size: 10 }, standoff: 4 }, tickformat: ',.0f', tickfont: { size: 9 } }),
-                xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30, tickfont: { size: 9 } }),
-                legend: { orientation: 'h', y: -0.32, font: { size: 9 }, bgcolor: 'transparent' }
+                bargap: 0.25,
+                bargroupgap: 0.08,
+                margin: { t: 4, r: 8, b: 42, l: 46 },
+                yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: 'kWh', font: { size: 9 }, standoff: 2 }, tickformat: ',.0f', tickfont: { size: 8 } }),
+                xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -45, tickfont: { size: 8 } }),
+                legend: { orientation: 'h', y: -0.35, font: { size: 8 }, bgcolor: 'transparent' }
               }), plotCfg);
           } else {
             document.getElementById('chart-trend-yoy').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-chart-bar" style="margin-right:8px;"></i>Dati non disponibili</div>';
@@ -548,24 +585,22 @@
               pct: totGlobale > 0 ? ((totali[c.key] || 0) / totGlobale * 100) : 0
             }));
             const maxVal = Math.max(...items.map(i => i.totale), 1);
-            commEl.innerHTML = `<ul class="es-comm-list">
+            commEl.innerHTML = `<ul class="es-comm-list" style="gap:4px;">
               ${items.map(it => `
-                <li class="es-comm-item">
-                  <div class="es-comm-header">
-                    <span class="es-comm-dot" style="background:${it.color};"></span>
-                    <i class="fa ${it.icon}" style="color:${it.color};font-size:11px;"></i>
-                    <span class="es-comm-label">${it.label}</span>
-                    <span class="es-comm-value">${it.totale > 0 ? '€ ' + fmtInt(it.totale) : '—'}</span>
-                    <span class="es-comm-pct">${it.totale > 0 ? fmt(it.pct, 1) + '%' : 'n/d'}</span>
+                <li class="es-comm-item" style="gap:2px;">
+                  <div class="es-comm-header" style="gap:5px;">
+                    <i class="fa ${it.icon}" style="color:${it.color};font-size:10px;flex-shrink:0;"></i>
+                    <span class="es-comm-label" style="font-size:10px;">${it.label}</span>
+                    <span class="es-comm-value" style="font-size:10px;">${it.totale > 0 ? '€ ' + fmtInt(it.totale) : '—'}</span>
                   </div>
-                  <div class="es-comm-bar-bg">
-                    <div class="es-comm-bar-fill" style="width:${it.totale > 0 ? (it.totale/maxVal*100).toFixed(1) : 0}%;background:${it.color};"></div>
+                  <div class="es-comm-bar-bg" style="height:4px;">
+                    <div class="es-comm-bar-fill" style="width:${it.totale > 0 ? (it.totale/maxVal*100).toFixed(1) : 0}%;background:${it.color};height:4px;"></div>
                   </div>
                 </li>`).join('')}
             </ul>
-            <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(30,58,95,0.4);display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:10px;color:var(--text-muted);">Totale periodo (${mesi} mesi)</span>
-              <span style="font-size:13px;font-weight:700;color:var(--text-primary);">€ ${fmtInt(totGlobale)}</span>
+            <div style="margin-top:6px;padding-top:5px;border-top:1px solid rgba(30,58,95,0.4);display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9px;color:var(--text-muted);">Tot. ${mesi} mesi</span>
+              <span style="font-size:12px;font-weight:700;color:var(--text-primary);">€ ${fmtInt(totGlobale)}</span>
             </div>`;
           } else {
             commEl.innerHTML = '<div class="es-comm-empty"><i class="fa fa-layer-group" style="margin-right:8px;"></i>Dati non disponibili</div>';
