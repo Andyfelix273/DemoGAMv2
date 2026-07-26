@@ -29,6 +29,21 @@ Le versioni seguono [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [Unreleased — commodity] — 2026-07-26
+
+### Aggiunto
+- **Set commodity esteso**: aggiunti `GAS_GPL` (GPL, kg), `HEATING_OIL` (Gasolio riscaldamento, litri), `DIESEL` (Gasolio autotrazione, litri), `PETROL` (Benzina, litri)
+- Classi CSS `edm-inv-commodity-card.*` per tutte le 7 commodity con colori distinti
+
+### Modificato
+- Rinominato `GAS` → `GAS_METHANE` con migrazione automatica dati esistenti (`ALTER TABLE` + `UPDATE`)
+- `COMMODITY_META` è ora l'unica fonte di verità per label, unità, icone e colori in tutto il modulo
+- Dashboard aggregata `efficiency-invoices.html` genera KPI strip e colonne tabella **dinamicamente** in base alle commodity presenti nei dati (nessun hardcoding)
+- Select commodity/unità aggiornati in tutti i form (inserimento manuale e nuova fornitura)
+- Prompt LLM aggiornato con tutti i 7 codici commodity
+
+---
+
 ## [1.3.0] — 2026-07-26
 
 ### Aggiunto
