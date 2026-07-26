@@ -50,27 +50,78 @@ PLANT_TYPE_COLOR = {
     "contatore":     "#A0A0A0",
 }
 
-# Classi energetiche EUI (kWh/mq/anno) per uffici — soglie EPBD
-EUI_THRESHOLDS_OFFICE = [
-    ("A4", 0,   30),
-    ("A3", 30,  50),
-    ("A2", 50,  75),
-    ("A1", 75,  100),
-    ("A",  100, 130),
-    ("B",  130, 160),
-    ("C",  160, 200),
-    ("D",  200, 250),
-    ("E",  250, 320),
-    ("F",  320, 400),
-    ("G",  400, 9999),
-]
+# Classi energetiche EUI (kWh/mq/anno) per categoria — soglie ENEA/EN 15251
+# Catalogo KPI v3.0 § 1.4
+EUI_THRESHOLDS = {
+    "OFFICE": [
+        ("A4", 0,   30),
+        ("A3", 30,  50),
+        ("A2", 50,  75),
+        ("A1", 75,  100),
+        ("A",  100, 130),
+        ("B",  130, 160),
+        ("C",  160, 200),
+        ("D",  200, 250),
+        ("E",  250, 320),
+        ("F",  320, 400),
+        ("G",  400, 9999),
+    ],
+    "WAREHOUSE": [
+        ("A",  0,   20),
+        ("B",  20,  30),
+        ("C",  30,  40),
+        ("D",  40,  60),
+        ("E",  60,  80),
+        ("F",  80,  120),
+        ("G",  120, 9999),
+    ],
+    "STORAGE": [
+        ("A",  0,   10),
+        ("B",  10,  15),
+        ("C",  15,  20),
+        ("D",  20,  30),
+        ("E",  30,  40),
+        ("F",  40,  60),
+        ("G",  60,  9999),
+    ],
+}
+
+# Benchmark €/mq/mese per categoria (fonte: ENEA, media nazionale 2024)
+EUI_BENCHMARK_EUR_MQ = {
+    "OFFICE":    {"min": 2.5, "max": 4.0, "label": "Benchmark uffici: 2,5–4,0 €/mq/mese"},
+    "WAREHOUSE": {"min": 0.8, "max": 1.8, "label": "Benchmark magazzini: 0,8–1,8 €/mq/mese"},
+    "STORAGE":   {"min": 0.4, "max": 1.0, "label": "Benchmark depositi: 0,4–1,0 €/mq/mese"},
+}
+
+# Soglie gauge EUI per colore (verde/giallo/rosso) per categoria — Catalogo KPI § 1.4
+EUI_GAUGE_THRESHOLDS = {
+    "OFFICE":    {"verde": 100, "giallo": 180},
+    "WAREHOUSE": {"verde": 40,  "giallo": 80},
+    "STORAGE":   {"verde": 20,  "giallo": 40},
+}
 
 
-def _eui_class(eui_kwh_mq_anno: float) -> str:
-    for label, lo, hi in EUI_THRESHOLDS_OFFICE:
+def _eui_class(eui_kwh_mq_anno: float, categoria: str = "OFFICE") -> str:
+    thresholds = EUI_THRESHOLDS.get(categoria, EUI_THRESHOLDS["OFFICE"])
+    for label, lo, hi in thresholds:
         if lo <= eui_kwh_mq_anno < hi:
             return label
     return "G"
+
+
+def _eui_gauge_color(eui: float, categoria: str) -> str:
+    """Restituisce il colore del gauge EUI in base alla categoria."""
+    if not categoria:
+        return "neutral"
+    thresholds = EUI_GAUGE_THRESHOLDS.get(categoria)
+    if not thresholds:
+        return "neutral"
+    if eui < thresholds["verde"]:
+        return "green"
+    elif eui < thresholds["giallo"]:
+        return "yellow"
+    else:
+        return "red"
 
 
 def _get_unit_cost(cur, asset_id: int, commodity: str) -> float:
@@ -108,15 +159,29 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         trend vs periodo precedente, CO2 equivalente."""
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # Dati asset
+        # Dati asset (include building_category per benchmark dinamici)
         cur.execute("""
             SELECT id, nome, tipo, superficie_mq, anno_costruzione, energy_class,
-                   working_hours_start, working_hours_end, working_days
-            FROM assets WHERE id=%s
+                   working_hours_start, working_hours_end, working_days,
+                   COALESCE(building_category, tipo_upper) AS building_category,
+                   annual_energy_budget_eur
+            FROM (
+                SELECT *,
+                       UPPER(tipo) AS tipo_upper
+                FROM assets WHERE id=%s
+            ) sub
         """, (asset_id,))
         asset = cur.fetchone()
         if not asset:
             raise HTTPException(status_code=404, detail="Asset non trovato")
+        # Normalizza building_category: mappa tipo asset → categoria BEMS
+        _tipo_map = {
+            "UFFICIO": "OFFICE", "UFFICI": "OFFICE", "OFFICE": "OFFICE",
+            "MAGAZZINO": "WAREHOUSE", "WAREHOUSE": "WAREHOUSE",
+            "DEPOSITO": "STORAGE", "STORAGE": "STORAGE",
+            "STABILIMENTO": "WAREHOUSE",
+        }
+        categoria = _tipo_map.get((asset.get("building_category") or "").upper(), None)
 
         superficie = asset["superficie_mq"] or 1
         now = datetime.now(timezone.utc)
@@ -240,9 +305,10 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         kwh_anno_proiettato = kwh_anno * (365 / giorni_anno_trascorsi)
         eui = round(kwh_anno_proiettato / superficie, 1)
 
-        # Classe calcolata vs certificata
-        eui_class_calcolata = _eui_class(eui)
+        # Classe calcolata vs certificata (soglie dinamiche per categoria)
+        eui_class_calcolata = _eui_class(eui, categoria or "OFFICE")
         eui_class_certificata = asset["energy_class"] or None
+        eui_gauge_color = _eui_gauge_color(eui, categoria)
 
         # CO2 equivalente mese (fattore 0.233 kg/kWh)
         co2_kg_mese = round(kwh_mese * 0.233, 1)
@@ -253,35 +319,57 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         else:
             trend_pct = None
 
-        # Allarmi energetici attivi
+        # Allarmi energetici attivi per severità (E-4)
         cur.execute("""
-            SELECT COUNT(*) AS n FROM alarms
+            SELECT
+                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('CRITICAL','CRITICO','HIGH','ALTA') THEN 1 ELSE 0 END), 0) AS n_critical,
+                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('MEDIUM','MEDIO','MEDIA') THEN 1 ELSE 0 END), 0) AS n_medium,
+                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('LOW','BASSO','BASSA') THEN 1 ELSE 0 END), 0) AS n_low,
+                COUNT(*) AS n_totale
+            FROM alarms
             WHERE asset_id=%s AND ack_at IS NULL
               AND (campo ILIKE '%%energia%%' OR campo ILIKE '%%consumo%%'
                    OR campo ILIKE '%%potenza%%' OR campo ILIKE '%%kwh%%'
                    OR campo ILIKE '%%efficien%%')
         """, (asset_id,))
-        n_allarmi = cur.fetchone()["n"] or 0
+        allarmi_row = cur.fetchone()
+        n_allarmi_critical = int(allarmi_row["n_critical"] or 0)
+        n_allarmi_medium   = int(allarmi_row["n_medium"] or 0)
+        n_allarmi_low      = int(allarmi_row["n_low"] or 0)
+        n_allarmi          = int(allarmi_row["n_totale"] or 0)
+
+        # Benchmark €/mq per categoria (E-2)
+        benchmark_eur_mq = EUI_BENCHMARK_EUR_MQ.get(categoria) if categoria else None
+
+        # Budget annuale (P-10 / E-1)
+        budget_annuale = float(asset.get("annual_energy_budget_eur") or 0) or None
 
         return {
             "asset_id": asset_id,
             "asset_nome": asset["nome"],
             "superficie_mq": superficie,
             "anno_costruzione": asset["anno_costruzione"],
+            "building_category": categoria,
             "energy_class_certificata": eui_class_certificata,
             "energy_class_calcolata": eui_class_calcolata,
+            "eui_gauge_color": eui_gauge_color,
             "working_hours_start": str(asset["working_hours_start"] or "08:00"),
             "working_hours_end":   str(asset["working_hours_end"]   or "19:00"),
             "working_days": asset["working_days"] or "MON,TUE,WED,THU,FRI",
             # E-1: Costo energetico periodo
             "costo_mese_eur": costo_mese,
             "costo_mese_prec_eur": costo_mese_prec,
-            # E-2: Costo per mq
+            # E-2: Costo per mq + benchmark categoria
             "costo_mq_eur": round(costo_mese / superficie, 3),
-            # E-3: EUI
+            "benchmark_eur_mq": benchmark_eur_mq,
+            # E-3: EUI con soglie dinamiche per categoria
             "eui_kwh_mq_anno": eui,
-            # E-4: Allarmi energetici
-            "allarmi_energetici_attivi": int(n_allarmi),
+            "eui_gauge_thresholds": EUI_GAUGE_THRESHOLDS.get(categoria) if categoria else None,
+            # E-4: Allarmi energetici per severità
+            "allarmi_energetici_attivi": n_allarmi,
+            "allarmi_critical": n_allarmi_critical,
+            "allarmi_medium": n_allarmi_medium,
+            "allarmi_low": n_allarmi_low,
             # E-5: % fuori orario
             "pct_fuori_orario": pct_fuori_orario,
             # E-6: CO2
@@ -293,6 +381,7 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             "kwh_mese_prec": round(kwh_mese_prec, 1),
             "kwh_anno": round(kwh_anno, 1),
             "has_telemetry": use_telemetry if use_telemetry else False,
+            "budget_annuale_eur": budget_annuale,
         }
 
     # ── E-7: Profilo 24h per tipo impianto ────────────────────────────────────
@@ -604,8 +693,21 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         mese_prec_start = (mese_start - timedelta(days=1)).replace(day=1)
         anno_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        cur.execute("SELECT id, nome, tipo, superficie_mq, energy_class FROM assets WHERE stato='attivo'")
+        cur.execute("""
+            SELECT id, nome, tipo, superficie_mq, energy_class,
+                   COALESCE(building_category, UPPER(tipo)) AS building_category,
+                   annual_energy_budget_eur
+            FROM assets WHERE stato='attivo'
+        """)
         assets = cur.fetchall()
+
+        # Mapping tipo → categoria BEMS
+        _tipo_map = {
+            "UFFICIO": "OFFICE", "UFFICI": "OFFICE", "OFFICE": "OFFICE",
+            "MAGAZZINO": "WAREHOUSE", "WAREHOUSE": "WAREHOUSE",
+            "DEPOSITO": "STORAGE", "STORAGE": "STORAGE",
+            "STABILIMENTO": "WAREHOUSE",
+        }
 
         totale_kwh_mese = 0.0
         totale_costo_mese = 0.0
@@ -615,11 +717,42 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         eui_list = []
         asset_ranking = []
 
+        # Anomalie totali portafoglio per severità (P-3)
+        cur.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('CRITICAL','CRITICO','HIGH','ALTA') THEN 1 ELSE 0 END), 0) AS n_critical,
+                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('MEDIUM','MEDIO','MEDIA') THEN 1 ELSE 0 END), 0) AS n_medium,
+                COALESCE(SUM(CASE WHEN UPPER(severita) IN ('LOW','BASSO','BASSA') THEN 1 ELSE 0 END), 0) AS n_low,
+                COUNT(*) AS n_totale
+            FROM alarms
+            WHERE ack_at IS NULL
+              AND (campo ILIKE '%%energia%%' OR campo ILIKE '%%consumo%%'
+                   OR campo ILIKE '%%potenza%%' OR campo ILIKE '%%kwh%%'
+                   OR campo ILIKE '%%efficien%%')
+        """)
+        allarmi_portfolio = cur.fetchone()
+
+        # Top 3 asset per numero di anomalie (P-3)
+        cur.execute("""
+            SELECT a.id, a.nome, COUNT(al.id) AS n_allarmi
+            FROM alarms al
+            JOIN assets a ON a.id = al.asset_id
+            WHERE al.ack_at IS NULL
+              AND (al.campo ILIKE '%%energia%%' OR al.campo ILIKE '%%consumo%%'
+                   OR al.campo ILIKE '%%potenza%%' OR al.campo ILIKE '%%kwh%%'
+                   OR al.campo ILIKE '%%efficien%%')
+            GROUP BY a.id, a.nome
+            ORDER BY n_allarmi DESC
+            LIMIT 3
+        """)
+        top_asset_anomalie = [{"asset_id": r["id"], "nome": r["nome"], "n_allarmi": r["n_allarmi"]} for r in cur.fetchall()]
+
         for a in assets:
             asset_id = a["id"]
             superficie = a["superficie_mq"] or 1
             unit_cost = _get_unit_cost(cur, asset_id, "ELECTRICITY")
             use_telemetry = _telemetry_available(cur, asset_id)
+            categoria = _tipo_map.get((a.get("building_category") or "").upper(), None)
 
             if use_telemetry:
                 # Formula corretta: integrazione trapezoidale Σ(power_kw × 0.25h)
@@ -675,12 +808,12 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             costo_mese = round(kwh_mese * unit_cost, 2)
             co2_mese = round(kwh_mese * 0.233, 1)
 
-            # EUI annualizzato
+            # EUI annualizzato con soglie dinamiche per categoria
             giorni_anno = max((now - anno_start).days, 1)
             kwh_anno_proiettato = kwh_anno * (365 / giorni_anno)
             eui = round(kwh_anno_proiettato / superficie, 1)
-            eui_class = _eui_class(eui)
-            eui_list.append(eui)
+            eui_class = _eui_class(eui, categoria or "OFFICE")
+            eui_list.append((eui, superficie, categoria))
 
             # I totali KPI aggregano solo asset con telemetria reale
             # (gli asset con energy_readings sintetici distorcerebbero i KPI)
@@ -695,11 +828,13 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
                 "asset_id": asset_id,
                 "nome": a["nome"],
                 "tipo": a["tipo"],
+                "categoria": categoria,
                 "superficie_mq": superficie,
                 "kwh_mese": round(kwh_mese, 1),
                 "costo_mese_eur": costo_mese,
                 "eui": eui,
                 "eui_class": eui_class,
+                "eui_gauge_color": _eui_gauge_color(eui, categoria),
                 "energy_class_certificata": a["energy_class"],
                 "has_telemetry": use_telemetry,
             })
@@ -712,27 +847,527 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         if totale_kwh_mese_prec > 0:
             trend_pct = round(((totale_kwh_mese - totale_kwh_mese_prec) / totale_kwh_mese_prec) * 100, 1)
 
-        eui_medio = round(sum(eui_list) / len(eui_list), 1) if eui_list else 0.0
+        # EUI medio globale (media ponderata per superficie) — P-2
+        if eui_list:
+            tot_sup = sum(sup for _, sup, _ in eui_list)
+            eui_medio = round(sum(e * sup for e, sup, _ in eui_list) / tot_sup, 1) if tot_sup > 0 else 0.0
+        else:
+            eui_medio = 0.0
+
+        # EUI medio per categoria (P-2 mini-tabella)
+        eui_per_categoria = {}
+        for eui_val, sup, cat in eui_list:
+            if cat:
+                if cat not in eui_per_categoria:
+                    eui_per_categoria[cat] = {"sum_eui_sup": 0.0, "sum_sup": 0.0}
+                eui_per_categoria[cat]["sum_eui_sup"] += eui_val * sup
+                eui_per_categoria[cat]["sum_sup"] += sup
+        eui_medio_per_categoria = {
+            cat: round(v["sum_eui_sup"] / v["sum_sup"], 1)
+            for cat, v in eui_per_categoria.items() if v["sum_sup"] > 0
+        }
+
+        # Top 3 efficienti e meno efficienti per categoria (P-4, P-5)
+        ranking_per_categoria = {}
+        for r in asset_ranking:
+            cat = r["categoria"] or "ALTRO"
+            if cat not in ranking_per_categoria:
+                ranking_per_categoria[cat] = []
+            ranking_per_categoria[cat].append(r)
+        # Ogni categoria è già ordinata per EUI decrescente (peggiori in cima)
+        top3_efficienti_per_cat = {
+            cat: sorted(items, key=lambda x: x["eui"])[:3]
+            for cat, items in ranking_per_categoria.items()
+        }
+        top3_inefficienti_per_cat = {
+            cat: sorted(items, key=lambda x: x["eui"], reverse=True)[:3]
+            for cat, items in ranking_per_categoria.items()
+        }
 
         return {
-            # P-1: Consumo totale portafoglio
+            # P-1: Consumo totale portafoglio (solo asset con telemetria reale)
             "kwh_mese_totale": round(totale_kwh_mese, 1),
             "kwh_anno_totale": round(totale_kwh_anno, 1),
-            # P-2: Costo totale
+            # P-1: Costo totale
             "costo_mese_eur": round(totale_costo_mese, 2),
-            # P-3: CO2 totale
+            # CO2 totale
             "co2_kg_mese": round(totale_co2_mese, 1),
-            # P-4: EUI medio portafoglio
+            # P-2: EUI medio portafoglio (media ponderata per superficie)
             "eui_medio": eui_medio,
-            # P-5: Trend
+            "eui_medio_per_categoria": eui_medio_per_categoria,
+            # P-3: Anomalie totali per severità
+            "allarmi_critical": int(allarmi_portfolio["n_critical"] or 0),
+            "allarmi_medium":   int(allarmi_portfolio["n_medium"] or 0),
+            "allarmi_low":      int(allarmi_portfolio["n_low"] or 0),
+            "allarmi_totale":   int(allarmi_portfolio["n_totale"] or 0),
+            "top_asset_anomalie": top_asset_anomalie,
+            # P-4/P-5: Top 3 efficienti/inefficienti per categoria
+            "top3_efficienti_per_categoria": top3_efficienti_per_cat,
+            "top3_inefficienti_per_categoria": top3_inefficienti_per_cat,
+            # Trend
             "trend_vs_mese_prec_pct": trend_pct,
-            # P-6: N. asset attivi con telemetria
+            # Asset attivi
             "n_asset_attivi": len(assets),
             "n_asset_telemetria": sum(1 for a in asset_ranking if a["has_telemetry"]),
-            # P-7: Ranking asset per EUI (peggiori prima)
+            # P-6: Ranking completo asset per EUI (per benchmark interno)
             "ranking_asset": asset_ranking,
-            # P-8: Asset più efficiente
+            # Retrocompatibilità frontend esistente
             "asset_migliore": asset_ranking[-1] if asset_ranking else None,
-            # P-9: Asset meno efficiente
             "asset_peggiore": asset_ranking[0] if asset_ranking else None,
         }
+
+    # ── P-7: Consumi per giorno della settimana — Media Portafoglio ───────────
+    @app.get("/api/efficiency/portfolio/weekday", tags=["efficiency"])
+    def get_portfolio_weekday(_=Depends(get_utente_corrente), db=Depends(get_db)):
+        """P-7: Media kWh/mq per giorno della settimana aggregata su tutti gli asset.
+        Richiede almeno 4 settimane di dati e gross_floor_area_sqm."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        quattro_sett = now - timedelta(weeks=4)
+
+        # Telemetria: media kWh per giorno settimana per asset con telemetria
+        cur.execute("""
+            SELECT
+                EXTRACT(DOW FROM t.ts AT TIME ZONE 'Europe/Rome') AS dow,
+                DATE_TRUNC('day', t.ts AT TIME ZONE 'Europe/Rome') AS giorno,
+                SUM(t.power_kw) * 0.25 AS kwh_giorno,
+                a.superficie_mq
+            FROM telemetry t
+            JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+            JOIN assets a ON a.id = t.asset_id
+            WHERE t.ts >= %s AND t.ts <= %s
+              AND p.tipo NOT IN ('contatore')
+              AND a.superficie_mq > 0
+            GROUP BY dow, giorno, a.superficie_mq
+        """, (quattro_sett, now))
+        rows = cur.fetchall()
+
+        if not rows:
+            return {"data": [], "message": "Dati insufficienti (richiede almeno 4 settimane)"}
+
+        # Aggrega per giorno settimana: media kWh/mq
+        from collections import defaultdict
+        dow_data = defaultdict(list)
+        for r in rows:
+            dow = int(r["dow"])  # 0=domenica, 1=lunedì, ..., 6=sabato
+            sup = float(r["superficie_mq"] or 1)
+            kwh = float(r["kwh_giorno"] or 0)
+            dow_data[dow].append(kwh / sup)
+
+        # Mappa PostgreSQL DOW (0=dom) → etichette italiane (0=lun)
+        dow_labels = {1: "Lun", 2: "Mar", 3: "Mer", 4: "Gio", 5: "Ven", 6: "Sab", 0: "Dom"}
+        dow_order  = [1, 2, 3, 4, 5, 6, 0]  # Lun→Dom
+
+        result = []
+        all_vals = []
+        for dow in dow_order:
+            vals = dow_data.get(dow, [])
+            media = round(sum(vals) / len(vals), 4) if vals else 0.0
+            all_vals.append(media)
+            result.append({
+                "dow": dow,
+                "label": dow_labels[dow],
+                "kwh_mq_medio": media,
+                "is_weekend": dow in (6, 0),
+            })
+
+        media_globale = round(sum(all_vals) / len(all_vals), 4) if all_vals else 0.0
+        return {"data": result, "media_globale": media_globale}
+
+
+    # ── P-8: Trend Mensile Portafoglio Anno su Anno ───────────────────────────
+    @app.get("/api/efficiency/portfolio/trend_yoy", tags=["efficiency"])
+    def get_portfolio_trend_yoy(mesi: int = 24,
+                                _=Depends(get_utente_corrente),
+                                db=Depends(get_db)):
+        """P-8: Consumo mensile totale portafoglio (kWh e €) per gli ultimi N mesi.
+        Supporta confronto anno su anno per Grouped Bar Chart."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+
+        # Genera lista mesi da coprire
+        mesi_list = []
+        for i in range(mesi - 1, -1, -1):
+            d = now.replace(day=1) - timedelta(days=1)
+            for _ in range(i):
+                d = d.replace(day=1) - timedelta(days=1)
+            mesi_list.append(d.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+
+        # Usa date_trunc per aggregare per mese
+        data_inizio = now.replace(day=1) - timedelta(days=mesi * 31)
+
+        # Telemetria (asset con IoT)
+        cur.execute("""
+            SELECT
+                DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                SUM(t.power_kw) * 0.25 AS kwh
+            FROM telemetry t
+            JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+            WHERE t.ts >= %s AND t.ts <= %s
+              AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+            GROUP BY mese
+            ORDER BY mese
+        """, (data_inizio, now))
+        telem_rows = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+
+        # Energy readings (asset senza IoT)
+        cur.execute("""
+            SELECT
+                DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                SUM(r.valore) AS kwh
+            FROM energy_readings r
+            JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
+            GROUP BY mese
+            ORDER BY mese
+        """, (data_inizio, now))
+        readings_rows = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+
+        # Costo medio portafoglio (approssimazione con default 0.285 €/kWh)
+        unit_cost = 0.285
+
+        result = []
+        for ms in mesi_list:
+            key = str(ms)[:7]
+            kwh = (telem_rows.get(key, 0) + readings_rows.get(key, 0))
+            result.append({
+                "mese": key,
+                "anno": ms.year,
+                "mese_num": ms.month,
+                "kwh": round(kwh, 1),
+                "costo_eur": round(kwh * unit_cost, 2),
+            })
+
+        return {"data": result, "mesi": mesi}
+
+
+    # ── P-9: Decomposizione Costo Portafoglio per Commodity ──────────────────
+    @app.get("/api/efficiency/portfolio/commodity", tags=["efficiency"])
+    def get_portfolio_commodity(mesi: int = 12,
+                                _=Depends(get_utente_corrente),
+                                db=Depends(get_db)):
+        """P-9: Costo mensile totale portafoglio scomposto per commodity (Stacked Bar).
+        Commodity: ELECTRICITY, GAS_METHANE, WATER."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        data_inizio = now.replace(day=1) - timedelta(days=mesi * 31)
+
+        # Elettricità da telemetria
+        cur.execute("""
+            SELECT
+                DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                SUM(t.power_kw) * 0.25 AS kwh
+            FROM telemetry t
+            JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+            WHERE t.ts >= %s AND t.ts <= %s
+              AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+            GROUP BY mese ORDER BY mese
+        """, (data_inizio, now))
+        elec_telem = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+
+        # Elettricità da energy_readings
+        cur.execute("""
+            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(r.valore) AS kwh
+            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
+            GROUP BY mese ORDER BY mese
+        """, (data_inizio, now))
+        elec_readings = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+
+        # Gas da energy_readings
+        cur.execute("""
+            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(r.valore) AS smc
+            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'gas'
+            GROUP BY mese ORDER BY mese
+        """, (data_inizio, now))
+        gas_rows = {str(r["mese"])[:7]: float(r["smc"] or 0) for r in cur.fetchall()}
+
+        # Acqua da energy_readings
+        cur.execute("""
+            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(r.valore) AS mc
+            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'acqua'
+            GROUP BY mese ORDER BY mese
+        """, (data_inizio, now))
+        water_rows = {str(r["mese"])[:7]: float(r["mc"] or 0) for r in cur.fetchall()}
+
+        # Costi unitari default
+        cost_elec  = 0.285   # €/kWh
+        cost_gas   = 0.980   # €/Smc
+        cost_water = 2.15    # €/m³
+
+        result = []
+        for i in range(mesi - 1, -1, -1):
+            d = now.replace(day=1)
+            for _ in range(i):
+                d = (d - timedelta(days=1)).replace(day=1)
+            key = str(d)[:7]
+            kwh_elec = (elec_telem.get(key, 0) + elec_readings.get(key, 0))
+            smc_gas  = gas_rows.get(key, 0)
+            mc_water = water_rows.get(key, 0)
+            result.append({
+                "mese": key,
+                "electricity_kwh": round(kwh_elec, 1),
+                "electricity_eur": round(kwh_elec * cost_elec, 2),
+                "gas_smc": round(smc_gas, 1),
+                "gas_eur": round(smc_gas * cost_gas, 2),
+                "water_mc": round(mc_water, 1),
+                "water_eur": round(mc_water * cost_water, 2),
+                "totale_eur": round(
+                    kwh_elec * cost_elec + smc_gas * cost_gas + mc_water * cost_water, 2
+                ),
+            })
+
+        return {"data": result, "mesi": mesi}
+
+
+    # ── P-10: Costo Cumulato vs Budget Annuale Portafoglio ────────────────────
+    @app.get("/api/efficiency/portfolio/budget", tags=["efficiency"])
+    def get_portfolio_budget(_=Depends(get_utente_corrente), db=Depends(get_db)):
+        """P-10: Costo energetico cumulato dall'inizio dell'anno vs budget annuale totale.
+        Restituisce serie mensile per grafico a linee cumulato."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        anno_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        # Budget totale portafoglio
+        cur.execute("SELECT COALESCE(SUM(annual_energy_budget_eur), 0) AS budget FROM assets WHERE stato='attivo'")
+        budget_totale = float(cur.fetchone()["budget"] or 0)
+
+        # Costo mensile anno corrente (telemetria + readings)
+        cur.execute("""
+            SELECT DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(t.power_kw) * 0.25 * 0.285 AS costo_eur
+            FROM telemetry t
+            JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+            WHERE t.ts >= %s AND t.ts <= %s
+              AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+            GROUP BY mese ORDER BY mese
+        """, (anno_start, now))
+        telem_costi = {str(r["mese"])[:7]: float(r["costo_eur"] or 0) for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(r.valore) * 0.285 AS costo_eur
+            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
+            GROUP BY mese ORDER BY mese
+        """, (anno_start, now))
+        readings_costi = {str(r["mese"])[:7]: float(r["costo_eur"] or 0) for r in cur.fetchall()}
+
+        # Costruisce serie cumulata mese per mese
+        result = []
+        cumulato = 0.0
+        mese_corrente = anno_start
+        while mese_corrente <= now:
+            key = str(mese_corrente)[:7]
+            costo_mese = (telem_costi.get(key, 0) + readings_costi.get(key, 0))
+            cumulato += costo_mese
+            mesi_trascorsi = mese_corrente.month
+            budget_lineare = (budget_totale / 12) * mesi_trascorsi if budget_totale > 0 else None
+            result.append({
+                "mese": key,
+                "costo_mese_eur": round(costo_mese, 2),
+                "costo_cumulato_eur": round(cumulato, 2),
+                "budget_lineare_eur": round(budget_lineare, 2) if budget_lineare else None,
+                "delta_vs_budget": round(cumulato - budget_lineare, 2) if budget_lineare else None,
+            })
+            # Avanza al mese successivo
+            if mese_corrente.month == 12:
+                mese_corrente = mese_corrente.replace(year=mese_corrente.year + 1, month=1)
+            else:
+                mese_corrente = mese_corrente.replace(month=mese_corrente.month + 1)
+
+        return {
+            "data": result,
+            "budget_totale_eur": round(budget_totale, 2),
+            "costo_cumulato_ytd": round(cumulato, 2),
+            "delta_vs_budget": round(cumulato - budget_totale * (now.month / 12), 2) if budget_totale > 0 else None,
+            "has_budget": budget_totale > 0,
+        }
+
+
+    # ── E-11: kWh HVAC vs Temperatura Esterna ────────────────────────────────
+    @app.get("/api/efficiency/{asset_id}/hvac_vs_temp", tags=["efficiency"])
+    def get_hvac_vs_temp(asset_id: int,
+                         giorni: int = 90,
+                         _=Depends(get_utente_corrente),
+                         db=Depends(get_db)):
+        """E-11: Scatter plot kWh HVAC giornaliero vs temperatura esterna.
+        Temperatura esterna: usa sensore esterno da telemetria (tipo='meteo')
+        oppure stima sintetica stagionale se non disponibile."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        data_inizio = now - timedelta(days=giorni)
+
+        # kWh HVAC giornaliero da telemetria
+        cur.execute("""
+            SELECT
+                DATE_TRUNC('day', t.ts AT TIME ZONE 'Europe/Rome') AS giorno,
+                SUM(t.power_kw) * 0.25 AS kwh_hvac
+            FROM telemetry t
+            JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+            WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
+              AND p.tipo = 'hvac' AND t.power_kw IS NOT NULL
+            GROUP BY giorno ORDER BY giorno
+        """, (asset_id, data_inizio, now))
+        hvac_rows = {str(r["giorno"])[:10]: float(r["kwh_hvac"] or 0) for r in cur.fetchall()}
+
+        if not hvac_rows:
+            return {"data": [], "message": "Dati HVAC non disponibili per questo asset"}
+
+        # Temperatura esterna: cerca in telemetria (sensore tipo='meteo' o campo temp_c)
+        cur.execute("""
+            SELECT
+                DATE_TRUNC('day', t.ts AT TIME ZONE 'Europe/Rome') AS giorno,
+                AVG(t.temp_c) AS temp_media
+            FROM telemetry t
+            WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
+              AND t.temp_c IS NOT NULL
+            GROUP BY giorno ORDER BY giorno
+        """, (asset_id, data_inizio, now))
+        temp_rows = {str(r["giorno"])[:10]: float(r["temp_media"]) for r in cur.fetchall() if r["temp_media"] is not None}
+
+        # Se non ci sono dati temperatura reali, usa stima stagionale sintetica per Roma
+        import math
+        def _temp_sintetica(data_str: str) -> float:
+            """Temperatura media giornaliera stimata per Roma (lat 41.9°N)."""
+            from datetime import date as date_type
+            d = date_type.fromisoformat(data_str)
+            day_of_year = d.timetuple().tm_yday
+            # Formula sinusoidale: Tmin=5°C gen, Tmax=30°C lug
+            return round(17.5 + 12.5 * math.sin(2 * math.pi * (day_of_year - 80) / 365), 1)
+
+        result = []
+        for giorno_str, kwh in sorted(hvac_rows.items()):
+            temp = temp_rows.get(giorno_str)
+            temp_source = "reale"
+            if temp is None:
+                temp = _temp_sintetica(giorno_str)
+                temp_source = "stimata"
+            # Stagione per colore punto
+            mese = int(giorno_str[5:7])
+            if mese in (12, 1, 2):
+                stagione = "inverno"
+            elif mese in (6, 7, 8):
+                stagione = "estate"
+            else:
+                stagione = "mezza_stagione"
+            result.append({
+                "data": giorno_str,
+                "kwh_hvac": round(kwh, 2),
+                "temp_c": temp,
+                "temp_source": temp_source,
+                "stagione": stagione,
+            })
+
+        # Regressione lineare semplice
+        if len(result) >= 3:
+            xs = [r["temp_c"] for r in result]
+            ys = [r["kwh_hvac"] for r in result]
+            n = len(xs)
+            mx, my = sum(xs)/n, sum(ys)/n
+            num = sum((x-mx)*(y-my) for x,y in zip(xs,ys))
+            den = sum((x-mx)**2 for x in xs)
+            slope = num/den if den != 0 else 0
+            intercept = my - slope * mx
+            # R²
+            ss_res = sum((y - (slope*x + intercept))**2 for x,y in zip(xs,ys))
+            ss_tot = sum((y - my)**2 for y in ys)
+            r2 = round(1 - ss_res/ss_tot, 3) if ss_tot > 0 else 0
+            regressione = {"slope": round(slope, 4), "intercept": round(intercept, 4), "r2": r2}
+        else:
+            regressione = None
+
+        return {
+            "data": result,
+            "regressione": regressione,
+            "giorni": giorni,
+            "has_temp_reale": bool(temp_rows),
+        }
+
+
+    # ── E-14: Decomposizione Costo Mensile per Commodity (singolo asset) ──────
+    @app.get("/api/efficiency/{asset_id}/commodity", tags=["efficiency"])
+    def get_asset_commodity(asset_id: int,
+                            mesi: int = 12,
+                            _=Depends(get_utente_corrente),
+                            db=Depends(get_db)):
+        """E-14: Costo mensile scomposto per commodity per singolo asset.
+        Stacked bar chart degli ultimi N mesi."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        data_inizio = now.replace(day=1) - timedelta(days=mesi * 31)
+
+        unit_cost_elec  = _get_unit_cost(cur, asset_id, "ELECTRICITY")
+        unit_cost_gas   = _get_unit_cost(cur, asset_id, "GAS_METHANE")
+        unit_cost_water = _get_unit_cost(cur, asset_id, "WATER")
+
+        use_telemetry = _telemetry_available(cur, asset_id)
+
+        if use_telemetry:
+            cur.execute("""
+                SELECT DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                       SUM(t.power_kw) * 0.25 AS kwh
+                FROM telemetry t
+                JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
+                  AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+                GROUP BY mese ORDER BY mese
+            """, (asset_id, data_inizio, now))
+            elec_rows = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+        else:
+            cur.execute("""
+                SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                       SUM(r.valore) AS kwh
+                FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+                WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
+                GROUP BY mese ORDER BY mese
+            """, (asset_id, data_inizio, now))
+            elec_rows = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(r.valore) AS smc
+            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'gas'
+            GROUP BY mese ORDER BY mese
+        """, (asset_id, data_inizio, now))
+        gas_rows = {str(r["mese"])[:7]: float(r["smc"] or 0) for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   SUM(r.valore) AS mc
+            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+            WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'acqua'
+            GROUP BY mese ORDER BY mese
+        """, (asset_id, data_inizio, now))
+        water_rows = {str(r["mese"])[:7]: float(r["mc"] or 0) for r in cur.fetchall()}
+
+        result = []
+        for i in range(mesi - 1, -1, -1):
+            d = now.replace(day=1)
+            for _ in range(i):
+                d = (d - timedelta(days=1)).replace(day=1)
+            key = str(d)[:7]
+            kwh_e = elec_rows.get(key, 0)
+            smc_g = gas_rows.get(key, 0)
+            mc_w  = water_rows.get(key, 0)
+            result.append({
+                "mese": key,
+                "electricity_kwh": round(kwh_e, 1),
+                "electricity_eur": round(kwh_e * unit_cost_elec, 2),
+                "gas_smc": round(smc_g, 1),
+                "gas_eur": round(smc_g * unit_cost_gas, 2),
+                "water_mc": round(mc_w, 1),
+                "water_eur": round(mc_w * unit_cost_water, 2),
+                "totale_eur": round(
+                    kwh_e * unit_cost_elec + smc_g * unit_cost_gas + mc_w * unit_cost_water, 2
+                ),
+            })
+
+        return {"data": result, "mesi": mesi, "has_telemetry": use_telemetry}
