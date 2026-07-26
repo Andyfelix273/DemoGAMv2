@@ -1291,6 +1291,16 @@ a.module-card:hover {
   margin-bottom: 10px;
 }
 
+/* Label sopra ogni grafico */
+.ee-chart-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
 /* Contenitore grafico con altezza fissa */
 .ee-chart {
   width: 100%;

@@ -133,36 +133,54 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
 
         if use_telemetry:
             # Consumi dal totale impianti (escludi contatori principali)
+            # Formula corretta: integrazione trapezoidale → SUM(power_kw * Δt_ore)
+            # usando LAG per calcolare Δt tra letture consecutive per ogni impianto
             cur.execute("""
-                SELECT
-                    COALESCE(SUM(t.power_kw) * (EXTRACT(EPOCH FROM (MAX(t.ts) - MIN(t.ts))) / 3600.0), 0) AS kwh_mese,
-                    COUNT(DISTINCT t.plant_id) AS n_impianti
-                FROM telemetry t
-                JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
-                WHERE t.asset_id=%s AND t.ts >= %s AND t.ts <= %s
-                  AND p.tipo NOT IN ('contatore')
-            """, (asset_id, mese_start, now))
+                SELECT COALESCE(SUM(sub.kwh_step), 0) AS kwh_mese
+                FROM (
+                    SELECT t.power_kw
+                           * EXTRACT(EPOCH FROM (t.ts - LAG(t.ts) OVER
+                               (PARTITION BY t.plant_id ORDER BY t.ts))) / 3600.0 AS kwh_step
+                    FROM telemetry t
+                    JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                    WHERE t.asset_id=%%s AND t.ts >= %%s AND t.ts <= %%s
+                      AND p.tipo NOT IN ('contatore')
+                ) sub
+                WHERE sub.kwh_step IS NOT NULL AND sub.kwh_step > 0
+            """.replace('%%s', '%s'), (asset_id, mese_start, now))
             row = cur.fetchone()
             kwh_mese = float(row["kwh_mese"] or 0)
 
             # Mese precedente
             cur.execute("""
-                SELECT COALESCE(SUM(t.power_kw) * (EXTRACT(EPOCH FROM (MAX(t.ts) - MIN(t.ts))) / 3600.0), 0) AS kwh
-                FROM telemetry t
-                JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
-                WHERE t.asset_id=%s AND t.ts >= %s AND t.ts < %s
-                  AND p.tipo NOT IN ('contatore')
-            """, (asset_id, mese_prec_start, mese_start))
+                SELECT COALESCE(SUM(sub.kwh_step), 0) AS kwh
+                FROM (
+                    SELECT t.power_kw
+                           * EXTRACT(EPOCH FROM (t.ts - LAG(t.ts) OVER
+                               (PARTITION BY t.plant_id ORDER BY t.ts))) / 3600.0 AS kwh_step
+                    FROM telemetry t
+                    JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                    WHERE t.asset_id=%%s AND t.ts >= %%s AND t.ts < %%s
+                      AND p.tipo NOT IN ('contatore')
+                ) sub
+                WHERE sub.kwh_step IS NOT NULL AND sub.kwh_step > 0
+            """.replace('%%s', '%s'), (asset_id, mese_prec_start, mese_start))
             kwh_mese_prec = float(cur.fetchone()["kwh"] or 0)
 
             # Anno corrente
             cur.execute("""
-                SELECT COALESCE(SUM(t.power_kw) * (EXTRACT(EPOCH FROM (MAX(t.ts) - MIN(t.ts))) / 3600.0), 0) AS kwh
-                FROM telemetry t
-                JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
-                WHERE t.asset_id=%s AND t.ts >= %s AND t.ts <= %s
-                  AND p.tipo NOT IN ('contatore')
-            """, (asset_id, anno_start, now))
+                SELECT COALESCE(SUM(sub.kwh_step), 0) AS kwh
+                FROM (
+                    SELECT t.power_kw
+                           * EXTRACT(EPOCH FROM (t.ts - LAG(t.ts) OVER
+                               (PARTITION BY t.plant_id ORDER BY t.ts))) / 3600.0 AS kwh_step
+                    FROM telemetry t
+                    JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                    WHERE t.asset_id=%%s AND t.ts >= %%s AND t.ts <= %%s
+                      AND p.tipo NOT IN ('contatore')
+                ) sub
+                WHERE sub.kwh_step IS NOT NULL AND sub.kwh_step > 0
+            """.replace('%%s', '%s'), (asset_id, anno_start, now))
             kwh_anno = float(cur.fetchone()["kwh"] or 0)
 
             # % fuori orario (ore non lavorative)

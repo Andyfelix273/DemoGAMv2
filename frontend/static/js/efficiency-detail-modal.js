@@ -1654,27 +1654,25 @@ async function _edmCaricaEfficienza(assetId) {
     const fmt        = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
     const fmtInt     = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
 
-    // Gauge EUI SVG
+    // Gauge EUI SVG compatto (per card nella griglia)
     function gaugeEuiSvg(eui, classe) {
       const max = 400;
       const pct = Math.min(eui / max, 1);
-      const angle = pct * 180; // 0–180 gradi
-      const r = 60, cx = 80, cy = 75;
+      const angle = pct * 180;
+      const r = 32, cx = 44, cy = 38;
       const rad = (deg) => (deg - 90) * Math.PI / 180;
       const x1 = cx + r * Math.cos(rad(-90));
       const y1 = cy + r * Math.sin(rad(-90));
       const x2 = cx + r * Math.cos(rad(-90 + angle));
       const y2 = cy + r * Math.sin(rad(-90 + angle));
       const large = angle > 180 ? 1 : 0;
-      // Colore in base alla classe
       const classColors = { A4:'#27AE60',A3:'#2ECC71',A2:'#52BE80',A1:'#82E0AA',A:'#A9DFBF',
                              B:'#F9E79F',C:'#F39C12',D:'#E67E22',E:'#E74C3C',F:'#C0392B',G:'#922B21' };
       const color = classColors[classe] || '#58A6FF';
-      return `<svg width="160" height="90" viewBox="0 0 160 90">
-        <path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="var(--border-color,#1E3A5F)" stroke-width="10"/>
-        <path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"/>
-        <text x="${cx}" y="${cy-8}" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text-primary,#E0F0FF)">${fmtInt(eui)}</text>
-        <text x="${cx}" y="${cy+6}" text-anchor="middle" font-size="9" fill="var(--text-muted,#7BAFC4)">kWh/m²/anno</text>
+      return `<svg width="88" height="48" viewBox="0 0 88 48">
+        <path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="var(--border-color,#1E3A5F)" stroke-width="7"/>
+        <path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round"/>
+        <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text-primary,#E0F0FF)">${fmtInt(eui)}</text>
       </svg>`;
     }
 
@@ -1728,55 +1726,44 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-value" style="color:#E74C3C;">${kpi.allarmi_energetici_attivi}</div>
           <div class="ee-kpi-card-unit">attivi non risolti</div>
         </div>` : ''}
+        <div class="ee-kpi-card">
+          <div class="ee-kpi-card-label">EUI · Classe ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''}</div>
+          ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata)}
+          <div class="ee-kpi-card-unit">${fmt(kpi.eui_kwh_mq_anno)} kWh/m²/anno</div>
+        </div>
       </div>`;
 
-    // ── Gauge EUI ─────────────────────────────────────────────────────────
-    const gaugeHtml = `
-      <div style="display:flex;align-items:flex-start;gap:20px;margin-bottom:14px;flex-wrap:wrap;">
-        <div class="ee-gauge-wrap">
-          ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata)}
-          <span class="ee-gauge-label ${kpi.energy_class_calcolata}">Classe ${kpi.energy_class_calcolata}</span>
-          <span class="ee-gauge-unit">EUI calcolato</span>
-        </div>
-        <div style="flex:1;min-width:200px;">
-          <div class="ee-section-title">Indice di Efficienza Energetica (EUI)</div>
-          <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin:0 0 8px;">
-            L'EUI (Energy Use Intensity) misura il consumo annuo per metro quadro.
-            Valore calcolato: <strong>${fmt(kpi.eui_kwh_mq_anno)} kWh/m²/anno</strong>
-            ${kpi.energy_class_certificata && kpi.energy_class_certificata !== kpi.energy_class_calcolata
-              ? ` — Classe certificata: <strong>${kpi.energy_class_certificata}</strong>`
-              : ''}.
-          </p>
-          ${!kpi.has_telemetry ? `<div style="font-size:11px;color:var(--text-muted);padding:6px 10px;background:rgba(88,166,255,0.05);border-radius:6px;border:1px solid var(--border-color);">
-            <i class="fa fa-info-circle" style="margin-right:4px;"></i>Dati da contatori vettoriali (no telemetria impianti)
-          </div>` : ''}
-        </div>
-      </div>`;
+    const gaugeHtml = '';  // Gauge integrato nella griglia KPI
 
     // ── Sezione Analisi ───────────────────────────────────────────────────
     const analisiHtml = `
       <div class="ee-section-title">Analisi consumi</div>
       <div class="ee-chart-row">
         <div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">PROFILO 24H PER TIPO IMPIANTO</div>
+          <div class="ee-chart-label">PROFILO 24H PER TIPO IMPIANTO</div>
           <div class="ee-chart" id="ee-chart-profile24h-${assetId}"></div>
         </div>
         <div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">RIPARTIZIONE CONSUMI (30 GG)</div>
+          <div class="ee-chart-label">RIPARTIZIONE CONSUMI (30 GG)</div>
           <div class="ee-chart" id="ee-chart-breakdown-${assetId}"></div>
         </div>
       </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">HEATMAP ORA × GIORNO SETTIMANA (28 GG)</div>
-        <div class="ee-chart" id="ee-chart-heatmap-${assetId}"></div>
+      <div class="ee-chart-row">
+        <div>
+          <div class="ee-chart-label">HEATMAP ORA × GIORNO (28 GG)</div>
+          <div class="ee-chart" id="ee-chart-heatmap-${assetId}"></div>
+        </div>
+        <div>
+          <div class="ee-chart-label">BASELINE PER IMPIANTO</div>
+          <div class="ee-chart" id="ee-chart-baseline-${assetId}"></div>
+        </div>
       </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">CONFRONTO BASELINE PER IMPIANTO</div>
-        <div class="ee-chart" id="ee-chart-baseline-${assetId}"></div>
-      </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">CORRELAZIONE OCCUPANCY VS COSTO (14 GG)</div>
-        <div class="ee-chart" id="ee-chart-occ-${assetId}"></div>
+      <div class="ee-chart-row">
+        <div>
+          <div class="ee-chart-label">OCCUPANCY VS COSTO (14 GG)</div>
+          <div class="ee-chart" id="ee-chart-occ-${assetId}"></div>
+        </div>
+        <div></div>
       </div>`;
 
     // ── Sezione Trend ─────────────────────────────────────────────────────
@@ -1784,11 +1771,11 @@ async function _edmCaricaEfficienza(assetId) {
       <div class="ee-section-title">Trend storico</div>
       <div class="ee-chart-row">
         <div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">CONSUMI MENSILI (kWh)</div>
+          <div class="ee-chart-label">CONSUMI MENSILI (kWh)</div>
           <div class="ee-chart" id="ee-chart-trend-kwh-${assetId}"></div>
         </div>
         <div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;">COSTI MENSILI (€)</div>
+          <div class="ee-chart-label">COSTI MENSILI (€)</div>
           <div class="ee-chart" id="ee-chart-trend-cost-${assetId}"></div>
         </div>
       </div>`;
