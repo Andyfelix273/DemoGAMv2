@@ -228,154 +228,50 @@ async function apriModaleAsset(id) {
     }
     document.getElementById('mm-panel-allarmi').innerHTML = allHtml;
 
-    // Tab Work Order
-    try {
-      const woList = await API.getAssetWorkOrders(id);
-      const aperti = woList.filter(w => w.stato !== 'completato' && w.stato !== 'annullato').length;
-      if (aperti > 0) {
-        document.getElementById('mm-wo-badge').innerHTML = ` <span style="background:#F39C12;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperti}</span>`;
+    // ── Tab Work Order — usa WoPanel (modulo condiviso) ─────────────────────
+    WoPanel.mount(document.getElementById('mm-panel-workorders'), {
+      assetId:   id,
+      assetNome: a.nome,
+      zIndex:    1100,
+      onSave: () => {
+        API.getAssetWorkOrders(id).then(list => {
+          const aperti = list.filter(w => w.stato !== 'completato' && w.stato !== 'annullato').length;
+          const badge = document.getElementById('mm-wo-badge');
+          if (badge) badge.innerHTML = aperti > 0
+            ? ` <span style="background:#F39C12;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperti}</span>`
+            : '';
+        }).catch(() => {});
       }
-      const statoColor2 = { aperto:'#3498DB', in_corso:'#F39C12', completato:'#27AE60', annullato:'#95A5A6' };
-      const prioColor2  = { bassa:'#95A5A6', media:'#3498DB', alta:'#F39C12', critica:'#E74C3C' };
-      let woHtml = '';
-      if (woList.length === 0) {
-        woHtml = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-circle-check"></i> Nessun work order per questo asset</p>';
-      } else {
-        woHtml = woList.map(w => `
-          <div class="mm-alarm-row" style="cursor:pointer" onclick="window.location.href='/static/workorders.html'">
-            <span style="font-size:11px;color:var(--text-secondary);min-width:72px">${w.codice}</span>
-            <span style="flex:1;font-size:13px">${w.titolo}</span>
-            <span style="font-size:11px;font-weight:600;color:${prioColor2[w.priorita]||''}">${w.priorita.toUpperCase()}</span>
-            <span style="background:${statoColor2[w.stato]||''}20;color:${statoColor2[w.stato]||''};padding:2px 6px;border-radius:4px;font-size:11px">${w.stato.replace('_',' ')}</span>
-          </div>`).join('');
+    });
+    // ── Tab Documenti — usa DocsPanel (modulo condiviso) ──────────────────────
+    DocsPanel.mount(document.getElementById('mm-panel-documenti'), {
+      assetId:   id,
+      assetNome: a.nome,
+      zIndex:    1100,
+      onSave: () => {
+        API.getAssetDocuments(id).then(list => {
+          const badge = document.getElementById('mm-doc-badge');
+          if (badge) badge.innerHTML = list.length > 0
+            ? ` <span style="background:var(--accent-blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${list.length}</span>`
+            : '';
+        }).catch(() => {});
       }
-      document.getElementById('mm-panel-workorders').innerHTML = woHtml;
-    } catch(woErr) {
-      console.warn('[apriModaleAsset] Impossibile caricare i work order per asset', id, ':', woErr.message);
-      document.getElementById('mm-panel-workorders').innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-exclamation-circle" style="margin-right:5px"></i>Work order non disponibili</p>';
-    }
-
-    // Tab Documenti
-    // ── Helper: renderizza la lista documenti nel pannello ──
-    const iconMap2 = { 'application/pdf': 'fa-file-pdf', 'image/': 'fa-file-image', 'application/vnd': 'fa-file-excel', 'text/': 'fa-file-lines' };
-    function icona2(mime) { if (!mime) return 'fa-file'; for (const [k,v] of Object.entries(iconMap2)) { if (mime.startsWith(k)) return v; } return 'fa-file'; }
-    function fmtSize(b) { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
-
-    function _renderListaDocumenti(docs) {
-      const panel = document.getElementById('mm-panel-documenti');
-      if (!panel) return;
-      const badge = document.getElementById('mm-doc-badge');
-      if (badge) badge.innerHTML = docs.length > 0
-        ? ` <span style="background:#3498DB;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${docs.length}</span>`
-        : '';
-      const lista = docs.length === 0
-        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-folder-open"></i> Nessun documento allegato</p>'
-        : docs.map(d => {
-            const isPdf = (d.tipo_mime === 'application/pdf') || d.nome_file.toLowerCase().endsWith('.pdf');
-            const viewBtn = isPdf
-              ? `<button onclick="_mmApriViewerPdf(${d.id}, '${d.nome_file.replace(/'/g, "\\'")}')"
-                   style="margin-left:4px;padding:2px 8px;background:transparent;
-                          border:1px solid var(--border,#1E3A5F);border-radius:4px;
-                          color:var(--text-secondary,#7BAFC4);cursor:pointer;font-size:12px;
-                          display:inline-flex;align-items:center;gap:4px;"
-                   title="Visualizza PDF">
-                   <i class="fa fa-eye"></i>
-                 </button>`
-              : '';
-            return `<div class="mm-alarm-row">
-              <i class="fa ${icona2(d.tipo_mime)}" style="color:#3498DB;font-size:16px;min-width:20px"></i>
-              <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
-              <span style="flex:1;font-size:13px;margin-left:8px">${d.nome_file}</span>
-              <span style="font-size:11px;color:var(--text-secondary)">${fmtSize(d.dimensione)}</span>
-              ${viewBtn}
-              <a href="${API.getDocumentDownloadUrl(d.id)}" target="_blank" class="btn btn-secondary btn-sm" style="margin-left:4px;padding:2px 8px" title="Scarica">
-                <i class="fa fa-download"></i>
-              </a>
-            </div>`;
-          }).join('');
-      // Pulsante upload + input nascosto + lista
-      const canUpload = API.can('documents.upload');
-      const uploadBar = canUpload
-        ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-            <input type="file" id="mm-doc-file-input" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt">
-            <button id="mm-doc-upload-btn" class="btn btn-primary btn-sm" style="padding:4px 12px;font-size:12px">
-              <i class="fa fa-upload" style="margin-right:5px"></i>Carica documento
-            </button>
-          </div>`
-        : '';
-      panel.innerHTML = uploadBar + lista;
-      if (canUpload) {
-        const btn = document.getElementById('mm-doc-upload-btn');
-        const inp = document.getElementById('mm-doc-file-input');
-        btn.addEventListener('click', () => inp.click());
-        inp.addEventListener('change', async () => {
-          const file = inp.files[0];
-          if (!file) return;
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa fa-spinner fa-spin" style="margin-right:5px"></i>Caricamento...';
-          try {
-            await API.uploadDocument(id, file);
-            const nuoviDocs = await API.getAssetDocuments(id);
-            _renderListaDocumenti(nuoviDocs);
-          } catch(e) {
-            alert('Errore upload: ' + e.message);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa fa-upload" style="margin-right:5px"></i>Carica documento';
-          } finally {
-            inp.value = '';
-          }
-        });
+    });
+    // ── Tab Scadenze — usa DeadlinesPanel (modulo condiviso) ──────────────────
+    DeadlinesPanel.mount(document.getElementById('mm-panel-scadenze'), {
+      assetId:   id,
+      assetNome: a.nome,
+      zIndex:    1100,
+      onSave: () => {
+        API.getAssetDeadlines(id).then(list => {
+          const aperte = list.filter(d => d.stato !== 'chiusa').length;
+          const badge = document.getElementById('mm-dl-badge');
+          if (badge) badge.innerHTML = aperte > 0
+            ? ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperte}</span>`
+            : '';
+        }).catch(() => {});
       }
-    }
-
-    try {
-      const docs = await API.getAssetDocuments(id);
-      _renderListaDocumenti(docs);
-    } catch(docErr) {
-      console.warn('[apriModaleAsset] Impossibile caricare i documenti per asset', id, ':', docErr.message);
-      document.getElementById('mm-panel-documenti').innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-exclamation-circle" style="margin-right:5px"></i>Documenti non disponibili</p>';
-    }
-
-    // Tab Scadenze
-    try {
-      const deadlines = await API.getAssetDeadlines(id);
-      const aperte = deadlines.filter(d => d.stato !== 'completata');
-      if (aperte.length > 0) {
-        const dlBadge = document.getElementById('mm-dl-badge');
-        if (dlBadge) dlBadge.innerHTML = ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperte.length}</span>`;
-      }
-      const coloreStato = { 'aperta': 'var(--stato-man)', 'in_corso': '#3498DB', 'completata': 'var(--stato-ok)', 'scaduta': 'var(--stato-inattivo)' };
-      const iconaStato  = { 'aperta': 'fa-clock', 'in_corso': 'fa-spinner', 'completata': 'fa-circle-check', 'scaduta': 'fa-exclamation-circle' };
-      let dlHtml = deadlines.length === 0
-        ? '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-calendar-check"></i> Nessuna scadenza registrata</p>'
-        : deadlines.map(d => {
-            const oggi = new Date();
-            const scad = new Date(d.data_scadenza);
-            const giorni = Math.ceil((scad - oggi) / 86400000);
-            const statoEff = d.stato !== 'completata' && scad < oggi ? 'scaduta' : d.stato;
-            const giorniLabel = d.stato === 'completata' ? '' : giorni < 0
-              ? `<span style="color:var(--stato-inattivo);font-size:11px">${Math.abs(giorni)}gg scaduta</span>`
-              : `<span style="color:var(--stato-man);font-size:11px">${giorni}gg</span>`;
-            return `<div class="mm-alarm-row mm-dl-row" onclick="_mmApriDettaglioScadenza(${d.id})"
-              style="cursor:pointer;transition:background 0.15s;"
-              onmouseover="this.style.background='rgba(0,180,216,0.07)'"
-              onmouseout="this.style.background=''">
-              <i class="fa ${iconaStato[statoEff] || 'fa-calendar'} " style="color:${coloreStato[statoEff] || '#aaa'};font-size:16px;min-width:20px"></i>
-              <span style="font-size:10px;color:var(--text-secondary);font-family:monospace;min-width:100px;flex-shrink:0">${d.codice || '—'}</span>
-              <span style="flex:1;font-size:13px;margin-left:8px">${d.titolo}</span>
-              <span style="font-size:11px;color:var(--text-secondary);margin-right:8px">${d.tipo || ''}</span>
-              <span style="font-size:11px;color:var(--text-secondary)">${d.data_scadenza ? new Date(d.data_scadenza).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}) : ''}</span>
-              ${giorniLabel}
-              <i class="fa fa-chevron-right" style="color:var(--text-secondary);font-size:10px;margin-left:6px;"></i>
-            </div>`;
-          }).join('');
-      const dlPanel = document.getElementById('mm-panel-scadenze');
-      if (dlPanel) dlPanel.innerHTML = dlHtml;
-    } catch(dlErr) {
-      console.warn('[apriModaleAsset] Impossibile caricare le scadenze per asset', id, ':', dlErr.message);
-      const dlPanel = document.getElementById('mm-panel-scadenze');
-      if (dlPanel) dlPanel.innerHTML = '<p style="color:var(--text-secondary);font-size:13px"><i class="fa fa-exclamation-circle" style="margin-right:5px"></i>Scadenze non disponibili</p>';
-    }
+    });
 
   } catch(e) {
     console.error('[apriModaleAsset] Errore nel caricamento dell\'asset', id, ':', e.message, e.stack);
