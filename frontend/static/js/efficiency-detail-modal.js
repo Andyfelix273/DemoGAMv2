@@ -1737,7 +1737,7 @@ async function _edmCaricaEfficienza(assetId) {
 
     const kpiCards = `
       <div class="ee-kpi-grid">
-        <div class="ee-kpi-section-sep" style="grid-column:1/-1;"><i class="fa fa-euro-sign" style="margin-right:5px;"></i>Costi</div>
+        <div class="ee-kpi-section-sep" style="grid-column:1/-1;"><i class="fa fa-gauge-high" style="margin-right:5px;"></i>Sintesi</div>
         <div class="ee-kpi-card">
           <div class="ee-kpi-card-label">Costo energetico</div>
           <div class="ee-kpi-card-value">€ ${fmtInt(kpi.costo_mese_eur)}</div>
@@ -1750,7 +1750,7 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-unit">€/m² · mese corrente</div>
           ${bmHtml}
         </div>
-        <div class="ee-kpi-section-sep" style="grid-column:1/-1;"><i class="fa fa-bolt" style="margin-right:5px;"></i>Consumi</div>
+
         <div class="ee-kpi-card accent-orange">
           <div class="ee-kpi-card-label">Consumi mese</div>
           <div class="ee-kpi-card-value">${fmtInt(kpi.kwh_mese)}</div>
@@ -1761,7 +1761,7 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-value">${fmtInt(kpi.co2_kg_mese)}</div>
           <div class="ee-kpi-card-unit">kg CO₂ · mese</div>
         </div>
-        <div class="ee-kpi-section-sep" style="grid-column:1/-1;"><i class="fa fa-leaf" style="margin-right:5px;"></i>Efficienza energetica</div>
+
         ${kpi.pct_fuori_orario !== null ? (() => {
           const pctOff = kpi.pct_fuori_orario;
           const pctOn  = 100 - pctOff;
@@ -1801,7 +1801,7 @@ async function _edmCaricaEfficienza(assetId) {
 
     // ── Sezione Analisi ───────────────────────────────────────────────────
     const analisiHtml = `
-      <div class="ee-section-title">Analisi consumi</div>
+      <div class="ee-section-title"><i class="fa fa-chart-bar" style="margin-right:5px;"></i>Analisi Consumi</div>
       <div class="ee-chart-row">
         <div>
           <div class="ee-chart-label">PROFILO 24H PER TIPO IMPIANTO</div>
@@ -1841,7 +1841,7 @@ async function _edmCaricaEfficienza(assetId) {
 
     // ── Sezione Trend ─────────────────────────────────────────────────────
     const trendHtml = `
-      <div class="ee-section-title">Trend storico</div>
+      <div class="ee-section-title"><i class="fa fa-chart-line" style="margin-right:5px;"></i>Trend e Confronto</div>
       <div class="ee-chart-row">
         <div>
           <div class="ee-chart-label">CONSUMI MENSILI (kWh)</div>
