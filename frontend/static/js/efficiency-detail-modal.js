@@ -2140,11 +2140,12 @@ async function _edmCaricaEfficienza(assetId) {
     const el2Cost = document.getElementById(`ee-chart-trend-cost-${assetId}`);
     if (el2Cost) el2Cost.style.display = 'none';
 
-    // ── E-11: HVAC vs Temperatura esterna — Scatter + regressione ───────────────
+    // ── E-11: HVAC vs Temperatura esterna — Scatter + regressione ──────────────
     try {
       const hvacRes = await fetch(`/api/efficiency/${assetId}/hvac_vs_temp?giorni=90`, { headers: AUTH });
       if (hvacRes.ok) {
         const hvac = await hvacRes.json();
+        const hvacEl = document.getElementById(`ee-chart-hvac-temp-${assetId}`);
         if (hvac.data && hvac.data.length > 0) {
           const hvacTraces = [
             { type: 'scatter', mode: 'markers', name: 'HVAC kWh/giorno',
@@ -2152,7 +2153,7 @@ async function _edmCaricaEfficienza(assetId) {
               marker: { color: '#58A6FF', size: 6, opacity: 0.7 },
               hovertemplate: '<b>%{x:.1f}°C</b><br>HVAC: %{y:.1f} kWh<extra></extra>' }
           ];
-
+          if (hvac.regressione && hvac.regressione.slope != null) {
             const xMin = Math.min(...hvac.data.map(r => r.temp_c));
             const xMax = Math.max(...hvac.data.map(r => r.temp_c));
             const { slope: m, intercept: q } = hvac.regressione;
@@ -2163,7 +2164,6 @@ async function _edmCaricaEfficienza(assetId) {
               hovertemplate: 'Regressione: %{y:.1f} kWh<extra></extra>'
             });
           }
-          const hvacEl = document.getElementById(`ee-chart-hvac-temp-${assetId}`);
           if (hvacEl) Plotly.newPlot(`ee-chart-hvac-temp-${assetId}`, hvacTraces,
             plotLayout({
               margin: { t: 8, r: 12, b: 40, l: 50 },
@@ -2172,7 +2172,6 @@ async function _edmCaricaEfficienza(assetId) {
               legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
             }), plotCfg);
         } else {
-          const hvacEl = document.getElementById(`ee-chart-hvac-temp-${assetId}`);
           if (hvacEl) hvacEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-thermometer-half"></i>Dati HVAC non disponibili</div>';
         }
       }
