@@ -228,50 +228,41 @@ async function apriModaleAsset(id) {
     }
     document.getElementById('mm-panel-allarmi').innerHTML = allHtml;
 
-    // ── Tab Work Order — usa WoPanel (modulo condiviso) ─────────────────────
-    WoPanel.mount(document.getElementById('mm-panel-workorders'), {
-      assetId:   id,
-      assetNome: a.nome,
-      zIndex:    1100,
-      onSave: () => {
-        API.getAssetWorkOrders(id).then(list => {
-          const aperti = list.filter(w => w.stato !== 'completato' && w.stato !== 'annullato').length;
-          const badge = document.getElementById('mm-wo-badge');
-          if (badge) badge.innerHTML = aperti > 0
-            ? ` <span style="background:#F39C12;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperti}</span>`
-            : '';
-        }).catch(() => {});
-      }
-    });
-    // ── Tab Documenti — usa DocsPanel (modulo condiviso) ──────────────────────
-    DocsPanel.mount(document.getElementById('mm-panel-documenti'), {
-      assetId:   id,
-      assetNome: a.nome,
-      zIndex:    1100,
-      onSave: () => {
-        API.getAssetDocuments(id).then(list => {
-          const badge = document.getElementById('mm-doc-badge');
-          if (badge) badge.innerHTML = list.length > 0
-            ? ` <span style="background:var(--accent-blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${list.length}</span>`
-            : '';
-        }).catch(() => {});
-      }
-    });
-    // ── Tab Scadenze — usa DeadlinesPanel (modulo condiviso) ──────────────────
-    DeadlinesPanel.mount(document.getElementById('mm-panel-scadenze'), {
-      assetId:   id,
-      assetNome: a.nome,
-      zIndex:    1100,
-      onSave: () => {
-        API.getAssetDeadlines(id).then(list => {
-          const aperte = list.filter(d => d.stato !== 'chiusa').length;
-          const badge = document.getElementById('mm-dl-badge');
-          if (badge) badge.innerHTML = aperte > 0
-            ? ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${aperte}</span>`
-            : '';
-        }).catch(() => {});
-      }
-    });
+    // ── Tab WO / Documenti / Scadenze: aprono modale grande con Panel.apri() ─────────
+    // Il codice di render è unico nel panel module; qui si inietta solo il pulsante di accesso.
+    const _assetNomeSafe = (a.nome || '').replace(/'/g, "\\'");
+
+    function _renderTabAccesso(panelId, label, icon, panelObj) {
+      const el = document.getElementById(panelId);
+      if (!el) return;
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;height:140px">
+          <button class="btn btn-primary" style="font-size:14px;padding:10px 24px"
+            onclick="${panelObj}.apri(${id}, '${_assetNomeSafe}')">
+            <i class="fa ${icon}" style="margin-right:8px"></i>Apri ${label}
+          </button>
+        </div>`;
+    }
+
+    _renderTabAccesso('mm-panel-workorders', 'Work Order', 'fa-wrench',   'WoPanel');
+    _renderTabAccesso('mm-panel-documenti',  'Documenti',  'fa-file',     'DocsPanel');
+    _renderTabAccesso('mm-panel-scadenze',   'Scadenze',   'fa-calendar', 'DeadlinesPanel');
+
+    // Badge: conteggi in background per aggiornare i tab
+    API.getAssetWorkOrders(id).then(list => {
+      const n = list.filter(w => !['completato','annullato'].includes(w.stato)).length;
+      const b = document.getElementById('mm-wo-badge');
+      if (b) b.innerHTML = n > 0 ? ` <span style="background:#F39C12;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${n}</span>` : '';
+    }).catch(() => {});
+    API.getAssetDocuments(id).then(list => {
+      const b = document.getElementById('mm-doc-badge');
+      if (b) b.innerHTML = list.length > 0 ? ` <span style="background:var(--accent-blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${list.length}</span>` : '';
+    }).catch(() => {});
+    API.getAssetDeadlines(id).then(list => {
+      const n = list.filter(d => d.stato !== 'chiusa').length;
+      const b = document.getElementById('mm-dl-badge');
+      if (b) b.innerHTML = n > 0 ? ` <span style="background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px">${n}</span>` : '';
+    }).catch(() => {});
 
   } catch(e) {
     console.error('[apriModaleAsset] Errore nel caricamento dell\'asset', id, ':', e.message, e.stack);

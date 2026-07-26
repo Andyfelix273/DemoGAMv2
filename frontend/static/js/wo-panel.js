@@ -598,6 +598,179 @@ const WoPanel = (() => {
     }
   }
 
+  // ── Modale pannello asset (tabella identica a workorders.html) ───────────────
+  let _panelAssetId   = null;
+  let _panelAssetNome = null;
+  let _panelDati      = [];
+  let _panelFiltrati  = [];
+  let _panelPagina    = 1;
+  const _PANEL_PAGE   = 15;
+
+  function _fmtData(s)    { if (!s) return '—'; return new Date(s).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+  function _fmtDataOra(s) { if (!s) return '—'; const d=new Date(s); return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}); }
+  function _labelStato(s) { return {aperto:'Aperto',in_corso:'In corso',completato:'Completato',annullato:'Annullato'}[s]||s; }
+
+  function _injectPanelOverlay() {
+    if (document.getElementById('wop-panel-overlay')) return;
+    const div = document.createElement('div');
+    div.innerHTML = `
+    <div class="modal-overlay" id="wop-panel-overlay" style="z-index:1100;align-items:flex-start;padding:40px 20px;">
+      <div class="modal-box" style="max-width:1100px;width:98%;max-height:88vh;display:flex;flex-direction:column;">
+        <div class="modal-header">
+          <h3 id="wop-panel-title">Work Order</h3>
+          <button class="btn-icon" onclick="WoPanel._chiudiPanel()" title="Chiudi"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div style="padding:12px 20px 0;flex-shrink:0">
+          <div class="filtri-bar">
+            <input type="text" id="wop-panel-search" placeholder="Cerca WO, asset..." style="flex:1;min-width:180px" oninput="WoPanel._panelFiltra()">
+            <select id="wop-panel-stato" onchange="WoPanel._panelFiltra()">
+              <option value="">Tutti gli stati</option>
+              <option value="aperto">Aperto</option>
+              <option value="in_corso">In corso</option>
+              <option value="completato">Completato</option>
+              <option value="annullato">Annullato</option>
+            </select>
+            <select id="wop-panel-tipo" onchange="WoPanel._panelFiltra()">
+              <option value="">Tutti i tipi</option>
+              <option value="correttivo">Correttivo</option>
+              <option value="preventivo">Preventivo</option>
+              <option value="ispezione">Ispezione</option>
+            </select>
+            <select id="wop-panel-prio" onchange="WoPanel._panelFiltra()">
+              <option value="">Tutte le priorità</option>
+              <option value="critica">Critica</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="bassa">Bassa</option>
+            </select>
+            <span class="record-count" id="wop-panel-count"></span>
+            <button class="btn btn-primary" onclick="WoPanel._apriNuovoPanel()"><i class="fa fa-plus"></i> Nuovo WO</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:12px 20px 20px">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Codice</th><th>Titolo</th><th>Tipo</th>
+                <th>Priorità</th><th>Stato</th><th>Assegnatario</th>
+                <th>Data pianif.</th><th>Apertura</th><th></th>
+              </tr></thead>
+              <tbody id="wop-panel-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="wop-panel-pagination"></div>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(div);
+  }
+
+  function _renderPanelTabella() {
+    const oggi   = new Date().toISOString().split('T')[0];
+    const tbody  = document.getElementById('wop-panel-tbody');
+    const countEl = document.getElementById('wop-panel-count');
+    const n = _panelFiltrati.length;
+    if (countEl) countEl.textContent = `${n} work order${_panelAssetNome ? ' — '+_panelAssetNome : ''}`;
+    if (!tbody) return;
+    const start  = (_panelPagina - 1) * _PANEL_PAGE;
+    const pagina = _panelFiltrati.slice(start, start + _PANEL_PAGE);
+    if (!pagina.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun work order trovato</td></tr>`;
+      document.getElementById('wop-panel-pagination').innerHTML = '';
+      return;
+    }
+    const canEdit = API.can('work_orders.update');
+    const canDel  = API.can('work_orders.delete');
+    tbody.innerHTML = pagina.map(wo => {
+      const scaduto = wo.data_pianificata && wo.data_pianificata < oggi && !['completato','annullato'].includes(wo.stato);
+      const canStato = canEdit && !['completato','annullato'].includes(wo.stato);
+      return `<tr ondblclick="WoPanel._apriDettaglio(${wo.id})">
+        <td><span style="font-family:monospace;font-size:12px;font-weight:600">${wo.codice}</span></td>
+        <td style="max-width:240px"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${wo.titolo}">${wo.titolo}</div></td>
+        <td><span class="tipo-badge">${wo.tipo}</span></td>
+        <td><span class="prio prio-${wo.priorita}">${wo.priorita.toUpperCase()}</span></td>
+        <td><span class="badge badge-${wo.stato}">${_labelStato(wo.stato)}</span></td>
+        <td style="font-size:12px">${wo.assegnatario||'<span style="color:var(--text-muted)">—</span>'}</td>
+        <td style="font-size:12px">${scaduto?'<span style="color:var(--accent-red)">⚠ </span>':''} ${_fmtData(wo.data_pianificata)}</td>
+        <td style="font-size:12px">${_fmtDataOra(wo.data_apertura)}</td>
+        <td><div class="row-actions">
+          <button class="btn-icon" title="Dettaglio" onclick="WoPanel._apriDettaglio(${wo.id})"><i class="fa fa-eye"></i></button>
+          ${canStato ? `<button class="btn-icon" title="Cambia stato" onclick="WoPanel._apriCambioStato(${wo.id})"><i class="fa fa-exchange"></i></button>` : ''}
+          ${canEdit  ? `<button class="btn-icon" title="Modifica" onclick="WoPanel._apriModifica(${wo.id})"><i class="fa fa-pen"></i></button>` : ''}
+          ${canDel   ? `<button class="btn-icon danger" title="Elimina" onclick="WoPanel._elimina(${wo.id})"><i class="fa fa-trash"></i></button>` : ''}
+        </div></td>
+      </tr>`;
+    }).join('');
+    // Paginazione
+    const totPag = Math.ceil(n / _PANEL_PAGE);
+    const pg = document.getElementById('wop-panel-pagination');
+    if (totPag <= 1) { if(pg) pg.innerHTML=''; return; }
+    let html = `<button class="page-btn" onclick="WoPanel._cambiaPanelPagina(${_panelPagina-1})" ${_panelPagina===1?'disabled':''}>&#8249;</button>`;
+    for (let i=1;i<=totPag;i++) html += `<button class="page-btn ${i===_panelPagina?'active':''}" onclick="WoPanel._cambiaPanelPagina(${i})">${i}</button>`;
+    html += `<button class="page-btn" onclick="WoPanel._cambiaPanelPagina(${_panelPagina+1})" ${_panelPagina===totPag?'disabled':''}>&#8250;</button>`;
+    if(pg) pg.innerHTML = html;
+  }
+
+  async function apri(assetId, assetNome) {
+    _panelAssetId   = assetId;
+    _panelAssetNome = assetNome;
+    _panelPagina    = 1;
+    _injectModals(1200);
+    _injectPanelOverlay();
+    const ov = document.getElementById('wop-panel-overlay');
+    if (ov) ov.classList.add('open');
+    const titleEl = document.getElementById('wop-panel-title');
+    if (titleEl) titleEl.textContent = assetNome ? `Work Order — ${assetNome}` : 'Work Order';
+    // Reset filtri
+    ['wop-panel-search','wop-panel-stato','wop-panel-tipo','wop-panel-prio'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const tbody = document.getElementById('wop-panel-tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
+    try {
+      const params = assetId ? { asset_id: assetId } : {};
+      _panelDati = await API.getWorkOrders(params);
+      _panelFiltrati = [..._panelDati];
+      _renderPanelTabella();
+    } catch (e) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="color:var(--accent-red);padding:16px">Errore: ${e.message}</td></tr>`;
+    }
+  }
+
+  function _chiudiPanel() {
+    const ov = document.getElementById('wop-panel-overlay');
+    if (ov) ov.classList.remove('open');
+  }
+
+  function _panelFiltra() {
+    const q  = (document.getElementById('wop-panel-search')?.value||'').toLowerCase();
+    const st = document.getElementById('wop-panel-stato')?.value||'';
+    const ti = document.getElementById('wop-panel-tipo')?.value||'';
+    const pr = document.getElementById('wop-panel-prio')?.value||'';
+    _panelFiltrati = _panelDati.filter(wo => {
+      if (st && wo.stato !== st) return false;
+      if (ti && wo.tipo  !== ti) return false;
+      if (pr && wo.priorita !== pr) return false;
+      if (q && ![(wo.codice||''),(wo.titolo||''),(wo.asset_nome||''),(wo.assegnatario||'')].some(v=>v.toLowerCase().includes(q))) return false;
+      return true;
+    });
+    _panelPagina = 1;
+    _renderPanelTabella();
+  }
+
+  function _cambiaPanelPagina(n) {
+    const tot = Math.ceil(_panelFiltrati.length / _PANEL_PAGE);
+    if (n < 1 || n > tot) return;
+    _panelPagina = n;
+    _renderPanelTabella();
+  }
+
+  function _apriNuovoPanel() {
+    _opts = { assetId: _panelAssetId, assetNome: _panelAssetNome, zIndex: 1200, onSave: async () => await apri(_panelAssetId, _panelAssetNome), readonly: false };
+    _lista = _panelDati;
+    _apriNuovo();
+  }
+
   // ── API pubblica ──────────────────────────────────────────────────────────────
   /**
    * mount(containerEl, opts)
@@ -622,11 +795,16 @@ const WoPanel = (() => {
   return {
     mount,
     refresh,
+    apri,
     _filtra,
+    _panelFiltra,
+    _cambiaPanelPagina,
     _apriNuovo,
+    _apriNuovoPanel,
     _apriModifica,
     _apriModificaDaDettaglio,
     _chiudiForm,
+    _chiudiPanel,
     _salva,
     _apriDettaglio,
     _chiudiDettaglio,

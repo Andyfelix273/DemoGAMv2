@@ -383,6 +383,158 @@ const DocsPanel = (() => {
     }
   }
 
+  // ── Modale pannello asset (tabella identica a documents.html) ───────────────
+  let _panelAssetId   = null;
+  let _panelAssetNome = null;
+  let _panelDati      = [];
+  let _panelFiltrati  = [];
+  let _panelPagina    = 1;
+  const _PANEL_PAGE   = 20;
+
+  function _injectPanelOverlay() {
+    if (document.getElementById('dcp-panel-overlay')) return;
+    const div = document.createElement('div');
+    div.innerHTML = `
+    <div class="modal-overlay" id="dcp-panel-overlay" style="z-index:1100;align-items:flex-start;padding:40px 20px;">
+      <div class="modal-box" style="max-width:1000px;width:98%;max-height:88vh;display:flex;flex-direction:column;">
+        <div class="modal-header">
+          <h3 id="dcp-panel-title">Documenti</h3>
+          <button class="btn-icon" onclick="DocsPanel._chiudiPanel()" title="Chiudi"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div style="padding:12px 20px 0;flex-shrink:0">
+          <div class="filtri-bar">
+            <input type="text" id="dcp-panel-search" placeholder="Cerca nome file..." style="flex:1;min-width:180px" oninput="DocsPanel._panelFiltra()">
+            <select id="dcp-panel-tipo" onchange="DocsPanel._panelFiltra()">
+              <option value="">Tutti i tipi</option>
+              <option value="pdf">PDF</option>
+              <option value="word">Word</option>
+              <option value="excel">Excel</option>
+              <option value="immagine">Immagine</option>
+              <option value="altro">Altro</option>
+            </select>
+            <span class="record-count" id="dcp-panel-count"></span>
+            <button class="btn btn-primary" onclick="DocsPanel._apriUploadPanel()"><i class="fa fa-upload"></i> Carica documento</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:12px 20px 20px">
+          <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:10px;overflow:hidden">
+            <table class="doc-table" style="width:100%">
+              <thead><tr>
+                <th>Tipo</th><th>Nome file</th><th>Dimensione</th>
+                <th>Data caricamento</th><th>Caricato da</th><th></th>
+              </tr></thead>
+              <tbody id="dcp-panel-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="dcp-panel-pagination"></div>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(div);
+  }
+
+  function _renderPanelTabella() {
+    const tbody   = document.getElementById('dcp-panel-tbody');
+    const countEl = document.getElementById('dcp-panel-count');
+    const n = _panelFiltrati.length;
+    if (countEl) countEl.textContent = `${n} document${n===1?'o':'i'}${_panelAssetNome ? ' — '+_panelAssetNome : ''}`;
+    if (!tbody) return;
+    const start  = (_panelPagina - 1) * _PANEL_PAGE;
+    const pagina = _panelFiltrati.slice(start, start + _PANEL_PAGE);
+    if (!pagina.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun documento trovato</td></tr>`;
+      document.getElementById('dcp-panel-pagination').innerHTML = '';
+      return;
+    }
+    const canDel = API.can('documents.delete');
+    tbody.innerHTML = pagina.map(d => {
+      const dlUrl = API.getDocumentDownloadUrl(d.id);
+      const pdfBtn = isPdf(d.mime_type, d.nome_file)
+        ? `<button class="btn-icon" title="Anteprima" onclick="DocsPanel._apriPdf(${d.id}, '${(d.nome_file||'').replace(/'/g,"\\'")}')"><i class="fa fa-eye"></i></button>`
+        : '';
+      const delBtn = canDel
+        ? `<button class="btn-icon danger" title="Elimina" onclick="DocsPanel._eliminaPanel(${d.id}, '${(d.nome_file||'').replace(/'/g,"\\'")}')"><i class="fa fa-trash"></i></button>`
+        : '';
+      return `<tr>
+        <td>${mimeBadge(d.mime_type, d.nome_file)}</td>
+        <td class="doc-nome">${d.nome_file||'—'}</td>
+        <td class="doc-dim">${fmtDim(d.dimensione_bytes)}</td>
+        <td class="doc-data">${fmtData(d.data_caricamento)}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${d.caricato_da||'—'}</td>
+        <td><div class="doc-actions">${pdfBtn}<a class="btn-icon" href="${dlUrl}" download="${d.nome_file||'documento'}" title="Scarica"><i class="fa fa-download"></i></a>${delBtn}</div></td>
+      </tr>`;
+    }).join('');
+    // Paginazione
+    const totPag = Math.ceil(n / _PANEL_PAGE);
+    const pg = document.getElementById('dcp-panel-pagination');
+    if (totPag <= 1) { if(pg) pg.style.display='none'; return; }
+    if(pg) pg.style.display='';
+    let html = `<button class="page-btn" onclick="DocsPanel._cambiaPanelPagina(${_panelPagina-1})" ${_panelPagina===1?'disabled':''}>&#8249;</button>`;
+    for (let i=1;i<=totPag;i++) html += `<button class="page-btn ${i===_panelPagina?'active':''}" onclick="DocsPanel._cambiaPanelPagina(${i})">${i}</button>`;
+    html += `<button class="page-btn" onclick="DocsPanel._cambiaPanelPagina(${_panelPagina+1})" ${_panelPagina===totPag?'disabled':''}>&#8250;</button>`;
+    if(pg) pg.innerHTML = html;
+  }
+
+  async function apri(assetId, assetNome) {
+    _panelAssetId   = assetId;
+    _panelAssetNome = assetNome;
+    _panelPagina    = 1;
+    _injectModals(1200);
+    _injectPanelOverlay();
+    const ov = document.getElementById('dcp-panel-overlay');
+    if (ov) ov.classList.add('open');
+    const titleEl = document.getElementById('dcp-panel-title');
+    if (titleEl) titleEl.textContent = assetNome ? `Documenti — ${assetNome}` : 'Documenti';
+    ['dcp-panel-search','dcp-panel-tipo'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    const tbody = document.getElementById('dcp-panel-tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
+    try {
+      const params = assetId ? { asset_id: assetId } : {};
+      _panelDati = await API.getDocuments(params);
+      _panelFiltrati = [..._panelDati];
+      _renderPanelTabella();
+    } catch (e) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="color:var(--accent-red);padding:16px">Errore: ${e.message}</td></tr>`;
+    }
+  }
+
+  function _chiudiPanel() {
+    const ov = document.getElementById('dcp-panel-overlay');
+    if (ov) ov.classList.remove('open');
+  }
+
+  function _panelFiltra() {
+    const q  = (document.getElementById('dcp-panel-search')?.value||'').toLowerCase();
+    const ti = document.getElementById('dcp-panel-tipo')?.value||'';
+    _panelFiltrati = _panelDati.filter(d => {
+      if (ti && (d.tipo_mime||'').indexOf(ti) === -1 && (d.nome_file||'').split('.').pop().toLowerCase() !== ti) return false;
+      if (q && !(d.nome_file||'').toLowerCase().includes(q)) return false;
+      return true;
+    });
+    _panelPagina = 1;
+    _renderPanelTabella();
+  }
+
+  function _cambiaPanelPagina(n) {
+    const tot = Math.ceil(_panelFiltrati.length / _PANEL_PAGE);
+    if (n < 1 || n > tot) return;
+    _panelPagina = n;
+    _renderPanelTabella();
+  }
+
+  function _apriUploadPanel() {
+    _opts = { assetId: _panelAssetId, assetNome: _panelAssetNome, zIndex: 1200, onSave: async () => await apri(_panelAssetId, _panelAssetNome), readonly: false };
+    _apriUpload();
+  }
+
+  async function _eliminaPanel(id, nomeFile) {
+    if (!confirm(`Eliminare il documento "${nomeFile}"?`)) return;
+    try {
+      await API.deleteDocument(id);
+      await apri(_panelAssetId, _panelAssetNome);
+    } catch (e) { alert('Errore: ' + e.message); }
+  }
+
   // ── API pubblica ──────────────────────────────────────────────────────────────
   function mount(containerEl, opts = {}) {
     _container = containerEl;
@@ -402,14 +554,20 @@ const DocsPanel = (() => {
   return {
     mount,
     refresh,
+    apri,
     _filtra,
+    _panelFiltra,
+    _cambiaPanelPagina,
     _apriUpload,
+    _apriUploadPanel,
     _onFileSelected,
     _onDrop,
     _eseguiUpload,
     _chiudiUpload,
+    _chiudiPanel,
     _apriPdf,
     _chiudiPdf,
     _elimina,
+    _eliminaPanel,
   };
 })();
