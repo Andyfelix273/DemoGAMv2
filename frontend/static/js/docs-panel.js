@@ -190,7 +190,7 @@ const DocsPanel = (() => {
     const q    = (document.getElementById(_uid + '_q')?.value   || '').toLowerCase();
     const tipo = (document.getElementById(_uid + '_tipo')?.value || '');
     _listaFiltrata = _lista.filter(doc => {
-      if (tipo && _tipoDoc(doc.mime_type, doc.nome_file) !== tipo) return false;
+      if (tipo && _tipoDoc(doc.tipo_mime, doc.nome_file) !== tipo) return false;
       if (q && ![doc.nome_file, doc.caricato_da, doc.asset_nome]
         .some(v => (v || '').toLowerCase().includes(q))) return false;
       return true;
@@ -211,18 +211,18 @@ const DocsPanel = (() => {
       return;
     }
     tbody.innerHTML = _listaFiltrata.map(doc => {
-      const pdfPreview = isPdf(doc.mime_type, doc.nome_file)
+      const pdfPreview = isPdf(doc.tipo_mime, doc.nome_file)
         ? `<button class="btn-icon" title="Anteprima PDF" onclick="DocsPanel._apriPdf(${doc.id}, '${(doc.nome_file || '').replace(/'/g, "\\'")}')"><i class="fa fa-eye"></i></button>`
         : '';
       return `
         <tr>
-          <td>${mimeBadge(doc.mime_type, doc.nome_file)}</td>
+          <td>${mimeBadge(doc.tipo_mime, doc.nome_file)}</td>
           <td class="col-titolo">
             <div class="cell-ellipsis" title="${doc.nome_file || ''}">${doc.nome_file || '—'}</div>
             ${!_opts.assetId ? `<div class="cell-sub">${doc.asset_nome || ''}</div>` : ''}
           </td>
-          <td class="cell-sm text-muted">${fmtDim(doc.dimensione_bytes)}</td>
-          <td class="cell-sm">${fmtData(doc.data_caricamento)}</td>
+          <td class="cell-sm text-muted">${fmtDim(doc.dimensione)}</td>
+          <td class="cell-sm">${fmtData(doc.created_at)}</td>
           <td class="cell-sm text-muted">${doc.caricato_da || '—'}</td>
           <td>
             <div class="row-actions">
@@ -267,8 +267,8 @@ const DocsPanel = (() => {
         <span class="record-count" id="${_uid}_count">${n} document${n === 1 ? 'o' : 'i'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
         ${canUpload ? `<button class="btn btn-primary" onclick="DocsPanel._apriUpload()"><i class="fa fa-upload"></i> Carica documento</button>` : ''}
       </div>
-      <div style="overflow-x:auto">
-        <table class="data-table" style="width:100%">
+      <div class="table-wrap">
+        <table class="bems-table">
           <thead>
             <tr>
               <th style="width:80px">Tipo</th>

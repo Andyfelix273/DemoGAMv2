@@ -1518,7 +1518,13 @@ def stats_documenti(
 def lista_documenti(asset_id: int, db=Depends(get_db), _=Depends(richiedi_permesso("documents.read"))):
     """Lista documenti allegati a un asset."""
     rows = db.execute(
-        "SELECT * FROM documents WHERE asset_id=%s ORDER BY created_at DESC",
+        """
+        SELECT d.*, a.codice AS asset_codice, a.nome AS asset_nome, a.tipo AS asset_tipo
+        FROM documents d
+        LEFT JOIN assets a ON a.id = d.asset_id
+        WHERE d.asset_id=%s
+        ORDER BY d.created_at DESC
+        """,
         (asset_id,)
     ).fetchall()
     return [dict(r) for r in rows]
