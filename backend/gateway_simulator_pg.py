@@ -63,10 +63,10 @@ PLANTS = [
     ("IMP-MAIN-MTR", None,   None,       "contatore"),
     ("IMP-P4-HVAC",  "P4",   None,       "hvac"),
     ("IMP-P4-LUX",   "P4",   None,       "illuminazione"),
-    ("IMP-P4-SUB",   "P4",   None,       "contatore"),
+    ("IMP-P4-SUB",   "P4",   None,       "altri_carichi"),
     ("IMP-P5-HVAC",  "P5",   None,       "hvac"),
     ("IMP-P5-LUX",   "P5",   None,       "illuminazione"),
-    ("IMP-P5-SUB",   "P5",   None,       "contatore"),
+    ("IMP-P5-SUB",   "P5",   None,       "altri_carichi"),
     ("IMP-CED",      None,   None,       "ced"),
     ("IMP-SERV-EM",  None,   None,       "servizi_em"),
 ]
@@ -80,6 +80,7 @@ BASELINE_KW = {
     "generatore":     0.0,
     "ced":            8.5,   # Piccolo CED: 4-5 server (1.2kW cad) + storage (1kW) + switch (0.3kW) + condizionatore (2kW)
     "servizi_em":    12.0,   # Servizi Elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
+    "altri_carichi":  7.0,   # Altri carichi: prese, stampanti, caricatori, piccoli elettrodomestici
 }
 
 # ── Funzioni di simulazione ─────────────────────────────────────────────────
@@ -172,6 +173,14 @@ def simula_impianto(plant_id: str, floor_id: str, tipo: str, ts: datetime) -> di
         if 0 <= ora < 5:
             factor += random.uniform(0, 0.05)   # +0-5% per batch notturni
         power = baseline * max(0.80, min(1.05, factor))
+    elif tipo == "altri_carichi":
+        # Prese, stampanti, caricatori, attrezzature varie
+        # Seguono l'orario lavorativo ma con baseline minima sempre presente (stand-by)
+        if is_working:
+            factor = 0.55 + random.uniform(0, 0.35)  # 55-90% in orario (molto variabile)
+        else:
+            factor = 0.08 + random.uniform(0, 0.07)  # 8-15% fuori orario (stand-by)
+        power = baseline * factor
     elif tipo == "servizi_em":
         # Servizi elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
         # Picco in orario lavorativo (ascensori, pompe circolazione), minimo notturno

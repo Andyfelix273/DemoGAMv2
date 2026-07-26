@@ -691,8 +691,8 @@ def popola_bems(conn):
         (asset_id, "P4", None, "IMP-P4-LUX",   "Illuminazione P4",          "illuminazione", "Philips",  "HUE-PRO",  2021, "operativo", 12.0),
         (asset_id, "P5", None, "IMP-P5-LUX",   "Illuminazione P5",          "illuminazione", "Philips",  "HUE-PRO",  2021, "operativo", 10.0),
         (asset_id, None, None, "IMP-MAIN-MTR", "Contatore Principale",       "contatore",     "ABB",      "B23-312",  2019, "operativo", None),
-        (asset_id, "P4", None, "IMP-P4-SUB",   "Sub-meter Piano 4",         "contatore",     "ABB",      "B21-213",  2019, "operativo", None),
-        (asset_id, "P5", None, "IMP-P5-SUB",   "Sub-meter Piano 5",         "contatore",     "ABB",      "B21-213",  2020, "operativo", None),
+        (asset_id, "P4", None, "IMP-P4-SUB",   "Altri carichi P4",          "altri_carichi", "ABB",      "B21-213",  2019, "operativo",  8.0),
+        (asset_id, "P5", None, "IMP-P5-SUB",   "Altri carichi P5",          "altri_carichi", "ABB",      "B21-213",  2020, "operativo",  6.0),
         (asset_id, None, None, "IMP-CED",      "CED (Data Center)",          "ced",           "Dell",     "PowerEdge",2022, "operativo",  8.5),
         (asset_id, None, None, "IMP-SERV-EM",  "Servizi Elettromeccanici",   "servizi_em",    "Schneider","EcoStruxure",2021,"operativo",12.0),
     ]
