@@ -106,7 +106,7 @@
       <!-- Grafico trend consumi — full width, multi-linea per impianto -->
       <div class="es-section">
         <div class="es-section-title">
-          <i class="fa fa-bolt"></i>Trend consumi mensili per impianto (kWh)
+          <i class="fa fa-bolt"></i>Trend consumi mensili — asset con telemetria IoT (kWh)
           <span id="trend-letture" style="font-weight:400;color:var(--text-muted);margin-left:8px;font-size:10px;"></span>
         </div>
         <div class="es-trend-chart" id="chart-trend-kwh"></div>
@@ -243,9 +243,8 @@
           <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
         </div>` : ''}`;
 
-      // ── Trend consumi: multi-linea per asset (come screenshot) ───────────────
-      // Recupera trend per tutti gli asset con dati
-      const assetsConDati = (port.ranking_asset || []).filter(a => a.kwh_mese > 0);
+      // ── Trend consumi: multi-linea — solo asset con telemetria reale ────────────
+      const assetsConDati = (port.ranking_asset || []).filter(a => a.has_telemetry && a.kwh_mese > 0);
       if (assetsConDati.length > 0) {
         const trendPromises = assetsConDati.map(a =>
           fetch(`/api/efficiency/${a.asset_id}/trend?mesi=${mesi}`, { headers: AUTH })
@@ -281,7 +280,7 @@
           }), plotCfg);
       } else {
         document.getElementById('chart-trend-kwh').innerHTML =
-          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Dati non disponibili</div>';
+          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-satellite-dish" style="margin-right:8px;"></i>Nessun asset con telemetria IoT attiva nel portafoglio</div>';
       }
 
       // ── Ranking EUI — lollipop orizzontale ───────────────────────────────────

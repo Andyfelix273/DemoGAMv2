@@ -705,6 +705,7 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
                 "eui": eui,
                 "eui_class": eui_class,
                 "energy_class_certificata": a["energy_class"],
+                "has_telemetry": use_telemetry,
             })
 
         # Ordina per EUI decrescente (peggiori in cima)
