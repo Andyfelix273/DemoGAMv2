@@ -1241,38 +1241,46 @@ a.module-card:hover {
 /* KPI card energetica */
 .ee-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .ee-kpi-card {
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
+  border-top: 2px solid var(--accent-blue);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
+.ee-kpi-card.accent-orange { border-top-color: var(--accent-orange); }
+.ee-kpi-card.accent-green  { border-top-color: var(--accent-green); }
+.ee-kpi-card.accent-red    { border-top-color: var(--accent-red); }
 .ee-kpi-card-label {
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ee-kpi-card-value {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.1;
+  white-space: nowrap;
 }
 .ee-kpi-card-unit {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: 1px;
 }
 .ee-kpi-card-delta {
-  font-size: 11px;
-  margin-top: 4px;
+  font-size: 10px;
+  margin-top: 3px;
   font-weight: 600;
 }
 .ee-kpi-card-delta.up   { color: #E74C3C; }
@@ -1281,14 +1289,14 @@ a.module-card:hover {
 
 /* Sezione titolo interna alla tab */
 .ee-section-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text-muted);
-  padding: 10px 0 6px;
+  padding: 8px 0 5px;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 /* Label sopra ogni grafico */
@@ -1304,12 +1312,12 @@ a.module-card:hover {
 /* Contenitore grafico con altezza fissa */
 .ee-chart {
   width: 100%;
-  height: 220px;
+  height: 190px;
   position: relative;
 }
 .ee-chart-lg {
   width: 100%;
-  height: 280px;
+  height: 240px;
   position: relative;
 }
 
@@ -1317,8 +1325,8 @@ a.module-card:hover {
 .ee-chart-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 @media (max-width: 900px) {
   .ee-chart-row { grid-template-columns: 1fr; }
@@ -1345,15 +1353,16 @@ a.module-card:hover {
 .ee-info-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
-  padding: 8px 0;
+  padding: 6px 0 8px;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 10px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 .ee-info-row strong { color: var(--text-primary); }
+.ee-info-row span { display: flex; align-items: center; gap: 4px; }
 
 /* Placeholder "no data" */
 .ee-no-data {
@@ -1435,3 +1444,31 @@ a.module-card:hover {
   height: 300px;
   position: relative;
 }
+
+/* ─── Modale dettaglio asset — tab Consumi ──────────────────────────────────*/
+.edm-consumi-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.edm-chart-wrap {
+  width: 100%;
+  height: 230px;
+  position: relative;
+}
+.edm-status-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.bems-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.bems-select:focus { outline: none; border-color: var(--accent-blue); }

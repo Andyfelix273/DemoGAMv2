@@ -291,17 +291,16 @@ async function apriDettaglioAsset(id) {
 
     // ── Consumi ────────────────────────────────────────────────
     document.getElementById('edm-panel-consumi').innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-        <select id="edm-consumi-ore" style="background:var(--bg-secondary,#0A1628);border:1px solid var(--border,#1E3A5F);
-          color:var(--text-primary,#E0F0FF);padding:4px 8px;border-radius:6px;font-size:12px;">
+      <div class="edm-consumi-toolbar">
+        <select id="edm-consumi-ore" class="bems-select">
           <option value="24">Ultime 24 ore</option>
           <option value="168" selected>Ultima settimana</option>
           <option value="720">Ultimo mese</option>
         </select>
-        <span id="edm-consumi-status" style="font-size:11px;color:var(--text-secondary,#7BAFC4);">Caricamento…</span>
+        <span id="edm-consumi-status" class="edm-status-label">Caricamento…</span>
       </div>
-      <div id="edm-consumi-chart" style="width:100%;height:220px;"></div>
-      <div id="edm-consumi-kpi" class="edm-kpi-grid" style="margin-top:12px;"></div>`;
+      <div id="edm-consumi-chart" class="edm-chart-wrap"></div>
+      <div id="edm-consumi-kpi" class="kpi-strip" style="margin-top:10px;"></div>`;
     _edmCaricaConsumi(id, 168);
     document.getElementById('edm-consumi-ore').addEventListener('change', (e) => {
       _edmCaricaConsumi(id, parseInt(e.target.value));
@@ -389,37 +388,52 @@ async function _edmCaricaConsumi(assetId, ore) {
     const max    = Math.max(...readings.map(r => r.valore || 0));
 
     if (kpiEl) kpiEl.innerHTML = `
-      ${kwIstantaneo > 0 ? `<div class="edm-kpi-card" style="border-color:#F39C12"><div class="edm-kpi-val" style="color:#F39C12">${kwIstantaneo.toFixed(1)}</div><div class="edm-kpi-lbl"><i class="fa fa-bolt"></i> kW ora</div></div>` : ''}
-      <div class="edm-kpi-card"><div class="edm-kpi-val">${totale.toFixed(0)}</div><div class="edm-kpi-lbl">Totale ${readings[0]?.unita || 'kWh'}</div></div>
-      <div class="edm-kpi-card"><div class="edm-kpi-val">${media.toFixed(1)}</div><div class="edm-kpi-lbl">Media lettura</div></div>
-      <div class="edm-kpi-card"><div class="edm-kpi-val">${max.toFixed(1)}</div><div class="edm-kpi-lbl">Picco max</div></div>
-      ${tempMedia > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${tempMedia.toFixed(1)}°C</div><div class="edm-kpi-lbl">Temp. media</div></div>` : ''}
-      ${co2Media  > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${co2Media.toFixed(0)}</div><div class="edm-kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+      ${kwIstantaneo > 0 ? `<div class="kpi-card warning"><div class="kpi-val">${kwIstantaneo.toFixed(1)}</div><div class="kpi-lbl"><i class="fa fa-bolt"></i> kW ora</div></div>` : ''}
+      <div class="kpi-card"><div class="kpi-val">${totale.toFixed(0)}</div><div class="kpi-lbl">Totale ${readings[0]?.unita || 'kWh'}</div></div>
+      <div class="kpi-card"><div class="kpi-val">${media.toFixed(1)}</div><div class="kpi-lbl">Media lettura</div></div>
+      <div class="kpi-card"><div class="kpi-val">${max.toFixed(1)}</div><div class="kpi-lbl">Picco max</div></div>
+      ${tempMedia > 0 ? `<div class="kpi-card info"><div class="kpi-val">${tempMedia.toFixed(1)}°C</div><div class="kpi-lbl">Temp. media</div></div>` : ''}
+      ${co2Media  > 0 ? `<div class="kpi-card"><div class="kpi-val">${co2Media.toFixed(0)}</div><div class="kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
 
     if (statusEl) statusEl.textContent = `${readings.length} letture`;
 
     if (typeof Plotly !== 'undefined') {
       const tipi   = [...new Set(readings.map(r => r.tipo || r.label || 'Energia'))];
       const colori = ['#3498DB','#27AE60','#F39C12','#9B59B6','#E74C3C'];
-      const traces = tipi.map((tipo, idx) => {
-        const dati = readings.filter(r => (r.tipo || r.label || 'Energia') === tipo);
-        return { x: dati.map(r => r.ts), y: dati.map(r => r.valore), name: tipo,
-                 type:'scatter', mode:'lines', line:{ color: colori[idx % colori.length], width:2 } };
-      });
       const isDark = (localStorage.getItem('gam_tema') || 'dark') !== 'light';
+      // Aggrega per ora per ridurre il rumore visivo
+      function aggPerOra(dati) {
+        const bucket = {};
+        dati.forEach(r => {
+          const d = new Date(r.ts);
+          const k = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()).toISOString();
+          if (!bucket[k]) bucket[k] = { sum: 0, n: 0 };
+          bucket[k].sum += (r.valore || 0);
+          bucket[k].n++;
+        });
+        return Object.entries(bucket).sort(([a],[b]) => a < b ? -1 : 1)
+          .map(([k, v]) => ({ ts: k, valore: v.sum / v.n }));
+      }
+      const traces = tipi.map((tipo, idx) => {
+        const raw  = readings.filter(r => (r.tipo || r.label || 'Energia') === tipo);
+        const dati = ore <= 48 ? raw : aggPerOra(raw);
+        return { x: dati.map(r => r.ts), y: dati.map(r => r.valore), name: tipo,
+                 type:'scatter', mode:'lines', fill: tipi.length === 1 ? 'tozeroy' : 'none',
+                 line:{ color: colori[idx % colori.length], width: tipi.length === 1 ? 1.5 : 2 },
+                 fillcolor: tipi.length === 1 ? colori[0] + '22' : undefined };
+      });
       const layout = {
         paper_bgcolor:'transparent', plot_bgcolor:'transparent',
         font:{ color: isDark ? '#7BAFC4' : '#57606a', size:10, family:'Inter,sans-serif' },
-        xaxis:{ gridcolor: isDark ? '#1E3A5F' : '#d0d7de' },
-        yaxis:{ gridcolor: isDark ? '#1E3A5F' : '#d0d7de', title:{ text: readings[0]?.unita || 'kWh', font:{size:10} } },
-        margin:{ t:10, r:10, b:40, l:50 },
-        legend:{ orientation:'h', y:-0.25, font:{size:10} },
+        xaxis:{ gridcolor: isDark ? '#1E3A5F' : '#d0d7de', tickfont:{size:9} },
+        yaxis:{ gridcolor: isDark ? '#1E3A5F' : '#d0d7de', tickfont:{size:9},
+                title:{ text: readings[0]?.unita || 'kWh', font:{size:9} } },
+        margin:{ t:6, r:8, b:tipi.length > 1 ? 50 : 30, l:44 },
+        legend:{ orientation:'h', y:-0.22, font:{size:9}, bgcolor:'transparent' },
         showlegend: tipi.length > 1
       };
-      // Ritardo per attendere che la modale sia completamente visibile prima di misurare la larghezza
       setTimeout(() => {
         Plotly.newPlot(chartEl, traces, layout, { responsive:true, displayModeBar:false });
-        // Forza un resize dopo il render per occupare tutta la larghezza disponibile
         setTimeout(() => { if (chartEl._fullLayout) Plotly.relayout(chartEl, {}); }, 50);
       }, 80);
     } else {
@@ -1691,20 +1705,21 @@ async function _edmCaricaEfficienza(assetId) {
       </div>`;
 
     // ── Sezione 2: KPI Sintesi (E-1…E-6) ─────────────────────────────────
+    const offOk = kpi.pct_fuori_orario !== null && kpi.pct_fuori_orario < 15;
     const kpiCards = `
       <div class="ee-kpi-grid">
         <div class="ee-kpi-card">
-          <div class="ee-kpi-card-label">Costo energetico mese</div>
+          <div class="ee-kpi-card-label">Costo energetico</div>
           <div class="ee-kpi-card-value">€ ${fmtInt(kpi.costo_mese_eur)}</div>
-          <div class="ee-kpi-card-unit">solo elettricità</div>
+          <div class="ee-kpi-card-unit">mese · solo elettricità</div>
           ${kpi.trend_vs_mese_prec_pct !== null ? `<div class="ee-kpi-card-delta ${trendClass(kpi.trend_vs_mese_prec_pct)}">${trendIcon(kpi.trend_vs_mese_prec_pct)} ${fmt(Math.abs(kpi.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
         <div class="ee-kpi-card">
           <div class="ee-kpi-card-label">Costo per m²</div>
           <div class="ee-kpi-card-value">€ ${fmt(kpi.costo_mq_eur, 2)}</div>
-          <div class="ee-kpi-card-unit">€/m² mese corrente</div>
+          <div class="ee-kpi-card-unit">€/m² · mese corrente</div>
         </div>
-        <div class="ee-kpi-card">
+        <div class="ee-kpi-card accent-orange">
           <div class="ee-kpi-card-label">Consumi mese</div>
           <div class="ee-kpi-card-value">${fmtInt(kpi.kwh_mese)}</div>
           <div class="ee-kpi-card-unit">kWh</div>
@@ -1712,22 +1727,22 @@ async function _edmCaricaEfficienza(assetId) {
         <div class="ee-kpi-card">
           <div class="ee-kpi-card-label">CO₂ equivalente</div>
           <div class="ee-kpi-card-value">${fmtInt(kpi.co2_kg_mese)}</div>
-          <div class="ee-kpi-card-unit">kg CO₂ mese</div>
+          <div class="ee-kpi-card-unit">kg CO₂ · mese</div>
         </div>
         ${kpi.pct_fuori_orario !== null ? `
-        <div class="ee-kpi-card">
+        <div class="ee-kpi-card ${offOk ? 'accent-green' : 'accent-red'}">
           <div class="ee-kpi-card-label">Fuori orario</div>
-          <div class="ee-kpi-card-value">${fmt(kpi.pct_fuori_orario)}%</div>
+          <div class="ee-kpi-card-value" style="color:${offOk ? 'var(--accent-green)' : '#E74C3C'}">${fmt(kpi.pct_fuori_orario)}%</div>
           <div class="ee-kpi-card-unit">dei consumi mensili</div>
         </div>` : ''}
         ${kpi.allarmi_energetici_attivi > 0 ? `
-        <div class="ee-kpi-card" style="border-color:rgba(231,76,60,0.4);">
+        <div class="ee-kpi-card accent-red">
           <div class="ee-kpi-card-label">Allarmi energetici</div>
           <div class="ee-kpi-card-value" style="color:#E74C3C;">${kpi.allarmi_energetici_attivi}</div>
           <div class="ee-kpi-card-unit">attivi non risolti</div>
         </div>` : ''}
-        <div class="ee-kpi-card">
-          <div class="ee-kpi-card-label">EUI · Classe ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''}</div>
+        <div class="ee-kpi-card accent-green">
+          <div class="ee-kpi-card-label">EUI · Cl. ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''}</div>
           ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata)}
           <div class="ee-kpi-card-unit">${fmt(kpi.eui_kwh_mq_anno)} kWh/m²/anno</div>
         </div>
