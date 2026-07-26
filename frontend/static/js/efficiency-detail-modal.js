@@ -170,7 +170,11 @@
   border-top-color:var(--accent-blue,#00A3E0);border-radius:50%;
   animation:edm-spin 0.8s linear infinite;flex-shrink:0;
 }
-.edm-inv-disambig-row {
+  .edm-inv-wrong-asset {
+    border-left: 3px solid var(--accent-red, #E74C3C);
+    background: rgba(248,81,73,0.06);
+  }
+  .edm-inv-disambig-row {
   background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.3);
   border-radius:6px;padding:10px 12px;margin-bottom:6px;font-size:12px;
 }
@@ -969,6 +973,7 @@ async function _edmCaricaBollette(assetId) {
       ready:                '<span class="badge badge-completato">Pronto</span>',
       processing:           '<span class="badge badge-in_corso">Elaborazione…</span>',
       needs_disambiguation: '<span class="badge badge-manutenzione">Da abbinare</span>',
+      wrong_asset:          '<span class="badge badge-scaduta">Asset errato</span>',
       error:                '<span class="badge badge-scaduta">Errore</span>',
     };
     return map[status] || `<span class="badge">${status}</span>`;
@@ -1020,16 +1025,14 @@ async function _edmCaricaBollette(assetId) {
   }).join('');
 
   // ── 2. Forniture attive ──────────────────────────────────────────────
-  const spBySupplier = {};
-  supplyPoints.forEach(sp => {
-    const key = sp.supplier_name || 'Senza fornitore';
-    if (!spBySupplier[key]) spBySupplier[key] = [];
-    spBySupplier[key].push(sp);
-  });
-
+  // Le forniture vengono create automaticamente al caricamento della prima bolletta.
+  // Questa sezione mostra le forniture rilevate e permette di gestirle.
   let spHtml = '';
   if (supplyPoints.length === 0) {
-    spHtml = `<div class="edm-inv-empty"><i class="fa fa-plug"></i><br>Nessuna fornitura configurata.<br>
+    spHtml = `<div class="edm-inv-empty"><i class="fa fa-plug"></i><br>
+      Nessuna fornitura configurata.<br>
+      <small style="color:var(--text-muted)">Le forniture vengono create automaticamente al caricamento della prima bolletta.<br>
+      In alternativa è possibile aggiungerle manualmente.</small><br>
       ${canManage ? `<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="_edmApriModaleNuovaFornitura(${assetId})"><i class="fa fa-plus"></i> Aggiungi fornitura</button>` : ''}</div>`;
   } else {
     spHtml = `
@@ -1071,7 +1074,22 @@ async function _edmCaricaBollette(assetId) {
       <span>Estrazione AI in corso: <strong>${i.original_filename || 'bolletta.pdf'}</strong></span>
     </div>`).join('');
 
-  // ── 4. Bollette da disambiguare ──────────────────────────────────────
+  // ── 4. Bollette con avvisi (wrong_asset + needs_disambiguation) ──────
+  const wrongAsset = invoices.filter(i => i.extraction_status === 'wrong_asset');
+  const wrongAssetHtml = wrongAsset.map(i => `
+    <div class="edm-inv-disambig-row edm-inv-wrong-asset">
+      <div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <i class="fa fa-triangle-exclamation" style="color:var(--accent-red,#E74C3C);margin-top:2px"></i>
+        <div>
+          <strong>Bolletta caricata sull'asset sbagliato</strong><br>
+          <span style="font-size:12px;color:var(--text-muted)">${i.original_filename || 'bolletta.pdf'} — ${i.llm_notes || ''}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        ${canManage ? `<button class="btn btn-secondary btn-sm" onclick="_edmEliminaBolletta(${assetId},'${i.invoice_id}')"><i class="fa fa-trash"></i> Scarta</button>` : ''}
+      </div>
+    </div>`).join('');
+
   const disambig = invoices.filter(i => i.extraction_status === 'needs_disambiguation');
   const disambigHtml = disambig.map(i => {
     const spOptions = supplyPoints
@@ -1105,7 +1123,9 @@ async function _edmCaricaBollette(assetId) {
       <div class="edm-inv-table-wrap">
         <table class="edm-inv-table">
           <thead><tr>
-            <th>Commodity</th><th>Periodo</th><th>Importo</th>
+            <th>Commodity</th><th>Periodo</th>
+            <th title="Importo totale della bolletta (IVA inclusa)">Importo totale</th>
+            <th title="Costi diversi dalla quota materia prima: trasporto, distribuzione, oneri generali, accise, imposte">Quota oneri</th>
             <th>Consumo</th><th>€/Unità</th><th>Fornitore</th>
             <th>Metodo</th><th>Stato</th>
             ${canManage ? '<th></th>' : ''}
@@ -1119,7 +1139,8 @@ async function _edmCaricaBollette(assetId) {
               return `<tr>
                 <td><i class="fa ${meta.icon || 'fa-bolt'}" style="color:${meta.color || ''};margin-right:4px"></i>${meta.label || i.commodity}</td>
                 <td style="white-space:nowrap">${periodo}</td>
-                <td style="white-space:nowrap">${i.total_amount_eur ? '€ ' + fmtNum(i.total_amount_eur) : '–'}</td>
+                <td style="white-space:nowrap" title="Importo totale bolletta IVA inclusa">${i.total_amount_eur ? '€ ' + fmtNum(i.total_amount_eur) : '–'}</td>
+                <td style="white-space:nowrap" title="Costi diversi dalla quota materia prima">${i.quota_oneri_eur != null ? '€ ' + fmtNum(i.quota_oneri_eur) : '–'}</td>
                 <td style="white-space:nowrap">${i.consumption_quantity ? fmtNum(i.consumption_quantity, 0) + ' ' + (i.consumption_unit || '') : '–'}</td>
                 <td style="white-space:nowrap">${fmtEur(i.unit_cost_eur)}</td>
                 <td>${i.supplier_name || '–'}</td>
@@ -1155,6 +1176,7 @@ async function _edmCaricaBollette(assetId) {
       </div>` : ''}
     </div>
     ${processingHtml}
+    ${wrongAssetHtml}
     ${disambigHtml}
     ${storicoHtml}`;
 }
@@ -1357,8 +1379,16 @@ function _edmApriFormManualeBolletta(assetId) {
               <input type="date" id="edm-inv-m-period-to">
             </div>
             <div class="form-group">
-              <label>Importo totale (€) *</label>
+              <label title="Importo totale della bolletta, IVA inclusa">Importo totale (€) *
+                <i class="fa fa-circle-info" style="font-size:11px;color:var(--text-muted);margin-left:3px" title="Inserire il totale della bolletta comprensivo di IVA, trasporto, oneri e accise"></i>
+              </label>
               <input type="number" id="edm-inv-m-amount" step="0.01" placeholder="es. 412.50">
+            </div>
+            <div class="form-group">
+              <label title="Costi diversi dalla quota materia prima">Quota oneri (€)
+                <i class="fa fa-circle-info" style="font-size:11px;color:var(--text-muted);margin-left:3px" title="Costi diversi dalla quota materia prima: trasporto, distribuzione, oneri generali, accise, imposte. Lasciare vuoto se non disponibile."></i>
+              </label>
+              <input type="number" id="edm-inv-m-oneri" step="0.01" placeholder="es. 85.20 (opzionale)">
             </div>
             <div class="form-group">
               <label>Consumo *</label>
@@ -1393,6 +1423,8 @@ async function _edmSalvaManualeBolletta() {
   const assetId = m._assetId;
   const commodity    = document.getElementById('edm-inv-m-commodity').value;
   const amount       = parseFloat(document.getElementById('edm-inv-m-amount').value);
+  const oneriRaw     = document.getElementById('edm-inv-m-oneri').value;
+  const oneri        = oneriRaw ? parseFloat(oneriRaw) : null;
   const consumption  = parseFloat(document.getElementById('edm-inv-m-consumption').value);
   const unit         = document.getElementById('edm-inv-m-unit').value;
   const issueDate    = document.getElementById('edm-inv-m-issue-date').value;
@@ -1421,7 +1453,8 @@ async function _edmSalvaManualeBolletta() {
       body: JSON.stringify({
         commodity, invoice_number: invNumber || null,
         issue_date: issueDate || null, period_from: periodFrom || null, period_to: periodTo || null,
-        total_amount_eur: amount, consumption_quantity: consumption,
+        total_amount_eur: amount, quota_oneri_eur: oneri,
+        consumption_quantity: consumption,
         consumption_unit: unit, unit_cost_eur: unitCost
       })
     });

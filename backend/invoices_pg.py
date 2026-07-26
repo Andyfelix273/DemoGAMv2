@@ -116,6 +116,7 @@ def migrate_invoices_schema(database_url: str = None):
                 period_from             DATE,
                 period_to               DATE,
                 total_amount_eur        NUMERIC(10,2),
+                quota_oneri_eur         NUMERIC(10,2),
                 consumption_quantity    NUMERIC(12,4),
                 consumption_unit        VARCHAR(10),
                 unit_cost_eur           NUMERIC(10,6),
@@ -123,7 +124,7 @@ def migrate_invoices_schema(database_url: str = None):
                                         CHECK (extraction_method IN ('LLM_EXTRACTED','MANUAL','LLM_CORRECTED')),
                 extraction_confidence   FLOAT,
                 extraction_status       VARCHAR(20)   NOT NULL DEFAULT 'ready'
-                                        CHECK (extraction_status IN ('processing','ready','needs_disambiguation','error')),
+                                        CHECK (extraction_status IN ('processing','ready','needs_disambiguation','wrong_asset','error')),
                 file_path               VARCHAR(500),
                 original_filename       VARCHAR(255),
                 is_multiutility_source  BOOLEAN       NOT NULL DEFAULT FALSE,
@@ -147,6 +148,24 @@ def migrate_invoices_schema(database_url: str = None):
                 PRIMARY KEY (asset_id, commodity)
             );
         """)
+
+        # Migrazioni per DB già esistenti
+        for col_sql in [
+            "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS quota_oneri_eur NUMERIC(10,2)",
+        ]:
+            try:
+                cur.execute(col_sql)
+            except Exception:
+                pass
+        # Aggiorna il CHECK constraint extraction_status per aggiungere wrong_asset
+        try:
+            cur.execute("""
+                ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_extraction_status_check;
+                ALTER TABLE invoices ADD CONSTRAINT invoices_extraction_status_check
+                    CHECK (extraction_status IN ('processing','ready','needs_disambiguation','wrong_asset','error'));
+            """)
+        except Exception:
+            pass
 
         cur.close()
         conn.close()
@@ -355,10 +374,16 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
             "Sei un assistente specializzato nell'analisi di bollette energetiche italiane. "
             "Il tuo compito è estrarre informazioni economiche precise dal documento fornito.\n\n"
             "ISTRUZIONI CRITICHE:\n"
-            "- Il campo unit_cost_eur deve rappresentare il costo TOTALE per unità consumata, "
-            "ottenuto dividendo l'importo totale (IVA inclusa) per la quantità consumata. "
-            "Deve includere TUTTE le voci: materia prima, trasporto, oneri di sistema, accise e IVA. "
+            "- total_amount_eur: importo TOTALE della bolletta (IVA inclusa). "
+            "È la somma di tutte le voci presenti in fattura, incluse materia prima, "
+            "trasporto, oneri di sistema, accise e IVA.\n"
+            "- quota_oneri_eur: importo relativo agli oneri di sistema e alle componenti "
+            "diverse dalla quota materia prima (es. trasporto, distribuzione, oneri generali, "
+            "accise, imposte). Se non identificabile separatamente, imposta null.\n"
+            "- unit_cost_eur: costo TOTALE per unità consumata, ottenuto dividendo "
+            "total_amount_eur per la quantità consumata. Deve includere TUTTE le voci. "
             "NON usare solo il prezzo della materia energia.\n"
+            "- point_code: codice POD (elettricità), PDR (gas) o matricola contatore (acqua).\n"
             "- Se il documento contiene più commodity (es. elettricità E gas nella stessa fattura), "
             "restituisci un oggetto separato nell'array items per ciascuna commodity.\n"
             "- Se non riesci a determinare un valore con certezza, imposta confidence < 0.60 "
@@ -387,6 +412,7 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                                     "period_from":          {"type": ["string", "null"]},
                                     "period_to":            {"type": ["string", "null"]},
                                     "total_amount_eur":     {"type": ["number", "null"]},
+                                    "quota_oneri_eur":      {"type": ["number", "null"]},
                                     "consumption_quantity": {"type": ["number", "null"]},
                                     "consumption_unit":     {"type": ["string", "null"]},
                                     "unit_cost_eur":        {"type": ["number", "null"]},
@@ -396,7 +422,8 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                                 "required": [
                                     "commodity", "supplier_name", "point_code",
                                     "invoice_number", "issue_date", "period_from", "period_to",
-                                    "total_amount_eur", "consumption_quantity", "consumption_unit",
+                                    "total_amount_eur", "quota_oneri_eur",
+                                    "consumption_quantity", "consumption_unit",
                                     "unit_cost_eur", "confidence", "notes"
                                 ],
                                 "additionalProperties": False,
@@ -440,6 +467,10 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
         if not inv_orig:
             cur.close(); conn.close(); return
 
+        # Recupera i dati dell'asset per la validazione cross-asset
+        cur.execute("SELECT id, nome, codice FROM assets WHERE id=%s", (asset_id,))
+        asset_row = cur.fetchone()
+
         # Recupera le supply_points attive dell'asset per il matching
         cur.execute("""
             SELECT sp.supply_point_id, sp.commodity, sp.point_code
@@ -448,18 +479,80 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
         """, (asset_id,))
         sp_list = cur.fetchall()
 
-        def _match_sp(commodity: str, point_code: str):
-            """Restituisce supply_point_id o None."""
-            # Priorità 1: match per point_code
+        def _check_cross_asset(point_code: str):
+            """Verifica se il POD/PDR appartiene già a un altro asset. Restituisce (asset_id_altro, nome_altro) o (None, None)."""
+            if not point_code:
+                return None, None
+            cur.execute("""
+                SELECT sp.asset_id, a.nome, a.codice
+                FROM supply_points sp
+                JOIN assets a ON a.id = sp.asset_id
+                WHERE sp.point_code = %s AND sp.asset_id != %s AND sp.is_active = TRUE
+                LIMIT 1
+            """, (point_code.strip(), asset_id))
+            row = cur.fetchone()
+            if row:
+                return row["asset_id"], f"{row['codice']} - {row['nome']}"
+            return None, None
+
+        def _auto_crea_supply_point(commodity: str, point_code: str, supplier_name: str):
+            """Crea automaticamente fornitura e fornitore se non esistono. Restituisce supply_point_id."""
+            # Trova o crea il fornitore
+            sup_name = (supplier_name or "Fornitore sconosciuto").strip()[:200]
+            cur.execute("SELECT supplier_id FROM suppliers WHERE asset_id=%s AND name=%s",
+                        (asset_id, sup_name))
+            sup_row = cur.fetchone()
+            if sup_row:
+                supplier_id = sup_row["supplier_id"]
+            else:
+                cur.execute("""
+                    INSERT INTO suppliers (asset_id, name, notes)
+                    VALUES (%s, %s, 'Creato automaticamente da estrazione bolletta')
+                    RETURNING supplier_id
+                """, (asset_id, sup_name))
+                supplier_id = cur.fetchone()["supplier_id"]
+            # Crea supply_point
+            cur.execute("""
+                INSERT INTO supply_points (asset_id, supplier_id, commodity, point_code,
+                    description, is_active)
+                VALUES (%s, %s, %s, %s, 'Creata automaticamente da estrazione bolletta', TRUE)
+                RETURNING supply_point_id
+            """, (asset_id, supplier_id, commodity, point_code))
+            new_sp_id = cur.fetchone()["supply_point_id"]
+            # Aggiorna sp_list locale
+            sp_list.append({"supply_point_id": new_sp_id, "commodity": commodity,
+                             "point_code": point_code})
+            return new_sp_id
+
+        def _match_or_create_sp(commodity: str, point_code: str, supplier_name: str):
+            """
+            Logica di matching:
+            1. POD su altro asset -> (None, 'wrong_asset', messaggio)
+            2. POD su questo asset -> (supply_point_id, 'ready', None)
+            3. POD nuovo -> auto-crea fornitura -> (supply_point_id, 'ready', None)
+            4. Unica fornitura attiva per commodity -> abbina -> (supply_point_id, 'ready', None)
+            5. Nessun match -> (None, 'needs_disambiguation', None)
+            """
+            # Controllo cross-asset
+            other_asset_id, other_asset_label = _check_cross_asset(point_code)
+            if other_asset_id:
+                return None, 'wrong_asset', (
+                    f"Il codice {point_code} risulta già associato all'asset {other_asset_label}. "
+                    "Verificare prima di procedere."
+                )
+            # Match per point_code su questo asset
             if point_code:
                 for sp in sp_list:
                     if sp["point_code"] and sp["point_code"].strip() == point_code.strip():
-                        return sp["supply_point_id"]
-            # Priorità 3: unica fornitura attiva per commodity
+                        return sp["supply_point_id"], 'ready', None
+                # POD nuovo su questo asset: auto-crea fornitura
+                new_sp_id = _auto_crea_supply_point(commodity, point_code, supplier_name)
+                return new_sp_id, 'ready', None
+            # Nessun POD estratto: unica fornitura attiva per commodity
             matches = [sp for sp in sp_list if sp["commodity"] == commodity]
             if len(matches) == 1:
-                return matches[0]["supply_point_id"]
-            return None  # needs_disambiguation
+                return matches[0]["supply_point_id"], 'ready', None
+            return None, 'needs_disambiguation', None
 
         is_multiutility = len(items) > 1
         sibling_ids = []
@@ -470,8 +563,13 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
             if commodity not in COMMODITIES:
                 continue
 
-            sp_id = _match_sp(commodity, item.get("point_code"))
-            status = "ready" if sp_id else "needs_disambiguation"
+            sp_id, status, cross_note = _match_or_create_sp(
+                commodity, item.get("point_code"), item.get("supplier_name")
+            )
+            # Combina note LLM con eventuale nota cross-asset
+            llm_notes = item.get("notes") or ""
+            if cross_note:
+                llm_notes = (cross_note + ("\n" + llm_notes if llm_notes else "")).strip()
 
             if idx == 0:
                 # Aggiorna il record originale
@@ -484,6 +582,7 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                         period_from           = %s,
                         period_to             = %s,
                         total_amount_eur      = %s,
+                        quota_oneri_eur       = %s,
                         consumption_quantity  = %s,
                         consumption_unit      = %s,
                         unit_cost_eur         = %s,
@@ -502,6 +601,7 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                     item.get("period_from"),
                     item.get("period_to"),
                     item.get("total_amount_eur"),
+                    item.get("quota_oneri_eur"),
                     item.get("consumption_quantity"),
                     item.get("consumption_unit"),
                     item.get("unit_cost_eur"),
@@ -509,7 +609,7 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                     status,
                     is_multiutility,
                     json.dumps(raw),
-                    item.get("notes"),
+                    llm_notes,
                     invoice_id,
                 ))
                 new_invoice_ids.append(invoice_id)
@@ -520,14 +620,16 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                     INSERT INTO invoices (
                         invoice_id, supply_point_id, asset_id, commodity,
                         invoice_number, issue_date, period_from, period_to,
-                        total_amount_eur, consumption_quantity, consumption_unit,
+                        total_amount_eur, quota_oneri_eur,
+                        consumption_quantity, consumption_unit,
                         unit_cost_eur, extraction_method, extraction_confidence,
                         extraction_status, file_path, original_filename,
                         is_multiutility_source, raw_llm_response, llm_notes
                     ) VALUES (
                         %s, %s, %s, %s,
                         %s, %s, %s, %s,
-                        %s, %s, %s,
+                        %s, %s,
+                        %s, %s,
                         %s, 'LLM_EXTRACTED', %s,
                         %s, %s, %s,
                         TRUE, %s, %s
@@ -539,6 +641,7 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                     item.get("period_from"),
                     item.get("period_to"),
                     item.get("total_amount_eur"),
+                    item.get("quota_oneri_eur"),
                     item.get("consumption_quantity"),
                     item.get("consumption_unit"),
                     item.get("unit_cost_eur"),
@@ -547,7 +650,7 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
                     inv_orig["file_path"],
                     inv_orig["original_filename"],
                     json.dumps(raw),
-                    item.get("notes"),
+                    llm_notes,
                 ))
                 new_invoice_ids.append(new_id)
                 sibling_ids.append(new_id)
@@ -621,6 +724,7 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         period_from:          Optional[str]   = None
         period_to:            Optional[str]   = None
         total_amount_eur:     Optional[float] = None
+        quota_oneri_eur:      Optional[float] = None
         consumption_quantity: Optional[float] = None
         consumption_unit:     Optional[str]   = None
         unit_cost_eur:        Optional[float] = None
