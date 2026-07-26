@@ -153,11 +153,15 @@ _LOAD_WEEKEND = [
     0.09, 0.09, 0.08, 0.08, 0.08, 0.08,
 ]
 
+# Baseline kW/100mq in picco orario lavorativo.
+# Formula: kw_picco = base * (sup/100); kW_medi_h24 = kw_picco * load_medio (~0.38)
+# EUI annuo = kW_medi * 8760 / sup = base * 0.38 * 8760 / 100
+# Target EUI: stabilimento ~200, ufficio ~80, magazzino ~60, deposito ~45 kWh/mq/anno
 _BASE_KW_PER_100M2 = {
-    "ufficio":      8.0,
-    "stabilimento": 18.0,
-    "magazzino":    5.0,
-    "deposito":     3.0,
+    "ufficio":      2.4,   # EUI ~80 kWh/mq/anno  (2.4 * 0.38 * 8760/100 = 80)
+    "stabilimento": 6.0,   # EUI ~200 kWh/mq/anno (6.0 * 0.38 * 8760/100 = 200)
+    "magazzino":    1.8,   # EUI ~60 kWh/mq/anno  (1.8 * 0.38 * 8760/100 = 60)
+    "deposito":     1.35,  # EUI ~45 kWh/mq/anno  (1.35 * 0.38 * 8760/100 = 45)
 }
 
 _VECTOR_FACTOR = {
