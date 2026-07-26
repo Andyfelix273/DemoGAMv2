@@ -127,6 +127,22 @@
     .es-kpi-delta.up   { color: #E74C3C; }
     .es-kpi-delta.down { color: #27AE60; }
     .es-kpi-delta.flat { color: var(--text-muted,#4A6FA5); }
+
+    /* Lista commodity con istogramma inline */
+    .es-comm-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+    .es-comm-item { display:flex; flex-direction:column; gap:3px; }
+    .es-comm-header { display:flex; align-items:center; gap:8px; }
+    .es-comm-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .es-comm-label { font-size:11px; color:var(--text-primary,#E8F4FD); flex:1; }
+    .es-comm-value { font-size:11px; font-weight:700; color:var(--text-primary,#E8F4FD); white-space:nowrap; }
+    .es-comm-pct { font-size:10px; color:var(--text-muted,#4A6FA5); white-space:nowrap; margin-left:4px; }
+    .es-comm-bar-bg { height:6px; border-radius:3px; background:rgba(30,58,95,0.4); overflow:hidden; }
+    .es-comm-bar-fill { height:100%; border-radius:3px; transition:width 0.4s; }
+    .es-comm-empty { font-size:11px; color:var(--text-muted,#4A6FA5); padding:20px 0; text-align:center; }
+
+    /* Grafici trend compressi */
+    .es-trend-chart { width:100%; height:200px; }
+    .es-trend-chart-sm { width:100%; height:160px; }
   </style>
 </head>
 <body class="app-layout">
@@ -159,7 +175,7 @@
       </div>
 
       <!-- P-4/P-5: Top efficienti / Da migliorare — liste compatte affiancate -->
-      <div class="es-row-2" style="margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
         <div class="es-section" style="margin-bottom:0;">
           <div class="es-section-title"><i class="fa fa-star" style="color:#27AE60;"></i>Top efficienti per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-4</span></div>
           <ul class="es-top-list" id="es-top-efficienti"></ul>
@@ -187,7 +203,7 @@
         </div>
         <div class="es-section" style="margin-bottom:0;">
           <div class="es-section-title"><i class="fa fa-layer-group"></i>Costo per commodity (€) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-9</span></div>
-          <div class="es-trend-chart" id="chart-commodity"></div>
+          <div id="chart-commodity-list" style="padding:4px 0;"></div>
         </div>
       </div>
 
@@ -379,12 +395,12 @@
 
         Plotly.newPlot('chart-trend-kwh', traces,
           Object.assign({}, baseLayout, {
-            margin: { t: 8, r: 16, b: 60, l: 58 },
+            margin: { t: 6, r: 10, b: 55, l: 52 },
             yaxis: Object.assign({}, baseLayout.yaxis, {
-              title: { text: 'kWh', font: { size: 10 }, standoff: 6 },
-              tickformat: ',.0f'
+              title: { text: 'kWh', font: { size: 10 }, standoff: 4 },
+              tickformat: ',.0f', tickfont: { size: 9 }
             }),
-            xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30 }),
+            xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30, tickfont: { size: 9 } }),
           }), plotCfg);
       } else {
         document.getElementById('chart-trend-kwh').innerHTML =
@@ -472,10 +488,12 @@
             Plotly.newPlot('chart-trend-yoy', yoyTraces,
               Object.assign({}, baseLayout, {
                 barmode: 'group',
-                margin: { t: 8, r: 16, b: 50, l: 58 },
-                yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: 'kWh', font: { size: 10 }, standoff: 6 }, tickformat: ',.0f' }),
-                xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30 }),
-                legend: { orientation: 'h', y: -0.28, font: { size: 10 }, bgcolor: 'transparent' }
+                bargap: 0.15,
+                bargroupgap: 0.05,
+                margin: { t: 6, r: 10, b: 55, l: 52 },
+                yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: 'kWh', font: { size: 10 }, standoff: 4 }, tickformat: ',.0f', tickfont: { size: 9 } }),
+                xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30, tickfont: { size: 9 } }),
+                legend: { orientation: 'h', y: -0.32, font: { size: 9 }, bgcolor: 'transparent' }
               }), plotCfg);
           } else {
             document.getElementById('chart-trend-yoy').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-chart-bar" style="margin-right:8px;"></i>Dati non disponibili</div>';
@@ -483,43 +501,52 @@
         }
       } catch(e2) { console.warn('[YoY]', e2); }
 
-      // ── P-9: Commodity — Stacked Bar ─────────────────────────────────────────
+      // ── P-9: Commodity — lista con istogramma inline ────────────────────────
       try {
         const commRes = await fetch(`/api/efficiency/portfolio/commodity?mesi=${mesi}`, { headers: AUTH });
-        if (commRes.ok) {
+        const commEl = document.getElementById('chart-commodity-list');
+        if (commRes.ok && commEl) {
           const comm = await commRes.json();
+          const commDef = [
+            { key: 'electricity_eur', label: 'Elettricità', color: '#58A6FF', icon: 'fa-bolt' },
+            { key: 'gas_eur',         label: 'Gas Metano',  color: '#F39C12', icon: 'fa-fire' },
+            { key: 'water_eur',       label: 'Acqua',       color: '#3498DB', icon: 'fa-tint' }
+          ];
           if (comm.data && comm.data.length > 0) {
-            // Backend restituisce record per mese con colonne electricity_eur, gas_eur, water_eur
-            const mesiNomi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-            const mesiX = comm.data.map(r => mesiNomi[(r.mese_num || 1) - 1] || r.mese);
-            const commDef = [
-              { key: 'electricity_eur', label: 'Elettricità', color: '#58A6FF' },
-              { key: 'gas_eur',         label: 'Gas Metano',  color: '#F39C12' },
-              { key: 'water_eur',       label: 'Acqua',       color: '#3498DB' }
-            ];
-            const commTraces = commDef
-              .filter(c => comm.data.some(r => (r[c.key] || 0) > 0))
-              .map(c => ({
-                type: 'bar', name: c.label,
-                x: mesiX,
-                y: comm.data.map(r => r[c.key] || 0),
-                marker: { color: c.color },
-                hovertemplate: `<b>${c.label} — %{x}</b><br>€ %{y:,.2f}<extra></extra>`
-              }));
-            if (commTraces.length > 0) {
-              Plotly.newPlot('chart-commodity', commTraces,
-                Object.assign({}, baseLayout, {
-                  barmode: 'stack',
-                  margin: { t: 8, r: 16, b: 50, l: 62 },
-                  yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: '€', font: { size: 10 }, standoff: 6 }, tickformat: ',.0f' }),
-                  xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30 }),
-                  legend: { orientation: 'h', y: -0.28, font: { size: 10 }, bgcolor: 'transparent' }
-                }), plotCfg);
-            } else {
-              document.getElementById('chart-commodity').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-layer-group" style="margin-right:8px;"></i>Solo elettricità disponibile</div>';
-            }
+            // Somma totali per commodity su tutto il periodo
+            const totali = {};
+            commDef.forEach(c => {
+              totali[c.key] = comm.data.reduce((s, r) => s + (r[c.key] || 0), 0);
+            });
+            const totGlobale = Object.values(totali).reduce((s, v) => s + v, 0);
+            // Includi sempre tutte le commodity, anche quelle a 0
+            const items = commDef.map(c => ({
+              ...c,
+              totale: totali[c.key] || 0,
+              pct: totGlobale > 0 ? ((totali[c.key] || 0) / totGlobale * 100) : 0
+            }));
+            const maxVal = Math.max(...items.map(i => i.totale), 1);
+            commEl.innerHTML = `<ul class="es-comm-list">
+              ${items.map(it => `
+                <li class="es-comm-item">
+                  <div class="es-comm-header">
+                    <span class="es-comm-dot" style="background:${it.color};"></span>
+                    <i class="fa ${it.icon}" style="color:${it.color};font-size:11px;"></i>
+                    <span class="es-comm-label">${it.label}</span>
+                    <span class="es-comm-value">${it.totale > 0 ? '€ ' + fmtInt(it.totale) : '—'}</span>
+                    <span class="es-comm-pct">${it.totale > 0 ? fmt(it.pct, 1) + '%' : 'n/d'}</span>
+                  </div>
+                  <div class="es-comm-bar-bg">
+                    <div class="es-comm-bar-fill" style="width:${it.totale > 0 ? (it.totale/maxVal*100).toFixed(1) : 0}%;background:${it.color};"></div>
+                  </div>
+                </li>`).join('')}
+            </ul>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(30,58,95,0.4);display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;color:var(--text-muted);">Totale periodo (${mesi} mesi)</span>
+              <span style="font-size:13px;font-weight:700;color:var(--text-primary);">€ ${fmtInt(totGlobale)}</span>
+            </div>`;
           } else {
-            document.getElementById('chart-commodity').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-layer-group" style="margin-right:8px;"></i>Dati non disponibili</div>';
+            commEl.innerHTML = '<div class="es-comm-empty"><i class="fa fa-layer-group" style="margin-right:8px;"></i>Dati non disponibili</div>';
           }
         }
       } catch(e3) { console.warn('[Commodity]', e3); }
