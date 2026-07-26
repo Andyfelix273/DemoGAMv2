@@ -26,6 +26,11 @@ Le versioni seguono [Semantic Versioning](https://semver.org/lang/it/).
 ### Corretto
 - Badge `wrong_asset` aggiunto a `statusBadge()` con classe `badge-scaduta` (rosso)
 - Classe CSS `edm-inv-wrong-asset` aggiunta con bordo rosso e sfondo semi-trasparente
+- **Endpoint bollette**: tutti gli endpoint usavano `db=None, utente=None` invece di `Depends(get_db)` — aggiunto `from fastapi import Depends` mancante
+- **Topbar titolo**: `renderTopbar` ora legge `opzioni.titolo` invece di restituire sempre "GIS Asset Manager"
+- **`efficiency-invoices.html`**: aggiunto `requireAuth()` mancante che causava blocco su "Caricamento..." e `.catch()` su `caricaDashboard()` per errori visibili
+- **Migrazione `GAS→GAS_METHANE`**: corretta sequenza operazioni (prima `DROP CONSTRAINT`, poi `UPDATE`, poi `ADD CONSTRAINT`) — il vecchio ordine causava il fallimento silenzioso dell'`UPDATE` per violazione del CHECK constraint esistente
+- **Modello LLM**: corretto typo `gpt-5-mini` → `gpt-4o-mini` nella costante `LLM_INVOICE_MODEL`
 
 ---
 

@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ── Costanti ────────────────────────────────────────────────────────────────
 INVOICES_STORAGE_PATH   = os.environ.get("INVOICES_STORAGE_PATH", "/app/uploads/invoices")
 MAX_INVOICE_FILE_MB     = int(os.environ.get("MAX_INVOICE_FILE_SIZE_MB", "10"))
-LLM_INVOICE_MODEL       = os.environ.get("LLM_INVOICE_MODEL", "gpt-5-mini")
+LLM_INVOICE_MODEL       = os.environ.get("LLM_INVOICE_MODEL", "gpt-4o-mini")
 UNIT_COST_ROLLING_N     = int(os.environ.get("UNIT_COST_ROLLING_INVOICES", "3"))
 LLM_EXTRACTION_TIMEOUT  = int(os.environ.get("LLM_EXTRACTION_TIMEOUT_SEC", "30"))
 
@@ -182,14 +182,9 @@ def migrate_invoices_schema(database_url: str = None):
             """)
         except Exception:
             pass
-        # Migrazione commodity: GAS -> GAS_METHANE + nuovi valori
-        # 1. Aggiorna i dati esistenti
-        for tbl in ['supply_points', 'invoices', 'energy_unit_costs']:
-            try:
-                cur.execute(f"UPDATE {tbl} SET commodity='GAS_METHANE' WHERE commodity='GAS'")
-            except Exception:
-                pass
-        # 2. Ricrea i CHECK constraint con il set esteso
+        # Migrazione commodity GAS -> GAS_METHANE
+        # ORDINE CRITICO: prima drop constraint (che blocca l'UPDATE),
+        # poi UPDATE dati, poi ricrea constraint con set esteso.
         commodity_check = "('ELECTRICITY','GAS_METHANE','GAS_GPL','WATER','HEATING_OIL','DIESEL','PETROL')"
         for tbl, cname in [
             ('supply_points',    'supply_points_commodity_check'),
@@ -197,8 +192,21 @@ def migrate_invoices_schema(database_url: str = None):
             ('energy_unit_costs','energy_unit_costs_commodity_check'),
         ]:
             try:
+                cur.execute(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {cname}")
+            except Exception:
+                pass
+        for tbl in ['supply_points', 'invoices', 'energy_unit_costs']:
+            try:
+                cur.execute(f"UPDATE {tbl} SET commodity='GAS_METHANE' WHERE commodity='GAS'")
+            except Exception:
+                pass
+        for tbl, cname in [
+            ('supply_points',    'supply_points_commodity_check'),
+            ('invoices',         'invoices_commodity_check'),
+            ('energy_unit_costs','energy_unit_costs_commodity_check'),
+        ]:
+            try:
                 cur.execute(f"""
-                    ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {cname};
                     ALTER TABLE {tbl} ADD CONSTRAINT {cname}
                         CHECK (commodity IN {commodity_check});
                 """)
