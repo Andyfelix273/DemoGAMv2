@@ -16,8 +16,6 @@
 /* global API */
 const DeadlinesPanel = (() => {
   // ── Costanti ─────────────────────────────────────────────────────────────────
-  const PRIO_COLOR  = { critica: 'var(--accent-red)', alta: 'var(--accent-orange)', media: 'var(--accent-blue)', bassa: 'var(--text-muted)' };
-  const STATO_COLOR = { aperta: 'var(--accent-blue)', chiusa: 'var(--accent-green)', scaduta: 'var(--accent-red)' };
   const TIPO_ICON   = { normativa: 'fa-gavel', manutenzione: 'fa-wrench', collaudo: 'fa-circle-check', contratto: 'fa-file-lines', scadenza: 'fa-clock' };
   const MODAL_FORM_ID = 'dlp-modal-form';
 
@@ -198,7 +196,6 @@ const DeadlinesPanel = (() => {
       const isScaduta = d.stato === 'scaduta' || (d.stato === 'aperta' && giorni < 0);
       const isUrgente = d.stato === 'aperta' && giorni >= 0 && giorni <= 7;
       const tipoIcon  = TIPO_ICON[d.tipo] || 'fa-clock';
-      const prioCol   = PRIO_COLOR[d.priorita] || 'var(--text-muted)';
       let giorniLabel = '';
       if (d.stato !== 'chiusa') {
         giorniLabel = giorni < 0
@@ -409,7 +406,6 @@ const DeadlinesPanel = (() => {
   let _panelDati      = [];
   let _panelFiltrati  = [];
 
-  const PRIO_COLOR_P = { critica: 'var(--accent-red)', alta: 'var(--accent-orange)', media: 'var(--accent-blue)', bassa: 'var(--text-muted)' };
   const TIPO_ICON_P  = { normativa: 'fa-gavel', manutenzione: 'fa-wrench', collaudo: 'fa-circle-check', contratto: 'fa-file-lines', scadenza: 'fa-clock' };
 
   function _injectPanelOverlay() {
@@ -470,19 +466,19 @@ const DeadlinesPanel = (() => {
       const isUrg   = d.stato === 'aperta' && diffGg >= 0 && diffGg <= 7;
       const rowCls  = d.stato === 'chiusa' ? 'chiusa' : isScad ? 'scaduta' : isUrg ? 'urgente' : 'normale';
       let dataLbl = '';
-      if (d.stato === 'chiusa') dataLbl = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
-      else if (isScad)          dataLbl = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
-      else if (diffGg === 0)    dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade oggi</span>`;
-      else if (diffGg === 1)    dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade domani</span>`;
-      else if (diffGg <= 7)     dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
-      else                      dataLbl = `<span style="color:var(--text-muted)"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
+      if (d.stato === 'chiusa') dataLbl = `<span class="lbl-chiusa"><i class="fa fa-check"></i> Chiusa</span>`;
+      else if (isScad)          dataLbl = `<span class="lbl-scaduta"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
+      else if (diffGg === 0)    dataLbl = `<span class="lbl-urgente"><i class="fa fa-clock"></i> Scade oggi</span>`;
+      else if (diffGg === 1)    dataLbl = `<span class="lbl-urgente"><i class="fa fa-clock"></i> Scade domani</span>`;
+      else if (diffGg <= 7)     dataLbl = `<span class="lbl-urgente"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
+      else                      dataLbl = `<span class="lbl-normale"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
       const canClose = canEdit && d.stato === 'aperta';
       return `<div class="dl-row ${rowCls}">
-        <i class="fa ${TIPO_ICON_P[d.tipo]||'fa-clock'}" style="color:${PRIO_COLOR_P[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
+        <i class="fa ${TIPO_ICON_P[d.tipo]||'fa-clock'} tipo-icon prio-icon-${d.priorita||'bassa'}"></i>
         <div class="dl-info">
           <div class="dl-titolo">${d.titolo}</div>
           <div class="dl-asset"><i class="fa fa-map-marker"></i> ${d.asset_nome||''} &mdash; ${d.asset_citta||''}</div>
-          <div class="dl-meta">${dataLbl} &nbsp;·&nbsp; <span style="font-weight:600;color:${PRIO_COLOR_P[d.priorita]||''}">${(d.priorita||'').toUpperCase()}</span> &nbsp;·&nbsp; ${d.tipo||''}${d.assegnatario?' &nbsp;·&nbsp; <i class="fa fa-user"></i> '+d.assegnatario:''}</div>
+          <div class="dl-meta">${dataLbl} &nbsp;·&nbsp; <span class="prio-text-${d.priorita||'bassa'}">${(d.priorita||'').toUpperCase()}</span> &nbsp;·&nbsp; ${d.tipo||''}${d.assegnatario?' &nbsp;·&nbsp; <i class="fa fa-user"></i> '+d.assegnatario:''}</div>
         </div>
         <div class="dl-actions">
           ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi" onclick="DeadlinesPanel._chiudiScadenzaPanel(${d.id})"><i class="fa fa-check"></i></button>` : ''}
@@ -646,19 +642,19 @@ const DeadlinesPanel = (() => {
       const isUrg  = d.stato === 'aperta' && diffGg >= 0 && diffGg <= 7;
       const rowCls = d.stato === 'chiusa' ? 'chiusa' : isScad ? 'scaduta' : isUrg ? 'urgente' : 'normale';
       let dataLbl = '';
-      if (d.stato === 'chiusa')  dataLbl = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
-      else if (isScad)           dataLbl = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
-      else if (diffGg === 0)     dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade oggi</span>`;
-      else if (diffGg === 1)     dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade domani</span>`;
-      else if (diffGg <= 7)      dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
-      else                       dataLbl = `<span style="color:var(--text-muted)"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
+      if (d.stato === 'chiusa')  dataLbl = `<span class="lbl-chiusa"><i class="fa fa-check"></i> Chiusa</span>`;
+      else if (isScad)           dataLbl = `<span class="lbl-scaduta"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
+      else if (diffGg === 0)     dataLbl = `<span class="lbl-urgente"><i class="fa fa-clock"></i> Scade oggi</span>`;
+      else if (diffGg === 1)     dataLbl = `<span class="lbl-urgente"><i class="fa fa-clock"></i> Scade domani</span>`;
+      else if (diffGg <= 7)      dataLbl = `<span class="lbl-urgente"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
+      else                       dataLbl = `<span class="lbl-normale"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
       const canClose = canEdit && d.stato === 'aperta';
       return `<div class="dl-row ${rowCls}">
-        <i class="fa ${TIPO_ICON_P[d.tipo]||'fa-clock'}" style="color:${PRIO_COLOR_P[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
+        <i class="fa ${TIPO_ICON_P[d.tipo]||'fa-clock'} tipo-icon prio-icon-${d.priorita||'bassa'}"></i>
         <div class="dl-info">
           <div class="dl-titolo">${d.titolo}</div>
           ${!_opts.assetId ? `<div class="dl-asset"><i class="fa fa-map-marker"></i> ${d.asset_nome||''} &mdash; ${d.asset_citta||''}</div>` : ''}
-          <div class="dl-meta">${dataLbl} &nbsp;·&nbsp; <span style="font-weight:600;color:${PRIO_COLOR_P[d.priorita]||''}">${(d.priorita||'').toUpperCase()}</span> &nbsp;·&nbsp; ${d.tipo||''}${d.assegnatario?' &nbsp;·&nbsp; <i class="fa fa-user"></i> '+d.assegnatario:''}</div>
+          <div class="dl-meta">${dataLbl} &nbsp;·&nbsp; <span class="prio-text-${d.priorita||'bassa'}">${(d.priorita||'').toUpperCase()}</span> &nbsp;·&nbsp; ${d.tipo||''}${d.assegnatario?' &nbsp;·&nbsp; <i class="fa fa-user"></i> '+d.assegnatario:''}</div>
         </div>
         <div class="dl-actions">
           ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi" onclick="DeadlinesPanel._chiudiScadenzaCard(${d.id})"><i class="fa fa-check"></i></button>` : ''}

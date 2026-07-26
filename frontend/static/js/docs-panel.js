@@ -91,31 +91,31 @@ const DocsPanel = (() => {
           </div>
           <div class="form-group">
             <label>File *</label>
-            <div style="border:2px dashed var(--border-color);border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color 0.2s"
+            <div class="upload-zone"
                  id="docp-drop-zone"
                  onclick="document.getElementById('docp-file-input').click()"
-                 ondragover="event.preventDefault();this.style.borderColor='var(--accent-blue)'"
-                 ondragleave="this.style.borderColor='var(--border-color)'"
+                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
                  ondrop="DocsPanel._onDrop(event)">
-              <i class="fa fa-upload" style="font-size:24px;color:var(--text-muted);display:block;margin-bottom:8px"></i>
-              <div style="font-size:13px;color:var(--text-muted)">Trascina qui il file o <span style="color:var(--accent-blue)">clicca per selezionare</span></div>
+              <i class="fa fa-upload upload-zone-icon" style="font-size:24px;display:block;margin-bottom:8px"></i>
+              <div class="upload-zone-text">Trascina qui il file o <span class="upload-zone-link">clicca per selezionare</span></div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:4px">PDF, Word, Excel, immagini — max 50 MB</div>
             </div>
             <input type="file" id="docp-file-input" style="display:none"
                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
                    onchange="DocsPanel._onFileSelected(this.files[0])">
-            <div id="docp-file-preview" style="display:none;margin-top:10px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:13px;align-items:center;gap:8px">
-              <i class="fa fa-file" style="color:var(--accent-blue)"></i>
+            <div id="docp-file-preview" class="det-box" style="display:none;margin-top:10px;align-items:center;gap:8px">
+              <i class="fa fa-file upload-zone-icon"></i>
               <span id="docp-file-name"></span>
-              <span id="docp-file-size" style="color:var(--text-muted);margin-left:auto"></span>
+              <span id="docp-file-size" class="upload-zone-size"></span>
             </div>
           </div>
           <div id="docp-upload-error" class="form-error"></div>
           <div id="docp-upload-progress" style="display:none;margin-top:8px">
-            <div style="background:var(--border-color);border-radius:4px;height:4px;overflow:hidden">
-              <div id="docp-progress-bar" style="height:100%;background:var(--accent-blue);width:0%;transition:width 0.3s"></div>
+            <div class="upload-progress-wrap">
+              <div id="docp-progress-bar" class="upload-progress-fill"></div>
             </div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-align:center">Caricamento in corso...</div>
+            <div class="det-meta" style="margin-top:4px;text-align:center">Caricamento in corso...</div>
           </div>
         </div>
         <div class="modal-footer">

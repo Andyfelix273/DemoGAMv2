@@ -7,61 +7,6 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
-  <style>/* Tab */
-/* Allarmi */
-    .alarm-row {
-      display:flex; align-items:center; gap:12px;
-      padding:12px 16px; border-radius:8px; margin-bottom:8px;
-      border:1px solid var(--border-color);
-      background:var(--bg-secondary);
-      transition:border-color 0.15s;
-    }
-    .alarm-row.alarm   { border-left:3px solid var(--accent-red); }
-    .alarm-row.warning { border-left:3px solid var(--accent-yellow); }
-    .alarm-row.acked   { opacity:0.5; }
-    .alarm-icon { font-size:18px; flex-shrink:0; }
-    .alarm-icon.alarm   { color:var(--accent-red); }
-    .alarm-icon.warning { color:var(--accent-yellow); }
-    .alarm-info { flex:1; min-width:0; }
-    .alarm-asset { font-size:13px; font-weight:600; }
-    .alarm-campo { font-size:12px; color:var(--text-secondary); margin-top:2px; }
-    .alarm-meta  { font-size:11px; color:var(--text-muted); margin-top:2px; }
-    .alarm-valore { font-size:16px; font-weight:700; text-align:right; }
-    .alarm-valore.alarm   { color:var(--accent-red); }
-    .alarm-valore.warning { color:var(--accent-yellow); }
-
-    /* Soglie */
-    .threshold-group { margin-bottom:24px; }
-    .threshold-group-title {
-      font-size:12px; font-weight:700; letter-spacing:0.06em;
-      color:var(--text-muted); text-transform:uppercase;
-      margin-bottom:10px; padding-bottom:6px;
-      border-bottom:1px solid var(--border-color);
-    }
-    .threshold-row {
-      display:flex; align-items:center; gap:12px;
-      padding:10px 0; border-bottom:1px solid var(--border-color);
-    }
-    .threshold-row:last-child { border-bottom:none; }
-    .threshold-label { flex:1; font-size:13px; }
-    .threshold-unit  { font-size:11px; color:var(--text-muted); width:50px; }
-    .threshold-input {
-      width:80px; padding:5px 8px;
-      background:var(--input-bg); border:1px solid var(--input-border);
-      border-radius:6px; color:var(--text-primary); font-size:13px; text-align:center;
-    }
-    .threshold-input:focus { outline:none; border-color:var(--accent-blue); }
-    .threshold-sep { font-size:11px; color:var(--text-muted); }
-
-    /* Storico */
-    .storico-empty { text-align:center; padding:40px; color:var(--text-muted); }
-
-    /* Contatore allarmi */
-    .alarm-counter {
-      display:inline-flex; align-items:center; gap:6px;
-      font-size:12px; color:var(--text-secondary);
-    }
-  </style>
   <link rel="stylesheet" href="/static/css/icons.css">
   <link rel="stylesheet" href="/static/css/bems-ui.css">
 </head>

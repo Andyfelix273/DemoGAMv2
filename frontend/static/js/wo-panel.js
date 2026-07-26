@@ -161,42 +161,42 @@ const WoPanel = (() => {
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <span id="wop-det-stato-badge"></span>
             <span id="wop-det-prio-badge"></span>
-            <span id="wop-det-tipo-badge" style="font-size:11px;color:var(--text-muted)"></span>
-            <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="wop-det-creato-da"></span>
+            <span id="wop-det-tipo-badge" class="det-meta"></span>
+            <span class="det-meta" style="margin-left:auto" id="wop-det-creato-da"></span>
           </div>
           <div class="form-grid" style="margin-bottom:16px">
             <div class="form-group full">
-              <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Titolo</label>
-              <span id="wop-det-titolo" style="font-size:15px;font-weight:600"></span>
+              <label class="det-label">Titolo</label>
+              <span id="wop-det-titolo" class="det-value-lg"></span>
             </div>
             <div class="form-group">
-              <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Asset</label>
-              <span id="wop-det-asset" style="font-size:13px"></span>
+              <label class="det-label">Asset</label>
+              <span id="wop-det-asset" class="det-value"></span>
             </div>
             <div class="form-group">
-              <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Assegnatario</label>
-              <span id="wop-det-assegnatario" style="font-size:13px"></span>
+              <label class="det-label">Assegnatario</label>
+              <span id="wop-det-assegnatario" class="det-value"></span>
             </div>
             <div class="form-group">
-              <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Data apertura</label>
-              <span id="wop-det-apertura" style="font-size:13px"></span>
+              <label class="det-label">Data apertura</label>
+              <span id="wop-det-apertura" class="det-value"></span>
             </div>
             <div class="form-group">
-              <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Data pianificata</label>
-              <span id="wop-det-pianificata" style="font-size:13px"></span>
+              <label class="det-label">Data pianificata</label>
+              <span id="wop-det-pianificata" class="det-value"></span>
             </div>
             <div class="form-group" id="wop-det-chiusura-wrap" style="display:none">
-              <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Data chiusura</label>
-              <span id="wop-det-chiusura" style="font-size:13px"></span>
+              <label class="det-label">Data chiusura</label>
+              <span id="wop-det-chiusura" class="det-value"></span>
             </div>
           </div>
           <div class="form-group" id="wop-det-desc-wrap">
-            <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Descrizione</label>
-            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:10px;font-size:13px;line-height:1.5;margin-top:4px" id="wop-det-descrizione"></div>
+            <label class="det-label">Descrizione</label>
+            <div class="det-box" id="wop-det-descrizione"></div>
           </div>
           <div class="form-group" id="wop-det-note-wrap" style="display:none;margin-top:12px">
-            <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600">Note di chiusura</label>
-            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:10px;font-size:13px;line-height:1.5;margin-top:4px" id="wop-det-note-chiusura"></div>
+            <label class="det-label">Note di chiusura</label>
+            <div class="det-box" id="wop-det-note-chiusura"></div>
           </div>
         </div>
         <div class="modal-footer">

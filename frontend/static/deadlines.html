@@ -7,60 +7,6 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
-  <style>
-    /* Riga scadenza */
-    .dl-row {
-      display:flex; align-items:center; gap:12px;
-      padding:12px 16px; border-radius:8px; margin-bottom:8px;
-      border:1px solid var(--border-color);
-      background:var(--bg-secondary);
-      transition:border-color 0.15s;
-    }
-    .dl-row.scaduta  { border-left:3px solid var(--accent-red); }
-    .dl-row.urgente  { border-left:3px solid var(--accent-orange); }
-    .dl-row.normale  { border-left:3px solid var(--accent-blue); }
-    .dl-row.chiusa   { opacity:0.55; border-left:3px solid var(--text-muted); }
-    .dl-info { flex:1; min-width:0; }
-    .dl-titolo { font-size:13px; font-weight:600; }
-    .dl-asset  { font-size:12px; color:var(--text-secondary); margin-top:2px; }
-    .dl-meta   { font-size:11px; color:var(--text-muted); margin-top:2px; }
-    .dl-actions { display:flex; gap:6px; flex-shrink:0; }
-
-    /* Calendario */
-    .cal-nav { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-    .cal-nav h2 { font-size:16px; font-weight:600; flex:1; text-align:center; }
-    .cal-grid {
-      display:grid; grid-template-columns:repeat(7,1fr);
-      gap:4px; margin-bottom:8px;
-    }
-    .cal-header { text-align:center; font-size:11px; font-weight:700; color:var(--text-muted); padding:4px 0; text-transform:uppercase; }
-    .cal-day {
-      min-height:72px; border-radius:8px; padding:6px;
-      background:var(--bg-secondary); border:1px solid var(--border-color);
-      font-size:12px; position:relative; cursor:default;
-    }
-    .cal-day.other-month { opacity:0.35; }
-    .cal-day.today { border-color:var(--accent-blue); }
-    .cal-day-num { font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; }
-    .cal-event {
-      font-size:10px; padding:2px 5px; border-radius:4px;
-      margin-bottom:2px; cursor:pointer; white-space:nowrap;
-      overflow:hidden; text-overflow:ellipsis;
-    }
-    .cal-event.critica  { background:var(--accent-red);    color:#fff; }
-    .cal-event.alta     { background:var(--accent-orange);  color:#fff; }
-    .cal-event.media    { background:var(--accent-blue);    color:#fff; }
-    .cal-event.bassa    { background:var(--text-muted);     color:#fff; }
-    .cal-event.scaduta  { background:#c0392b; color:#fff; }
-
-    @media (max-width: 768px) {
-      .cal-grid { overflow-x:auto; grid-template-columns:repeat(7, minmax(44px, 1fr)); gap:2px; }
-      .cal-day { min-height:52px; padding:4px; }
-      .cal-event { font-size:9px; }
-      .dl-row { flex-wrap:wrap; }
-      .dl-actions { width:100%; justify-content:flex-end; margin-top:4px; }
-    }
-  </style>
   <link rel="stylesheet" href="/static/css/icons.css">
   <link rel="stylesheet" href="/static/css/bems-ui.css">
 </head>

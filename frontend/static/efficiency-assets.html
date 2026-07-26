@@ -8,53 +8,6 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
-  <style>/* Barra ricerca + contatore */
-/* Tabella */
-/* Paginazione */
-/* Modal form asset */
-/* Modal dettaglio asset */
-    .detail-tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color); margin-bottom:16px; }
-    .detail-tab {
-      padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer;
-      border-bottom:2px solid transparent; color:var(--text-secondary);
-      transition:all 0.15s; background:none; border-top:none; border-left:none; border-right:none;
-    }
-    .detail-tab:hover { color:var(--text-primary); }
-    .detail-tab.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
-    .detail-panel { display:none; }
-    .detail-panel.active { display:block; }
-    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; }
-    .detail-row { display:flex; flex-direction:column; gap:2px; }
-    .detail-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
-    .detail-value { font-size:14px; color:var(--text-primary); }
-    .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
-.alarm-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:13px; }
-    .alarm-row:last-child { border-bottom:none; }
-    .esg-bar-wrap { margin-bottom:10px; }
-    .esg-bar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
-    .esg-bar { height:8px; border-radius:4px; background:var(--border-color); overflow:hidden; }
-    .esg-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
-
-    /* Import Excel */
-    .import-zone {
-      border:2px dashed var(--border-color); border-radius:8px;
-      padding:24px; text-align:center; cursor:pointer;
-      transition:border-color 0.15s;
-    }
-    .import-zone:hover { border-color:var(--accent-blue); }
-    .import-zone.drag-over { border-color:var(--accent-blue); background:rgba(88,166,255,0.05); }
-    .import-result { margin-top:12px; font-size:13px; }
-
-    /* Badge efficienza */
-    .eff-badge {
-      display:inline-block; padding:2px 8px; border-radius:20px;
-      font-size:11px; font-weight:700;
-    }
-    .eff-alta    { background:rgba(39,174,96,0.15);  color:#27AE60; }
-    .eff-media   { background:rgba(243,156,18,0.15); color:#F39C12; }
-    .eff-bassa   { background:rgba(231,76,60,0.15);  color:#E74C3C; }
-    .eff-nd      { background:rgba(149,165,166,0.15);color:#95A5A6; }
-  </style>
   <link rel="stylesheet" href="/static/css/icons.css">
   <link rel="stylesheet" href="/static/css/bems-ui.css">
 </head>
