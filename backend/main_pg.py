@@ -82,6 +82,13 @@ from occupancy_pg import (
     register_occupancy_routes,
 )
 
+# ── Modulo Tariffe & Bollette ─────────────────────────────────────────────────
+from invoices_pg import (
+    migrate_invoices_schema,
+    seed_invoices_demo,
+    register_invoices_routes,
+)
+
 # ── Configurazione ──────────────────────────────────────────────────────────
 SECRET_KEY  = "gis-asset-manager-secret-key-2026"
 ALGORITHM   = "HS256"
@@ -463,12 +470,15 @@ def richiedi_admin(utente=Depends(get_utente_corrente)):
 migrate_bems_studio_schema(DATABASE_URL)
 migrate_energy_schema(DATABASE_URL)
 migrate_occupancy_schema(DATABASE_URL)
+migrate_invoices_schema(DATABASE_URL)
 seed_energy_meters(DATABASE_URL)
 seed_energy_history(DATABASE_URL, giorni=30)
 seed_occupancy_config(DATABASE_URL)
 seed_occupancy_history(DATABASE_URL, giorni=30)
+seed_invoices_demo(DATABASE_URL)
 register_energy_routes(app, get_db, get_utente_corrente)
 register_occupancy_routes(app, get_db, get_utente_corrente)
+register_invoices_routes(app, get_db, get_utente_corrente)
 print("[main] Asset Efficiency routes registered OK")
 
 # ── Migrazione codice documents e deadlines ──────────────────────────────────────────

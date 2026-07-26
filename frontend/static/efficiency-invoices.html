@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Tariffe &amp; Bollette</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
+  <link rel="stylesheet" href="/static/css/icons.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css">
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+
+    <!-- HEADER PAGINA -->
+    <div class="page-header">
+      <h1 class="page-title">
+        <i class="fa fa-file-invoice-dollar" style="margin-right:8px;color:var(--accent-blue)"></i>Tariffe &amp; Bollette
+      </h1>
+      <div class="page-actions">
+        <select id="filter-commodity" class="btn btn-secondary btn-sm">
+          <option value="">Tutte le commodity</option>
+          <option value="ELECTRICITY">Elettricità</option>
+          <option value="GAS">Gas</option>
+          <option value="WATER">Acqua</option>
+        </select>
+        <select id="filter-tipo" class="btn btn-secondary btn-sm">
+          <option value="">Tutti i tipi</option>
+          <option value="stabilimento">Stabilimento</option>
+          <option value="ufficio">Ufficio</option>
+          <option value="magazzino">Magazzino</option>
+          <option value="deposito">Deposito</option>
+        </select>
+        <input type="text" id="search-input" placeholder="Cerca asset…"
+               style="min-width:160px;background:var(--bg-secondary);border:1px solid var(--border);
+                      color:var(--text-primary);padding:6px 10px;border-radius:6px;font-size:12px">
+      </div>
+    </div>
+
+    <!-- KPI FLOTTA -->
+    <div class="kpi-strip" id="kpi-strip">
+      <div class="kpi-card" id="kpi-elec">
+        <div class="kpi-icon"><i class="fa fa-bolt"></i></div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="kpi-elec-val">–</div>
+          <div class="kpi-lbl">€/kWh Elettricità (media flotta)</div>
+        </div>
+      </div>
+      <div class="kpi-card" id="kpi-gas">
+        <div class="kpi-icon"><i class="fa fa-fire"></i></div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="kpi-gas-val">–</div>
+          <div class="kpi-lbl">€/Smc Gas (media flotta)</div>
+        </div>
+      </div>
+      <div class="kpi-card" id="kpi-water">
+        <div class="kpi-icon"><i class="fa fa-tint"></i></div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="kpi-water-val">–</div>
+          <div class="kpi-lbl">€/m³ Acqua (media flotta)</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon"><i class="fa fa-file-invoice"></i></div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="kpi-tot-bollette">–</div>
+          <div class="kpi-lbl">Bollette totali caricate</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="color:var(--accent-orange)"><i class="fa fa-exclamation-triangle"></i></div>
+        <div class="kpi-body">
+          <div class="kpi-val" id="kpi-disambig">–</div>
+          <div class="kpi-lbl">Da abbinare</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABELLA ASSET CON COSTI UNITARI -->
+    <div class="page-body">
+      <div class="table-wrap">
+        <table id="inv-table">
+          <thead>
+            <tr>
+              <th>Codice</th>
+              <th>Asset</th>
+              <th>Tipo</th>
+              <th>Città</th>
+              <th><i class="fa fa-bolt" style="color:var(--accent-blue)"></i> €/kWh</th>
+              <th><i class="fa fa-fire" style="color:var(--accent-orange)"></i> €/Smc</th>
+              <th><i class="fa fa-tint" style="color:#3498DB"></i> €/m³</th>
+              <th>Bollette</th>
+              <th>Ultima bolletta</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="inv-tbody">
+            <tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-secondary)">
+              <span class="spinner"></span> Caricamento…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- .page -->
+  </div><!-- .sidebar-content -->
+
+  <script src="/static/js/api.js?v=2"></script>
+  <script src="/static/js/utils.js?v=2"></script>
+  <script>
+    // ── Costanti ─────────────────────────────────────────────────────────────
+    const COMMODITY_META = {
+      ELECTRICITY: { label: 'Elettricità', unit: 'kWh', icon: 'fa-bolt',  color: 'var(--accent-blue,#00A3E0)' },
+      GAS:         { label: 'Gas',          unit: 'Smc', icon: 'fa-fire',  color: 'var(--accent-orange,#F39C12)' },
+      WATER:       { label: 'Acqua',        unit: 'm³',  icon: 'fa-tint',  color: '#3498DB' },
+    };
+
+    let allRows = [];
+
+    // ── Utility ───────────────────────────────────────────────────────────────
+    function fmtEur(v) {
+      if (v == null) return '<span style="color:var(--text-muted)">–</span>';
+      return '€ ' + parseFloat(v).toFixed(4).replace('.', ',');
+    }
+    function fmtData(s) {
+      if (!s) return '–';
+      return new Date(s).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+    }
+
+    // ── Caricamento dati ──────────────────────────────────────────────────────
+    async function caricaDashboard() {
+      const AUTH = { headers: { 'Authorization': 'Bearer ' + API.getToken() } };
+
+      // 1. Lista asset
+      const rAssets = await fetch('/api/assets', AUTH);
+      if (!rAssets.ok) { renderErrore('Impossibile caricare gli asset'); return; }
+      const geoJson = await rAssets.json();
+      const assets  = geoJson.features
+        ? geoJson.features.map(f => ({ id: f.properties.id, ...f.properties }))
+        : (geoJson.assets || []);
+
+      // 2. Costi flotta aggregati
+      const rFlotta = await fetch('/api/bems/fleet/energy-costs', AUTH);
+      const flotta  = rFlotta.ok ? (await rFlotta.json()) : {};
+
+      // 3. Bollette per asset (richiesta parallela)
+      const invPerAsset = {};
+      await Promise.all(assets.map(async a => {
+        try {
+          const r = await fetch(`/api/bems/buildings/${a.id}/invoices`, AUTH);
+          if (r.ok) invPerAsset[a.id] = (await r.json()).invoices || [];
+        } catch { invPerAsset[a.id] = []; }
+      }));
+
+      // 4. Costi unitari per asset (richiesta parallela)
+      const costsPerAsset = {};
+      await Promise.all(assets.map(async a => {
+        try {
+          const r = await fetch(`/api/bems/buildings/${a.id}/energy-costs`, AUTH);
+          if (r.ok) costsPerAsset[a.id] = (await r.json()).energy_costs || [];
+        } catch { costsPerAsset[a.id] = []; }
+      }));
+
+      // ── KPI flotta ──────────────────────────────────────────────────────────
+      const fc = flotta.fleet_costs || {};
+      document.getElementById('kpi-elec-val').textContent =
+        fc.ELECTRICITY ? '€ ' + parseFloat(fc.ELECTRICITY).toFixed(4) : '–';
+      document.getElementById('kpi-gas-val').textContent =
+        fc.GAS ? '€ ' + parseFloat(fc.GAS).toFixed(4) : '–';
+      document.getElementById('kpi-water-val').textContent =
+        fc.WATER ? '€ ' + parseFloat(fc.WATER).toFixed(4) : '–';
+
+      let totBollette = 0, totDisambig = 0;
+      Object.values(invPerAsset).forEach(inv => {
+        totBollette += inv.length;
+        totDisambig += inv.filter(i => i.extraction_status === 'needs_disambiguation').length;
+      });
+      document.getElementById('kpi-tot-bollette').textContent = totBollette;
+      document.getElementById('kpi-disambig').textContent = totDisambig;
+      if (totDisambig > 0) {
+        document.getElementById('kpi-disambig').style.color = 'var(--accent-orange,#F39C12)';
+      }
+
+      // ── Costruzione righe tabella ────────────────────────────────────────────
+      allRows = assets.map(a => {
+        const costs = costsPerAsset[a.id] || [];
+        const costsMap = {};
+        costs.forEach(c => { costsMap[c.commodity] = c; });
+
+        const invoices    = invPerAsset[a.id] || [];
+        const lastInvoice = invoices
+          .filter(i => i.extraction_status === 'ready')
+          .sort((a, b) => new Date(b.issue_date || 0) - new Date(a.issue_date || 0))[0];
+
+        return {
+          id:       a.id,
+          codice:   a.codice || '',
+          nome:     a.nome   || '',
+          tipo:     a.tipo   || '',
+          citta:    a.citta  || '',
+          elec:     costsMap['ELECTRICITY']?.unit_cost_eur ?? null,
+          gas:      costsMap['GAS']?.unit_cost_eur         ?? null,
+          water:    costsMap['WATER']?.unit_cost_eur       ?? null,
+          nBollette:    invoices.length,
+          nDisambig:    invoices.filter(i => i.extraction_status === 'needs_disambiguation').length,
+          lastDate:     lastInvoice?.issue_date ?? null,
+          lastCommodity: lastInvoice?.commodity ?? null,
+        };
+      });
+
+      applicaFiltri();
+    }
+
+    function applicaFiltri() {
+      const q         = document.getElementById('search-input').value.toLowerCase();
+      const commodity = document.getElementById('filter-commodity').value;
+      const tipo      = document.getElementById('filter-tipo').value;
+
+      const filtered = allRows.filter(r => {
+        const matchQ = !q || r.codice.toLowerCase().includes(q) || r.nome.toLowerCase().includes(q) || r.citta.toLowerCase().includes(q);
+        const matchT = !tipo || r.tipo === tipo;
+        const matchC = !commodity ||
+          (commodity === 'ELECTRICITY' && r.elec != null) ||
+          (commodity === 'GAS'         && r.gas  != null) ||
+          (commodity === 'WATER'       && r.water != null);
+        return matchQ && matchT && matchC;
+      });
+
+      renderTabella(filtered);
+    }
+
+    function renderTabella(rows) {
+      const tbody = document.getElementById('inv-tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-secondary)">Nessun asset trovato.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const disambigBadge = r.nDisambig > 0
+          ? `<span class="badge badge-manutenzione" style="margin-left:4px" title="${r.nDisambig} da abbinare">${r.nDisambig}</span>`
+          : '';
+        const lastStr = r.lastDate
+          ? `${fmtData(r.lastDate)}${r.lastCommodity ? ' <span style="font-size:10px;color:var(--text-muted)">' + (COMMODITY_META[r.lastCommodity]?.label || r.lastCommodity) + '</span>' : ''}`
+          : '<span style="color:var(--text-muted)">–</span>';
+
+        return `<tr>
+          <td><span class="asset-code">${r.codice}</span></td>
+          <td><a href="#" onclick="apriDettaglioAsset(${r.id});return false" style="color:var(--accent-blue);text-decoration:none">${r.nome}</a></td>
+          <td>${r.tipo}</td>
+          <td>${r.citta}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">${fmtEur(r.elec)}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">${fmtEur(r.gas)}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums">${fmtEur(r.water)}</td>
+          <td style="text-align:center">${r.nBollette}${disambigBadge}</td>
+          <td>${lastStr}</td>
+          <td>
+            <div style="display:flex;gap:4px;justify-content:flex-end">
+              <button class="btn-icon" title="Apri dettaglio asset" onclick="apriDettaglioAsset(${r.id})">
+                <i class="fa fa-eye"></i>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderErrore(msg) {
+      document.getElementById('inv-tbody').innerHTML =
+        `<tr><td colspan="10" style="text-align:center;padding:30px;color:#E74C3C">
+          <i class="fa fa-exclamation-triangle" style="margin-right:6px"></i>${msg}
+        </td></tr>`;
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    renderSidebar('eff-bollette', 'efficiency');
+    renderTopbar('eff-bollette', { titolo: 'Asset Efficiency', modulo: 'efficiency' });
+
+    document.getElementById('search-input').addEventListener('input', applicaFiltri);
+    document.getElementById('filter-commodity').addEventListener('change', applicaFiltri);
+    document.getElementById('filter-tipo').addEventListener('change', applicaFiltri);
+
+    caricaDashboard();
+  </script>
+
+  <!-- Modale dettaglio asset condivisa (per apertura da click riga) -->
+  <script src="/static/js/efficiency-detail-modal.js?v=3"></script>
+</body>
+</html>

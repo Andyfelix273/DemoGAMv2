@@ -122,15 +122,16 @@ function renderSidebar(paginaAttiva, modulo, elementId) {
   if (modulo === 'efficiency') {
     // ── Dimostratore Energy Efficiency ──────────────────────────
     html = `
-      ${a('/static/efficiency-map.html',    'eff-mappa',      'fa-map-marker', 'Mappa efficienza')}
-      ${a('/static/efficiency-assets.html', 'eff-anagrafica', 'fa-database',   'Anagrafica asset')}
+      ${a('/static/efficiency-map.html',      'eff-mappa',       'fa-map-marker',          'Mappa efficienza')}
+      ${a('/static/efficiency-assets.html',   'eff-anagrafica',  'fa-database',            'Anagrafica asset')}
       <a href="/static/efficiency-alarms.html"
          class="${cls} ${paginaAttiva === 'eff-allarmi' ? 'active' : ''}"
          title="Allarmi energetici" id="${alrId}">
         <i class="fa fa-bell"></i>
         <span class="${dotCls}" id="${dotId}"></span>
       </a>
-      ${a('/static/efficiency-settings.html', 'eff-impostazioni', 'fa-cog', 'Impostazioni')}
+      ${a('/static/efficiency-invoices.html', 'eff-bollette',    'fa-file-invoice-dollar', 'Tariffe & Bollette')}
+      ${a('/static/efficiency-settings.html', 'eff-impostazioni', 'fa-cog',                'Impostazioni')}
       <div class="${spacer}"></div>
       <button class="${cls}" onclick="API.logout()" title="Esci">
         <i class="fa fa-sign-out"></i>

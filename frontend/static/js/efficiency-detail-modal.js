@@ -51,6 +51,7 @@
       <button class="edm-tab" data-tab="esg"><i class="fa fa-leaf"></i> Efficienza energetica</button>
       <button class="edm-tab" data-tab="impianti"><i class="fa fa-cogs"></i> Impianti</button>
       <button class="edm-tab" data-tab="zone"><i class="fa fa-th-large"></i> Zone &amp; Occupancy</button>
+      <button class="edm-tab" data-tab="bollette"><i class="fa fa-file-invoice-dollar"></i> Tariffe &amp; Bollette</button>
     </div>
 
     <!-- BODY -->
@@ -61,6 +62,7 @@
       <div id="edm-panel-esg"        class="edm-panel"></div>
       <div id="edm-panel-impianti"   class="edm-panel"></div>
       <div id="edm-panel-zone"       class="edm-panel"></div>
+      <div id="edm-panel-bollette"   class="edm-panel"></div>
     </div>
 
     <!-- FOOTER -->
@@ -119,6 +121,62 @@
   border-top-color:var(--accent,#00B4D8);border-radius:50%;
   animation:edm-spin 0.8s linear infinite;margin:30px auto;display:block; }
 @keyframes edm-spin { to { transform:rotate(360deg); } }
+/* ── Tariffe & Bollette ─────────────────────────────────────────────── */
+.edm-inv-section-title {
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;
+  color:var(--text-secondary,#7BAFC4);margin:16px 0 8px;padding-bottom:6px;
+  border-bottom:1px solid var(--border,#1E3A5F);
+}
+.edm-inv-section-title:first-child { margin-top:0; }
+.edm-inv-commodity-strip {
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:4px;
+}
+.edm-inv-commodity-card {
+  background:var(--bg-secondary,#0A1628);border:1px solid var(--border,#1E3A5F);
+  border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;
+}
+.edm-inv-commodity-card.electricity { border-left:3px solid var(--accent-blue,#00A3E0); }
+.edm-inv-commodity-card.gas         { border-left:3px solid var(--accent-orange,#F39C12); }
+.edm-inv-commodity-card.water       { border-left:3px solid #3498DB; }
+.edm-inv-commodity-label { font-size:10px;color:var(--text-secondary,#7BAFC4);text-transform:uppercase;letter-spacing:0.5px; }
+.edm-inv-commodity-cost  { font-size:20px;font-weight:700;color:var(--text-primary,#E0F0FF); }
+.edm-inv-commodity-unit  { font-size:10px;color:var(--text-muted,#4A7A9B); }
+.edm-inv-commodity-date  { font-size:10px;color:var(--text-muted,#4A7A9B);margin-top:2px; }
+.edm-inv-table-wrap { overflow-x:auto;margin-bottom:4px; }
+.edm-inv-table { width:100%;border-collapse:collapse;font-size:12px; }
+.edm-inv-table th {
+  text-align:left;padding:6px 8px;font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary,#7BAFC4);
+  border-bottom:1px solid var(--border,#1E3A5F);white-space:nowrap;
+}
+.edm-inv-table td {
+  padding:7px 8px;border-bottom:1px solid var(--border,#1E3A5F);
+  color:var(--text-primary,#E0F0FF);vertical-align:middle;
+}
+.edm-inv-table tr:last-child td { border-bottom:none; }
+.edm-inv-table tr:hover td { background:rgba(255,255,255,0.02); }
+.edm-inv-actions { display:flex;gap:4px;justify-content:flex-end; }
+.edm-inv-upload-area {
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;
+}
+.edm-inv-processing-row {
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:rgba(0,163,224,0.08);border:1px solid rgba(0,163,224,0.25);
+  border-radius:6px;font-size:12px;color:var(--text-secondary,#7BAFC4);
+  margin-bottom:6px;
+}
+.edm-inv-processing-spinner {
+  width:14px;height:14px;border:2px solid var(--border,#1E3A5F);
+  border-top-color:var(--accent-blue,#00A3E0);border-radius:50%;
+  animation:edm-spin 0.8s linear infinite;flex-shrink:0;
+}
+.edm-inv-disambig-row {
+  background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.3);
+  border-radius:6px;padding:10px 12px;margin-bottom:6px;font-size:12px;
+}
+.edm-inv-empty {
+  text-align:center;padding:24px;color:var(--text-secondary,#7BAFC4);font-size:12px;
+}
 </style>`;
   document.body.appendChild(el.firstElementChild);
   document.body.appendChild(el.lastElementChild); // <style>
@@ -252,6 +310,9 @@ async function apriDettaglioAsset(id) {
 
     // ── Zone ───────────────────────────────────────────────────
     _edmCaricaZone(id);
+
+    // ── Tariffe & Bollette ─────────────────────────────────────
+    _edmCaricaBollette(id);
 
     // ── Bottone Floorplan (solo per edifici con BEMS) ──────────
     // Mostra se l'asset ha zone BEMS (verificato in _edmCaricaZone)
@@ -859,4 +920,637 @@ async function _edmApriModaleNuovoReferente(assetId) {
       errEl.style.display = 'block';
     }
   };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// TAB TARIFFE & BOLLETTE
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * _edmCaricaBollette(assetId)
+ * Carica e renderizza il pannello Tariffe & Bollette per l'asset specificato.
+ *
+ * Struttura del pannello:
+ *   1. Strip KPI costi unitari per commodity (Elettricità, Gas, Acqua)
+ *   2. Sezione Forniture attive (supply_points) con azioni CRUD
+ *   3. Sezione Storico bollette con upload e azioni per singola bolletta
+ *   4. Modali inline: upload bolletta, form manuale, disambiguazione
+ */
+async function _edmCaricaBollette(assetId) {
+  const el = document.getElementById('edm-panel-bollette');
+  if (!el) return;
+
+  const AUTH = { headers: { 'Authorization': 'Bearer ' + API.getToken() } };
+  const canManage = API.can('documents.upload'); // riusa permesso documenti
+
+  // ── Costanti commodity ──────────────────────────────────────────────
+  const COMMODITY_META = {
+    ELECTRICITY: { label: 'Elettricità', unit: 'kWh', icon: 'fa-bolt',       cls: 'electricity', color: 'var(--accent-blue,#00A3E0)' },
+    GAS:         { label: 'Gas',          unit: 'Smc', icon: 'fa-fire',       cls: 'gas',         color: 'var(--accent-orange,#F39C12)' },
+    WATER:       { label: 'Acqua',        unit: 'm³',  icon: 'fa-tint',       cls: 'water',       color: '#3498DB' },
+  };
+
+  // ── Utility ─────────────────────────────────────────────────────────
+  function fmtEur(v) {
+    if (v == null) return '–';
+    return '€ ' + parseFloat(v).toFixed(4).replace('.', ',');
+  }
+  function fmtData(s) {
+    if (!s) return '–';
+    return new Date(s).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  }
+  function fmtNum(v, dec = 2) {
+    if (v == null) return '–';
+    return parseFloat(v).toLocaleString('it-IT', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function statusBadge(status) {
+    const map = {
+      ready:                '<span class="badge badge-completato">Pronto</span>',
+      processing:           '<span class="badge badge-in_corso">Elaborazione…</span>',
+      needs_disambiguation: '<span class="badge badge-manutenzione">Da abbinare</span>',
+      error:                '<span class="badge badge-scaduta">Errore</span>',
+    };
+    return map[status] || `<span class="badge">${status}</span>`;
+  }
+  function methodBadge(method) {
+    if (method === 'LLM_EXTRACTED')  return '<span class="badge badge-attivo" title="Estratto da AI">AI</span>';
+    if (method === 'LLM_CORRECTED')  return '<span class="badge badge-in_corso" title="Corretto manualmente">AI+M</span>';
+    if (method === 'MANUAL')         return '<span class="badge badge-inattivo" title="Inserito manualmente">Man.</span>';
+    return '';
+  }
+
+  // ── Fetch dati ───────────────────────────────────────────────────────
+  let costs = [], supplyPoints = [], invoices = [];
+  try {
+    const [rCosts, rSp, rInv] = await Promise.all([
+      fetch(`/api/bems/buildings/${assetId}/energy-costs`, AUTH),
+      fetch(`/api/bems/buildings/${assetId}/supply-points`, AUTH),
+      fetch(`/api/bems/buildings/${assetId}/invoices`, AUTH),
+    ]);
+    if (rCosts.ok)  costs        = (await rCosts.json()).energy_costs   || [];
+    if (rSp.ok)     supplyPoints = (await rSp.json()).supply_points     || [];
+    if (rInv.ok)    invoices     = (await rInv.json()).invoices         || [];
+  } catch (e) {
+    el.innerHTML = `<div class="edm-inv-empty"><i class="fa fa-exclamation-triangle"></i><br>Errore caricamento dati: ${e.message}</div>`;
+    return;
+  }
+
+  // ── Polling bollette in elaborazione ────────────────────────────────
+  const processing = invoices.filter(i => i.extraction_status === 'processing');
+  if (processing.length > 0) {
+    setTimeout(() => _edmCaricaBollette(assetId), 4000);
+  }
+
+  // ── 1. KPI costi unitari ─────────────────────────────────────────────
+  const costsMap = {};
+  costs.forEach(c => { costsMap[c.commodity] = c; });
+
+  const kpiHtml = Object.entries(COMMODITY_META).map(([key, meta]) => {
+    const c = costsMap[key];
+    const costStr = c ? fmtEur(c.unit_cost_eur) : '–';
+    const dateStr = c ? fmtData(c.last_updated) : '';
+    return `
+      <div class="edm-inv-commodity-card ${meta.cls}">
+        <div class="edm-inv-commodity-label"><i class="fa ${meta.icon}" style="margin-right:4px;color:${meta.color}"></i>${meta.label}</div>
+        <div class="edm-inv-commodity-cost">${costStr}</div>
+        <div class="edm-inv-commodity-unit">€ / ${meta.unit}</div>
+        ${dateStr ? `<div class="edm-inv-commodity-date">Agg. ${dateStr}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  // ── 2. Forniture attive ──────────────────────────────────────────────
+  const spBySupplier = {};
+  supplyPoints.forEach(sp => {
+    const key = sp.supplier_name || 'Senza fornitore';
+    if (!spBySupplier[key]) spBySupplier[key] = [];
+    spBySupplier[key].push(sp);
+  });
+
+  let spHtml = '';
+  if (supplyPoints.length === 0) {
+    spHtml = `<div class="edm-inv-empty"><i class="fa fa-plug"></i><br>Nessuna fornitura configurata.<br>
+      ${canManage ? `<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="_edmApriModaleNuovaFornitura(${assetId})"><i class="fa fa-plus"></i> Aggiungi fornitura</button>` : ''}</div>`;
+  } else {
+    spHtml = `
+      <div class="edm-inv-table-wrap">
+        <table class="edm-inv-table">
+          <thead><tr>
+            <th>Commodity</th><th>Fornitore</th><th>Codice POD/PDR</th>
+            <th>Descrizione</th><th>Costo unitario</th><th>Stato</th>
+            ${canManage ? '<th></th>' : ''}
+          </tr></thead>
+          <tbody>
+            ${supplyPoints.map(sp => {
+              const meta = COMMODITY_META[sp.commodity] || {};
+              const activeLabel = sp.is_active
+                ? '<span class="badge badge-attivo">Attiva</span>'
+                : '<span class="badge badge-inattivo">Disattiva</span>';
+              const costVal = sp.last_unit_cost_eur ? fmtEur(sp.last_unit_cost_eur) + ' / ' + (meta.unit || '') : '–';
+              return `<tr>
+                <td><i class="fa ${meta.icon || 'fa-bolt'}" style="color:${meta.color || ''};margin-right:4px"></i>${meta.label || sp.commodity}</td>
+                <td>${sp.supplier_name || '–'}</td>
+                <td><code style="font-size:11px">${sp.point_code || '–'}</code></td>
+                <td>${sp.description || '–'}</td>
+                <td>${costVal}</td>
+                <td>${activeLabel}</td>
+                ${canManage ? `<td><div class="edm-inv-actions">
+                  <button class="btn-icon" title="Disattiva" onclick="_edmDisattivaSP(${assetId},'${sp.supply_point_id}')"><i class="fa fa-ban"></i></button>
+                </div></td>` : ''}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── 3. Bollette in elaborazione ──────────────────────────────────────
+  const processingHtml = processing.map(i => `
+    <div class="edm-inv-processing-row">
+      <div class="edm-inv-processing-spinner"></div>
+      <span>Estrazione AI in corso: <strong>${i.original_filename || 'bolletta.pdf'}</strong></span>
+    </div>`).join('');
+
+  // ── 4. Bollette da disambiguare ──────────────────────────────────────
+  const disambig = invoices.filter(i => i.extraction_status === 'needs_disambiguation');
+  const disambigHtml = disambig.map(i => {
+    const spOptions = supplyPoints
+      .filter(sp => sp.commodity === i.commodity)
+      .map(sp => `<option value="${sp.supply_point_id}">${sp.supplier_name} — ${sp.point_code || sp.description || sp.commodity}</option>`)
+      .join('');
+    return `
+      <div class="edm-inv-disambig-row">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <i class="fa fa-exclamation-triangle" style="color:var(--accent-orange,#F39C12)"></i>
+          <span><strong>${i.original_filename || 'bolletta.pdf'}</strong> — commodity <strong>${i.commodity}</strong>: fornitura non identificata automaticamente.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <select id="disambig-sp-${i.invoice_id}" style="flex:1;min-width:180px;background:var(--bg-secondary,#0A1628);border:1px solid var(--border,#1E3A5F);color:var(--text-primary,#E0F0FF);padding:4px 8px;border-radius:6px;font-size:12px;">
+            <option value="">— Seleziona fornitura —</option>
+            ${spOptions}
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="_edmConfermaDisambig(${assetId},'${i.invoice_id}')">Conferma</button>
+          <button class="btn btn-secondary btn-sm" onclick="_edmEliminaBolletta(${assetId},'${i.invoice_id}')">Scarta</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  // ── 5. Storico bollette ──────────────────────────────────────────────
+  const ready = invoices.filter(i => i.extraction_status === 'ready' || i.extraction_status === 'error');
+  let storicoHtml = '';
+  if (ready.length === 0) {
+    storicoHtml = `<div class="edm-inv-empty"><i class="fa fa-file-invoice"></i><br>Nessuna bolletta caricata.</div>`;
+  } else {
+    storicoHtml = `
+      <div class="edm-inv-table-wrap">
+        <table class="edm-inv-table">
+          <thead><tr>
+            <th>Commodity</th><th>Periodo</th><th>Importo</th>
+            <th>Consumo</th><th>€/Unità</th><th>Fornitore</th>
+            <th>Metodo</th><th>Stato</th>
+            ${canManage ? '<th></th>' : ''}
+          </tr></thead>
+          <tbody>
+            ${ready.map(i => {
+              const meta = COMMODITY_META[i.commodity] || {};
+              const periodo = (i.period_from && i.period_to)
+                ? fmtData(i.period_from) + ' – ' + fmtData(i.period_to)
+                : fmtData(i.issue_date);
+              return `<tr>
+                <td><i class="fa ${meta.icon || 'fa-bolt'}" style="color:${meta.color || ''};margin-right:4px"></i>${meta.label || i.commodity}</td>
+                <td style="white-space:nowrap">${periodo}</td>
+                <td style="white-space:nowrap">${i.total_amount_eur ? '€ ' + fmtNum(i.total_amount_eur) : '–'}</td>
+                <td style="white-space:nowrap">${i.consumption_quantity ? fmtNum(i.consumption_quantity, 0) + ' ' + (i.consumption_unit || '') : '–'}</td>
+                <td style="white-space:nowrap">${fmtEur(i.unit_cost_eur)}</td>
+                <td>${i.supplier_name || '–'}</td>
+                <td>${methodBadge(i.extraction_method)}</td>
+                <td>${statusBadge(i.extraction_status)}</td>
+                ${canManage ? `<td><div class="edm-inv-actions">
+                  ${i.file_path ? `<a class="btn-icon" href="/api/bems/buildings/${assetId}/invoices/${i.invoice_id}/file" target="_blank" title="Scarica PDF"><i class="fa fa-download"></i></a>` : ''}
+                  <button class="btn-icon danger" title="Elimina" onclick="_edmEliminaBolletta(${assetId},'${i.invoice_id}')"><i class="fa fa-trash"></i></button>
+                </div></td>` : ''}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── Render finale ────────────────────────────────────────────────────
+  el.innerHTML = `
+    <div class="edm-inv-section-title"><i class="fa fa-euro-sign" style="margin-right:6px"></i>Costi unitari correnti</div>
+    <div class="edm-inv-commodity-strip">${kpiHtml}</div>
+
+    <div class="edm-inv-section-title" style="margin-top:20px">
+      <i class="fa fa-plug" style="margin-right:6px"></i>Forniture
+      ${canManage ? `<button class="btn btn-primary btn-sm" style="margin-left:auto;display:inline-flex;align-items:center;gap:4px" onclick="_edmApriModaleNuovaFornitura(${assetId})"><i class="fa fa-plus"></i> Aggiungi</button>` : ''}
+    </div>
+    ${spHtml}
+
+    <div class="edm-inv-section-title" style="margin-top:20px">
+      <i class="fa fa-file-invoice-dollar" style="margin-right:6px"></i>Bollette
+      ${canManage ? `<div class="edm-inv-upload-area" style="display:inline-flex;margin-left:auto">
+        <button class="btn btn-primary btn-sm" onclick="_edmApriUploadBolletta(${assetId})"><i class="fa fa-upload"></i> Carica PDF</button>
+        <button class="btn btn-secondary btn-sm" onclick="_edmApriFormManualeBolletta(${assetId})"><i class="fa fa-pen"></i> Inserimento manuale</button>
+      </div>` : ''}
+    </div>
+    ${processingHtml}
+    ${disambigHtml}
+    ${storicoHtml}`;
+}
+
+// ── Azioni Bollette ────────────────────────────────────────────────────────
+
+async function _edmEliminaBolletta(assetId, invoiceId) {
+  if (!confirm('Eliminare questa bolletta?')) return;
+  const r = await fetch(`/api/bems/buildings/${assetId}/invoices/${invoiceId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + API.getToken() }
+  });
+  if (r.ok) _edmCaricaBollette(assetId);
+  else alert('Errore eliminazione bolletta');
+}
+
+async function _edmConfermaDisambig(assetId, invoiceId) {
+  const sel = document.getElementById('disambig-sp-' + invoiceId);
+  if (!sel || !sel.value) { alert('Selezionare una fornitura'); return; }
+  const r = await fetch(`/api/bems/buildings/${assetId}/invoices/${invoiceId}/confirm-disambiguation`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + API.getToken(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignments: [{ invoice_id: invoiceId, supply_point_id: sel.value }] })
+  });
+  if (r.ok) _edmCaricaBollette(assetId);
+  else alert('Errore conferma abbinamento');
+}
+
+async function _edmDisattivaSP(assetId, spId) {
+  if (!confirm('Disattivare questa fornitura?')) return;
+  const r = await fetch(`/api/bems/buildings/${assetId}/supply-points/${spId}/deactivate`, {
+    method: 'PATCH',
+    headers: { 'Authorization': 'Bearer ' + API.getToken() }
+  });
+  if (r.ok) _edmCaricaBollette(assetId);
+  else alert('Errore disattivazione fornitura');
+}
+
+// ── Upload bolletta PDF ────────────────────────────────────────────────────
+
+function _edmApriUploadBolletta(assetId) {
+  const MODAL_ID = 'edm-inv-upload-modal';
+  let m = document.getElementById(MODAL_ID);
+  if (!m) {
+    m = document.createElement('div');
+    m.id = MODAL_ID;
+    m.className = 'modal-overlay';
+    m.style.zIndex = '4000';
+    m.innerHTML = `
+      <div class="modal-box modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title"><i class="fa fa-upload" style="margin-right:6px"></i>Carica bolletta PDF</h3>
+          <button class="btn-icon" onclick="document.getElementById('${MODAL_ID}').classList.remove('open')"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>File PDF *</label>
+            <div class="upload-zone" id="edm-inv-drop-zone"
+                 onclick="document.getElementById('edm-inv-file-input').click()"
+                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="_edmInvOnDrop(event)">
+              <i class="fa fa-file-pdf upload-zone-icon" style="font-size:24px;display:block;margin-bottom:8px"></i>
+              <div class="upload-zone-text">Trascina il PDF o <span class="upload-zone-link">clicca per selezionare</span></div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Solo PDF — max 10 MB</div>
+            </div>
+            <input type="file" id="edm-inv-file-input" style="display:none" accept=".pdf"
+                   onchange="_edmInvOnFileSelected(this.files[0])">
+            <div id="edm-inv-file-preview" class="det-box" style="display:none;margin-top:8px;align-items:center;gap:8px">
+              <i class="fa fa-file-pdf upload-zone-icon"></i>
+              <span id="edm-inv-file-name"></span>
+              <span id="edm-inv-file-size" class="upload-zone-size"></span>
+            </div>
+          </div>
+          <div id="edm-inv-upload-error" class="form-error"></div>
+          <div id="edm-inv-upload-progress" style="display:none;margin-top:8px">
+            <div class="upload-progress-wrap"><div id="edm-inv-progress-bar" class="upload-progress-fill"></div></div>
+            <div class="det-meta" style="margin-top:4px;text-align:center">Caricamento in corso…</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="document.getElementById('${MODAL_ID}').classList.remove('open')">Annulla</button>
+          <button class="btn btn-primary" id="edm-inv-upload-btn" onclick="_edmEseguiUploadBolletta()"><i class="fa fa-upload"></i> Carica e analizza</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+  }
+  m._assetId = assetId;
+  m._file = null;
+  document.getElementById('edm-inv-file-preview').style.display = 'none';
+  document.getElementById('edm-inv-upload-error').textContent = '';
+  document.getElementById('edm-inv-upload-progress').style.display = 'none';
+  document.getElementById('edm-inv-progress-bar').style.width = '0%';
+  m.classList.add('open');
+}
+
+function _edmInvOnDrop(event) {
+  event.preventDefault();
+  document.getElementById('edm-inv-drop-zone').classList.remove('drag-over');
+  const file = event.dataTransfer.files[0];
+  if (file) _edmInvOnFileSelected(file);
+}
+
+function _edmInvOnFileSelected(file) {
+  const m = document.getElementById('edm-inv-upload-modal');
+  if (!file) return;
+  m._file = file;
+  document.getElementById('edm-inv-file-name').textContent = file.name;
+  const kb = file.size / 1024;
+  document.getElementById('edm-inv-file-size').textContent =
+    kb < 1024 ? kb.toFixed(1) + ' KB' : (kb / 1024).toFixed(2) + ' MB';
+  document.getElementById('edm-inv-file-preview').style.display = 'flex';
+  document.getElementById('edm-inv-upload-error').textContent = '';
+}
+
+async function _edmEseguiUploadBolletta() {
+  const m = document.getElementById('edm-inv-upload-modal');
+  const errEl = document.getElementById('edm-inv-upload-error');
+  if (!m._file) { errEl.textContent = 'Selezionare un file PDF.'; return; }
+  if (!m._file.name.toLowerCase().endsWith('.pdf')) { errEl.textContent = 'Il file deve essere in formato PDF.'; return; }
+  if (m._file.size > 10 * 1024 * 1024) { errEl.textContent = 'Il file supera i 10 MB.'; return; }
+
+  const btn = document.getElementById('edm-inv-upload-btn');
+  btn.disabled = true;
+  document.getElementById('edm-inv-upload-progress').style.display = 'block';
+
+  // Simula avanzamento progress bar
+  let pct = 0;
+  const bar = document.getElementById('edm-inv-progress-bar');
+  const timer = setInterval(() => {
+    pct = Math.min(pct + 10, 85);
+    bar.style.width = pct + '%';
+  }, 200);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', m._file);
+    const r = await fetch(`/api/bems/buildings/${m._assetId}/invoices/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + API.getToken() },
+      body: fd
+    });
+    clearInterval(timer);
+    bar.style.width = '100%';
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }));
+      throw new Error(err.detail || 'Errore upload');
+    }
+    m.classList.remove('open');
+    _edmCaricaBollette(m._assetId);
+  } catch (e) {
+    clearInterval(timer);
+    errEl.textContent = e.message;
+    document.getElementById('edm-inv-upload-progress').style.display = 'none';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Inserimento manuale bolletta ───────────────────────────────────────────
+
+function _edmApriFormManualeBolletta(assetId) {
+  const MODAL_ID = 'edm-inv-manual-modal';
+  let m = document.getElementById(MODAL_ID);
+  if (!m) {
+    m = document.createElement('div');
+    m.id = MODAL_ID;
+    m.className = 'modal-overlay';
+    m.style.zIndex = '4000';
+    m.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 class="modal-title"><i class="fa fa-pen" style="margin-right:6px"></i>Inserimento manuale bolletta</h3>
+          <button class="btn-icon" onclick="document.getElementById('${MODAL_ID}').classList.remove('open')"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label>Commodity *</label>
+              <select id="edm-inv-m-commodity">
+                <option value="ELECTRICITY">Elettricità</option>
+                <option value="GAS">Gas</option>
+                <option value="WATER">Acqua</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Numero fattura</label>
+              <input type="text" id="edm-inv-m-number" placeholder="es. FAT-2026-001">
+            </div>
+            <div class="form-group">
+              <label>Data emissione</label>
+              <input type="date" id="edm-inv-m-issue-date">
+            </div>
+            <div class="form-group">
+              <label>Periodo dal</label>
+              <input type="date" id="edm-inv-m-period-from">
+            </div>
+            <div class="form-group">
+              <label>Periodo al</label>
+              <input type="date" id="edm-inv-m-period-to">
+            </div>
+            <div class="form-group">
+              <label>Importo totale (€) *</label>
+              <input type="number" id="edm-inv-m-amount" step="0.01" placeholder="es. 412.50">
+            </div>
+            <div class="form-group">
+              <label>Consumo *</label>
+              <input type="number" id="edm-inv-m-consumption" step="0.001" placeholder="es. 3200">
+            </div>
+            <div class="form-group">
+              <label>Unità</label>
+              <select id="edm-inv-m-unit">
+                <option value="kWh">kWh</option>
+                <option value="Smc">Smc</option>
+                <option value="m³">m³</option>
+              </select>
+            </div>
+          </div>
+          <div id="edm-inv-m-error" class="form-error" style="margin-top:8px"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="document.getElementById('${MODAL_ID}').classList.remove('open')">Annulla</button>
+          <button class="btn btn-primary" onclick="_edmSalvaManualeBolletta()"><i class="fa fa-save"></i> Salva</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+  }
+  m._assetId = assetId;
+  document.getElementById('edm-inv-m-error').textContent = '';
+  m.classList.add('open');
+}
+
+async function _edmSalvaManualeBolletta() {
+  const m = document.getElementById('edm-inv-manual-modal');
+  const errEl = document.getElementById('edm-inv-m-error');
+  const assetId = m._assetId;
+  const commodity    = document.getElementById('edm-inv-m-commodity').value;
+  const amount       = parseFloat(document.getElementById('edm-inv-m-amount').value);
+  const consumption  = parseFloat(document.getElementById('edm-inv-m-consumption').value);
+  const unit         = document.getElementById('edm-inv-m-unit').value;
+  const issueDate    = document.getElementById('edm-inv-m-issue-date').value;
+  const periodFrom   = document.getElementById('edm-inv-m-period-from').value;
+  const periodTo     = document.getElementById('edm-inv-m-period-to').value;
+  const invNumber    = document.getElementById('edm-inv-m-number').value;
+
+  if (!amount || isNaN(amount) || amount <= 0) { errEl.textContent = 'Importo non valido.'; return; }
+  if (!consumption || isNaN(consumption) || consumption <= 0) { errEl.textContent = 'Consumo non valido.'; return; }
+
+  const unitCost = amount / consumption;
+
+  try {
+    // Prima crea un invoice in stato processing, poi aggiorna con i dati manuali
+    const rUp = await fetch(`/api/bems/buildings/${assetId}/invoices/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + API.getToken() },
+      body: (() => { const fd = new FormData(); fd.append('file', new File([''], 'manuale.pdf', { type: 'application/pdf' })); return fd; })()
+    });
+    if (!rUp.ok) throw new Error('Errore creazione bolletta');
+    const { invoice_id } = await rUp.json();
+
+    const rPut = await fetch(`/api/bems/buildings/${assetId}/invoices/${invoice_id}`, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + API.getToken(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commodity, invoice_number: invNumber || null,
+        issue_date: issueDate || null, period_from: periodFrom || null, period_to: periodTo || null,
+        total_amount_eur: amount, consumption_quantity: consumption,
+        consumption_unit: unit, unit_cost_eur: unitCost
+      })
+    });
+    if (!rPut.ok) throw new Error('Errore salvataggio dati');
+    m.classList.remove('open');
+    _edmCaricaBollette(assetId);
+  } catch (e) {
+    errEl.textContent = e.message;
+  }
+}
+
+// ── Nuova fornitura (supply point) ────────────────────────────────────────
+
+async function _edmApriModaleNuovaFornitura(assetId) {
+  const MODAL_ID = 'edm-inv-sp-modal';
+  let m = document.getElementById(MODAL_ID);
+
+  // Carica fornitori esistenti per il select
+  const AUTH = { headers: { 'Authorization': 'Bearer ' + API.getToken() } };
+  const rSup = await fetch(`/api/bems/buildings/${assetId}/suppliers`, AUTH);
+  const suppliers = rSup.ok ? (await rSup.json()).suppliers || [] : [];
+
+  const supplierOptions = suppliers.map(s =>
+    `<option value="${s.supplier_id}">${s.name}</option>`
+  ).join('');
+
+  if (!m) {
+    m = document.createElement('div');
+    m.id = MODAL_ID;
+    m.className = 'modal-overlay';
+    m.style.zIndex = '4000';
+    document.body.appendChild(m);
+  }
+  m._assetId = assetId;
+  m.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa fa-plug" style="margin-right:6px"></i>Nuova fornitura</h3>
+        <button class="btn-icon" onclick="document.getElementById('${MODAL_ID}').classList.remove('open')"><i class="fa fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Fornitore *</label>
+            <select id="edm-sp-supplier">
+              <option value="">— Seleziona fornitore —</option>
+              ${supplierOptions}
+              <option value="__new__">+ Nuovo fornitore…</option>
+            </select>
+          </div>
+          <div class="form-group" id="edm-sp-new-supplier-wrap" style="display:none;grid-column:1/-1">
+            <label>Nome fornitore *</label>
+            <input type="text" id="edm-sp-new-supplier-name" placeholder="es. Enel Energia S.p.A.">
+          </div>
+          <div class="form-group">
+            <label>Commodity *</label>
+            <select id="edm-sp-commodity">
+              <option value="ELECTRICITY">Elettricità</option>
+              <option value="GAS">Gas</option>
+              <option value="WATER">Acqua</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Codice POD / PDR / Matricola</label>
+            <input type="text" id="edm-sp-point-code" placeholder="es. IT001E12345678">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Descrizione</label>
+            <input type="text" id="edm-sp-description" placeholder="es. Quadro generale piano terra">
+          </div>
+          <div class="form-group">
+            <label>Data attivazione</label>
+            <input type="date" id="edm-sp-activated-on">
+          </div>
+        </div>
+        <div id="edm-sp-error" class="form-error" style="margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('${MODAL_ID}').classList.remove('open')">Annulla</button>
+        <button class="btn btn-primary" onclick="_edmSalvaNuovaFornitura(${assetId})"><i class="fa fa-save"></i> Salva</button>
+      </div>
+    </div>`;
+
+  // Toggle nuovo fornitore
+  m.querySelector('#edm-sp-supplier').addEventListener('change', (e) => {
+    document.getElementById('edm-sp-new-supplier-wrap').style.display =
+      e.target.value === '__new__' ? 'block' : 'none';
+  });
+
+  m.classList.add('open');
+}
+
+async function _edmSalvaNuovaFornitura(assetId) {
+  const m = document.getElementById('edm-inv-sp-modal');
+  const errEl = document.getElementById('edm-sp-error');
+  const AUTH = { 'Authorization': 'Bearer ' + API.getToken(), 'Content-Type': 'application/json' };
+
+  let supplierId = document.getElementById('edm-sp-supplier').value;
+  const commodity    = document.getElementById('edm-sp-commodity').value;
+  const pointCode    = document.getElementById('edm-sp-point-code').value.trim() || null;
+  const description  = document.getElementById('edm-sp-description').value.trim() || null;
+  const activatedOn  = document.getElementById('edm-sp-activated-on').value || null;
+
+  if (!supplierId) { errEl.textContent = 'Selezionare un fornitore.'; return; }
+
+  try {
+    // Crea nuovo fornitore se richiesto
+    if (supplierId === '__new__') {
+      const name = document.getElementById('edm-sp-new-supplier-name').value.trim();
+      if (!name) { errEl.textContent = 'Inserire il nome del fornitore.'; return; }
+      const rSup = await fetch(`/api/bems/buildings/${assetId}/suppliers`, {
+        method: 'POST', headers: AUTH,
+        body: JSON.stringify({ name })
+      });
+      if (!rSup.ok) throw new Error('Errore creazione fornitore');
+      supplierId = (await rSup.json()).supplier.supplier_id;
+    }
+
+    const rSp = await fetch(`/api/bems/buildings/${assetId}/supply-points`, {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({ supplier_id: supplierId, commodity, point_code: pointCode, description, activated_on: activatedOn })
+    });
+    if (!rSp.ok) {
+      const err = await rSp.json().catch(() => ({ detail: rSp.statusText }));
+      throw new Error(err.detail || 'Errore creazione fornitura');
+    }
+    m.classList.remove('open');
+    _edmCaricaBollette(assetId);
+  } catch (e) {
+    errEl.textContent = e.message;
+  }
 }
