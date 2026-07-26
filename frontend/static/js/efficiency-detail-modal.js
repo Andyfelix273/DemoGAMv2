@@ -2,8 +2,8 @@
  * efficiency-detail-modal.js — Modale dettaglio asset condivisa
  *
  * Componente autonomo: inietta il markup HTML della modale nel <body>,
- * gestisce tutti i 7 tab (Anagrafica, Consumi, Occupancy, Allarmi, Efficienza energetica,
- * Impianti, Zone) e si apre con apriDettaglioAsset(id).
+ * gestisce tutti i 6 tab (Anagrafica, Consumi, Allarmi, Efficienza energetica,
+ * Impianti, Zone & Occupancy) e si apre con apriDettaglioAsset(id).
  *
  * Utilizzato da:
  *   - efficiency-map.html   (sostituisce efficiency-map-modal.js)
@@ -47,18 +47,16 @@
                               padding:0 24px;flex-shrink:0;overflow-x:auto;">
       <button class="edm-tab active" data-tab="anagrafica"><i class="fa fa-info-circle"></i> Anagrafica</button>
       <button class="edm-tab" data-tab="consumi"><i class="fa fa-bolt"></i> Consumi</button>
-      <button class="edm-tab" data-tab="occupancy"><i class="fa fa-users"></i> Occupancy</button>
       <button class="edm-tab" data-tab="allarmi"><i class="fa fa-bell"></i> Allarmi <span id="edm-alarm-badge"></span></button>
       <button class="edm-tab" data-tab="esg"><i class="fa fa-leaf"></i> Efficienza energetica</button>
       <button class="edm-tab" data-tab="impianti"><i class="fa fa-cogs"></i> Impianti</button>
-      <button class="edm-tab" data-tab="zone"><i class="fa fa-th-large"></i> Zone</button>
+      <button class="edm-tab" data-tab="zone"><i class="fa fa-th-large"></i> Zone &amp; Occupancy</button>
     </div>
 
     <!-- BODY -->
     <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;min-height:0;">
       <div id="edm-panel-anagrafica" class="edm-panel active"></div>
       <div id="edm-panel-consumi"    class="edm-panel"></div>
-      <div id="edm-panel-occupancy"  class="edm-panel"></div>
       <div id="edm-panel-allarmi"    class="edm-panel"></div>
       <div id="edm-panel-esg"        class="edm-panel"></div>
       <div id="edm-panel-impianti"   class="edm-panel"></div>
@@ -175,7 +173,7 @@ async function apriDettaglioAsset(id) {
   document.getElementById('edm-btn-floorplan').style.display = 'none';
 
   // Pre-popola gli altri panel con spinner
-  ['consumi','occupancy','allarmi','esg','impianti','zone'].forEach(t => {
+  ['consumi','allarmi','esg','impianti','zone'].forEach(t => {
     document.getElementById('edm-panel-' + t).innerHTML = _edmSpinner();
   });
 
@@ -242,9 +240,6 @@ async function apriDettaglioAsset(id) {
     document.getElementById('edm-consumi-ore').addEventListener('change', (e) => {
       _edmCaricaConsumi(id, parseInt(e.target.value));
     });
-
-    // ── Occupancy ──────────────────────────────────────────────
-    _edmCaricaOccupancy(id);
 
     // ── Allarmi ────────────────────────────────────────────────
     _edmCaricaAllarmi(id, a.nome);
@@ -368,77 +363,6 @@ async function _edmCaricaConsumi(assetId, ore) {
   }
 }
 
-async function _edmCaricaOccupancy(assetId) {
-  const el = document.getElementById('edm-panel-occupancy');
-  if (!el) return;
-  try {
-    const [summaryRes, telRes, zonesRes] = await Promise.all([
-      fetch('/api/occupancy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } }),
-      fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null),
-      fetch(`/api/bems/buildings/${assetId}/zones`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
-    ]);
-    const items   = summaryRes.ok ? await summaryRes.json() : [];
-    const telData = telRes && telRes.ok ? await telRes.json() : {};
-    const zones   = zonesRes && zonesRes.ok ? await zonesRes.json() : [];
-    const occ     = items.find(i => i.asset_id === assetId);
-
-    const telValues   = Object.values(telData);
-    const zoneOccupate = telValues.filter(z => z.occupancy === true).length;
-    const zoneTotali   = telValues.length;
-
-    const pct        = occ ? (occ.pct_occupancy || 0) : (zoneTotali > 0 ? (zoneOccupate / zoneTotali * 100) : 0);
-    const presenti   = occ ? occ.presenti : zoneOccupate;
-    const capMax     = occ ? occ.capacita_max : zones.reduce((s, z) => s + (z.capacita_persone || 0), 0);
-    const statoColor = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#F39C12' : pct > 0 ? '#27AE60' : '#95A5A6';
-
-    let html = `
-      <div class="edm-kpi-grid" style="margin-bottom:12px;">
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:${statoColor}">${presenti}</div><div class="edm-kpi-lbl">Presenti</div></div>
-        <div class="edm-kpi-card"><div class="edm-kpi-val">${capMax || '–'}</div><div class="edm-kpi-lbl">Capienza max</div></div>
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:${statoColor}">${pct.toFixed(0)}%</div><div class="edm-kpi-lbl">Occupancy</div></div>
-        ${zoneTotali > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${zoneOccupate}/${zoneTotali}</div><div class="edm-kpi-lbl">Zone attive</div></div>` : ''}
-      </div>
-      <div style="background:var(--bg-secondary,#0A1628);border-radius:4px;height:6px;overflow:hidden;margin-bottom:14px;">
-        <div style="background:${statoColor};height:100%;width:${Math.min(pct,100)}%;border-radius:4px;transition:width 0.5s;"></div>
-      </div>`;
-
-    if (zones.length > 0 && Object.keys(telData).length > 0) {
-      const piani = {};
-      zones.forEach(z => {
-        const k = z.floor_nome || z.floor_id || 'Piano';
-        if (!piani[k]) piani[k] = [];
-        piani[k].push(z);
-      });
-      html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary,#7BAFC4);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Dettaglio per zona</div>`;
-      for (const [pianoNome, zoneList] of Object.entries(piani)) {
-        const zoneConTel = zoneList.filter(z => telData[z.zone_id]);
-        if (zoneConTel.length === 0) continue;
-        html += `<div style="font-size:10px;font-weight:600;color:var(--accent,#00B4D8);margin-bottom:5px;">${pianoNome}</div>`;
-        html += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">`;
-        zoneConTel.forEach(z => {
-          const tel    = telData[z.zone_id] || {};
-          const isOcc  = tel.occupancy === true;
-          const oc     = isOcc ? '#27AE60' : '#95A5A6';
-          const tempStr = tel.temp_c  != null ? `${tel.temp_c.toFixed(1)}°C` : '';
-          const co2Str  = tel.co2_ppm != null ? `${tel.co2_ppm.toFixed(0)} ppm` : '';
-          html += `
-            <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;
-                        background:var(--bg-secondary,#0A1628);border-radius:6px;border-left:3px solid ${oc};">
-              <i class="fa fa-circle" style="font-size:8px;color:${oc};"></i>
-              <span style="flex:1;font-size:11px;">${z.nome}</span>
-              ${tempStr ? `<span style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-thermometer-half" style="margin-right:2px;"></i>${tempStr}</span>` : ''}
-              ${co2Str  ? `<span style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-leaf" style="margin-right:2px;"></i>${co2Str}</span>` : ''}
-              <span style="font-size:10px;font-weight:600;color:${oc};">${isOcc ? 'Occupata' : 'Libera'}</span>
-            </div>`;
-        });
-        html += `</div>`;
-      }
-    }
-    el.innerHTML = html;
-  } catch(e) {
-    if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Dati occupancy non disponibili</p>`;
-  }
-}
 
 async function _edmCaricaAllarmi(assetId, nomeAsset) {
   const el = document.getElementById('edm-panel-allarmi');
@@ -559,13 +483,16 @@ async function _edmCaricaZone(assetId) {
   const el = document.getElementById('edm-panel-zone');
   if (!el) return;
   try {
-    const [zonesRes, telRes] = await Promise.all([
+    const [zonesRes, telRes, summaryRes] = await Promise.all([
       fetch(`/api/bems/buildings/${assetId}/zones`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }),
-      fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
+      fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null),
+      fetch('/api/occupancy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
     ]);
     if (!zonesRes.ok) throw new Error('HTTP ' + zonesRes.status);
-    const zones   = await zonesRes.json();
-    const telData = telRes && telRes.ok ? await telRes.json() : {};
+    const zones      = await zonesRes.json();
+    const telData    = telRes && telRes.ok ? await telRes.json() : {};
+    const occItems   = summaryRes && summaryRes.ok ? await summaryRes.json() : [];
+    const occ        = occItems.find(i => i.asset_id === assetId);
 
     if (!zones || zones.length === 0) {
       el.innerHTML = `<p style="color:var(--text-secondary,#7BAFC4);font-size:13px;text-align:center;padding:20px;">Nessuna zona BEMS configurata per questo asset.</p>`;
@@ -583,7 +510,26 @@ async function _edmCaricaZone(assetId) {
                        bagno:'fa-male', reception:'fa-info-circle', server:'fa-server',
                        archivio:'fa-archive', altro:'fa-th-large' };
 
-    let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary,#7BAFC4);">${zones.length} zone BEMS registrate</div>`;
+    // ── KPI Occupancy aggregati ──────────────────────────────────────────
+    const telValues    = Object.values(telData);
+    const zoneOccupate = telValues.filter(z => z.occupancy === true).length;
+    const zoneTotali   = telValues.length;
+    const pct          = occ ? (occ.pct_occupancy || 0) : (zoneTotali > 0 ? (zoneOccupate / zoneTotali * 100) : 0);
+    const presenti     = occ ? occ.presenti : zoneOccupate;
+    const capMax       = occ ? occ.capacita_max : zones.reduce((s, z) => s + (z.capacita_persone || 0), 0);
+    const statoColor   = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#F39C12' : pct > 0 ? '#27AE60' : '#95A5A6';
+
+    let html = `
+      <div class="edm-kpi-grid" style="margin-bottom:12px;">
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:${statoColor}">${presenti}</div><div class="edm-kpi-lbl">Presenti</div></div>
+        <div class="edm-kpi-card"><div class="edm-kpi-val">${capMax || '–'}</div><div class="edm-kpi-lbl">Capienza max</div></div>
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:${statoColor}">${pct.toFixed(0)}%</div><div class="edm-kpi-lbl">Occupancy</div></div>
+        ${zoneTotali > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${zoneOccupate}/${zoneTotali}</div><div class="edm-kpi-lbl">Zone attive</div></div>` : ''}
+      </div>
+      <div style="background:var(--bg-secondary,#0A1628);border-radius:4px;height:6px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:${statoColor};height:100%;width:${Math.min(pct,100)}%;border-radius:4px;transition:width 0.5s;"></div>
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary,#7BAFC4);">${zones.length} zone BEMS registrate</div>`;
 
     for (const [pianoNome, zoneList] of Object.entries(piani)) {
       html += `<div style="margin-bottom:12px;">`;
@@ -620,7 +566,7 @@ async function _edmCaricaZone(assetId) {
     }
     el.innerHTML = html;
   } catch(e) {
-    if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Zone non disponibili: ${e.message}</p>`;
+    if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Zone & Occupancy non disponibili: ${e.message}</p>`;
   }
 }
 
