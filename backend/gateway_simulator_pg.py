@@ -78,7 +78,7 @@ BASELINE_KW = {
     "illuminazione":  8.0,
     "ups":            5.0,
     "generatore":     0.0,
-    "ced":           22.0,   # CED: server, storage, networking — quasi costante h24
+    "ced":            8.5,   # Piccolo CED: 4-5 server (1.2kW cad) + storage (1kW) + switch (0.3kW) + condizionatore (2kW)
     "servizi_em":    12.0,   # Servizi Elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
 }
 
@@ -163,13 +163,15 @@ def simula_impianto(plant_id: str, floor_id: str, tipo: str, ts: datetime) -> di
         factor = (0.8 + random.uniform(0, 0.15)) if is_working else 0.05
         power = baseline * factor
     elif tipo == "ced":
-        # CED: carico quasi costante h24 con picchi durante orario lavorativo
-        # (batch notturni, backup, aggiornamenti)
-        if is_working:
-            factor = 0.80 + random.uniform(0, 0.15)  # 80-95% in orario
-        else:
-            factor = 0.70 + random.uniform(0, 0.10)  # 70-80% fuori orario (batch/backup)
-        power = baseline * factor
+        # Piccolo CED: 4-5 server + storage + switch + condizionatore sempre acceso
+        # Carico quasi piatto h24 con leggere variazioni (batch notturni, backup)
+        # Server: ~1.2 kW x5 = 6 kW, storage: ~1 kW, switch: ~0.3 kW, condizionatore: ~2 kW
+        # Totale atteso: ~8-9 kW con variazione ±5%
+        factor = 0.92 + random.gauss(0, 0.03)   # molto stabile, quasi flat
+        # Leggero picco notturno per backup/aggiornamenti (00-05)
+        if 0 <= ora < 5:
+            factor += random.uniform(0, 0.05)   # +0-5% per batch notturni
+        power = baseline * max(0.80, min(1.05, factor))
     elif tipo == "servizi_em":
         # Servizi elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
         # Picco in orario lavorativo (ascensori, pompe circolazione), minimo notturno
