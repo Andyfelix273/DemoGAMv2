@@ -296,7 +296,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
     renderSidebar('eff-energy-summary', 'efficiency');
-    renderTopbar(i18n.t('energy_summary', 'Energy Summary'));
+    renderTopbar('eff-energy-summary', { titolo: 'Asset Efficiency', filtri: false });
     caricaDashboard();
     document.getElementById('filter-mesi').addEventListener('change', caricaDashboard);
     document.getElementById('btn-refresh').addEventListener('click', caricaDashboard);
