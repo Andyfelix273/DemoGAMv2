@@ -1759,12 +1759,28 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-value">${fmtInt(kpi.co2_kg_mese)}</div>
           <div class="ee-kpi-card-unit">kg CO₂ · mese</div>
         </div>
-        ${kpi.pct_fuori_orario !== null ? `
-        <div class="ee-kpi-card ${offOk ? 'accent-green' : 'accent-red'}">
-          <div class="ee-kpi-card-label">Fuori orario</div>
-          <div class="ee-kpi-card-value" style="color:${offOk ? 'var(--accent-green)' : '#E74C3C'}">${fmt(kpi.pct_fuori_orario)}%</div>
-          <div class="ee-kpi-card-unit">dei consumi mensili</div>
-        </div>` : ''}
+        ${kpi.pct_fuori_orario !== null ? (() => {
+          const pctOff = kpi.pct_fuori_orario;
+          const pctOn  = 100 - pctOff;
+          const r = 20, cx = 26, cy = 26;
+          const circ = 2 * Math.PI * r;
+          const dashOff = (pctOff / 100) * circ;
+          const dashOn  = circ - dashOff;
+          const offColor = offOk ? '#27AE60' : '#E74C3C';
+          const donutSvg = `<svg width="52" height="52" viewBox="0 0 52 52" style="display:block;margin:4px auto 2px;">
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(30,58,95,0.5)" stroke-width="6"/>
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${offColor}" stroke-width="6"
+              stroke-dasharray="${dashOff.toFixed(1)} ${dashOn.toFixed(1)}"
+              stroke-dashoffset="${(circ * 0.25).toFixed(1)}" stroke-linecap="round"/>
+            <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="9" font-weight="700" fill="${offColor}">${fmt(pctOff)}%</text>
+          </svg>`;
+          return `<div class="ee-kpi-card ${offOk ? 'accent-green' : 'accent-red'}">
+            <div class="ee-kpi-card-label">Fuori orario (E-5)</div>
+            ${donutSvg}
+            <div class="ee-kpi-card-unit" style="color:${offColor};font-weight:600;">${fmt(pctOff)}% dei consumi mensili</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${offOk ? 'Nella norma (&lt;15%)' : 'Attenzione: sopra soglia'}</div>
+          </div>`;
+        })() : ''}
         <div class="ee-kpi-card ${alTot > 0 ? (alCrit > 0 ? 'accent-red' : 'accent-orange') : 'accent-green'}">
           <div class="ee-kpi-card-label">Allarmi energetici</div>
           <div class="ee-kpi-card-value" style="color:${alTot > 0 ? (alCrit > 0 ? '#E74C3C' : '#F39C12') : '#27AE60'};">${alTot}</div>
@@ -1870,7 +1886,7 @@ async function _edmCaricaEfficienza(assetId) {
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-area"></i>Dati non disponibili</div>';
     }
 
-    // Breakdown donut
+    // E-9: Breakdown donut + tabella dettaglio sotto
     if (bk && bk.breakdown && bk.breakdown.length) {
       Plotly.newPlot(`ee-chart-breakdown-${assetId}`,
         [{ type: 'pie', hole: 0.55,
@@ -1881,6 +1897,34 @@ async function _edmCaricaEfficienza(assetId) {
            hovertemplate: '<b>%{label}</b><br>%{value:.0f} kWh<br>%{percent}<extra></extra>' }],
         plotLayout({ margin: { t: 10, r: 10, b: 10, l: 10 },
                      legend: { orientation: 'v', x: 1.02, y: 0.5 } }), plotCfg);
+
+      // Tabella dettaglio E-9 sotto il donut
+      const bkEl = document.getElementById(`ee-chart-breakdown-${assetId}`);
+      if (bkEl && bkEl.parentNode) {
+        const totalKwh = bk.breakdown.reduce((s, r) => s + r.kwh, 0);
+        const prezzoKwh = kpi.costo_mese_eur && kpi.kwh_mese > 0 ? kpi.costo_mese_eur / kpi.kwh_mese : 0.285;
+        const tbl = document.createElement('div');
+        tbl.style.cssText = 'margin-top:6px;font-size:10px;';
+        tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="color:var(--text-secondary);border-bottom:1px solid rgba(30,58,95,0.4);">
+            <th style="text-align:left;padding:3px 4px;">Impianto</th>
+            <th style="text-align:right;padding:3px 4px;">kWh</th>
+            <th style="text-align:right;padding:3px 4px;">%</th>
+            <th style="text-align:right;padding:3px 4px;">€ stim.</th>
+          </tr></thead>
+          <tbody>${bk.breakdown.map(r => {
+            const pct = totalKwh > 0 ? (r.kwh / totalKwh * 100) : 0;
+            const costoStim = r.kwh * prezzoKwh;
+            return `<tr style="border-bottom:1px solid rgba(30,58,95,0.2);">
+              <td style="padding:3px 4px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${r.color};margin-right:4px;"></span>${r.label}</td>
+              <td style="text-align:right;padding:3px 4px;">${fmtInt(r.kwh)}</td>
+              <td style="text-align:right;padding:3px 4px;">${fmt(pct)}%</td>
+              <td style="text-align:right;padding:3px 4px;">€ ${fmt(costoStim, 0)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`;
+        bkEl.parentNode.appendChild(tbl);
+      }
     } else {
       const el2 = document.getElementById(`ee-chart-breakdown-${assetId}`);
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-pie"></i>Dati non disponibili</div>';
@@ -1902,72 +1946,199 @@ async function _edmCaricaEfficienza(assetId) {
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-th"></i>Dati non disponibili</div>';
     }
 
-    // Baseline bar chart
+    // E-8: Baseline vs Reale — Line Chart con banda di confidenza ±1σ
     if (bl && bl.length) {
       const filtered = bl.filter(r => r.kw_baseline > 0 || r.kw_attuale > 0);
+      const nomi = filtered.map(r => r.nome);
+      const baseline = filtered.map(r => r.kw_baseline);
+      const attuale  = filtered.map(r => r.kw_attuale);
+      // Banda ±1σ: se non disponibile dal backend, usa ±10% della baseline come approssimazione
+      const sigma = filtered.map(r => r.sigma_kw != null ? r.sigma_kw : r.kw_baseline * 0.10);
+      const bandaUp  = baseline.map((b, i) => b + sigma[i]);
+      const bandaDn  = baseline.map((b, i) => Math.max(0, b - sigma[i]));
       Plotly.newPlot(`ee-chart-baseline-${assetId}`,
-        [{ name: 'Baseline', type: 'bar', x: filtered.map(r => r.nome),
-           y: filtered.map(r => r.kw_baseline), marker: { color: 'rgba(88,166,255,0.4)' } },
-         { name: 'Attuale (24h)', type: 'bar', x: filtered.map(r => r.nome),
-           y: filtered.map(r => r.kw_attuale), marker: { color: filtered.map(r =>
-             r.delta_pct === null ? '#58A6FF' : r.delta_pct > 15 ? '#E74C3C' : r.delta_pct < -15 ? '#27AE60' : '#F39C12'
-           )} }],
-        plotLayout({ barmode: 'group', yaxis: { title: 'kW medio' } }), plotCfg);
+        [
+          // Banda superiore (invisibile, solo per fill)
+          { name: 'Banda +1σ', type: 'scatter', mode: 'lines',
+            x: nomi, y: bandaUp,
+            line: { color: 'transparent' },
+            showlegend: false,
+            hoverinfo: 'skip' },
+          // Banda inferiore con fill verso la superiore
+          { name: 'Intervallo ±1σ', type: 'scatter', mode: 'lines',
+            x: nomi, y: bandaDn,
+            fill: 'tonexty', fillcolor: 'rgba(88,166,255,0.12)',
+            line: { color: 'transparent' },
+            hoverinfo: 'skip' },
+          // Linea baseline
+          { name: 'Baseline', type: 'scatter', mode: 'lines+markers',
+            x: nomi, y: baseline,
+            line: { color: '#58A6FF', width: 2, dash: 'dash' },
+            marker: { color: '#58A6FF', size: 6 },
+            hovertemplate: '<b>%{x}</b><br>Baseline: %{y:.2f} kW<extra></extra>' },
+          // Linea attuale con colore per delta
+          { name: 'Attuale (24h)', type: 'scatter', mode: 'lines+markers',
+            x: nomi, y: attuale,
+            line: { color: '#F39C12', width: 2.5 },
+            marker: { color: filtered.map(r =>
+              r.delta_pct === null ? '#F39C12' : r.delta_pct > 15 ? '#E74C3C' : r.delta_pct < -15 ? '#27AE60' : '#F39C12'
+            ), size: 8 },
+            hovertemplate: '<b>%{x}</b><br>Attuale: %{y:.2f} kW<br>Δ: ' +
+              filtered.map(r => r.delta_pct != null ? (r.delta_pct > 0 ? '+' : '') + r.delta_pct.toFixed(1) + '%' : '–').join('|') +
+              '<extra></extra>' }
+        ],
+        plotLayout({
+          margin: { t: 8, r: 12, b: 40, l: 50 },
+          yaxis: { title: { text: 'kW medio', standoff: 6 }, gridcolor: 'rgba(30,58,95,0.5)' },
+          xaxis: { tickangle: -20, gridcolor: 'rgba(30,58,95,0.5)' },
+          legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+        }), plotCfg);
     } else {
       const el2 = document.getElementById(`ee-chart-baseline-${assetId}`);
-      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-bar"></i>Dati non disponibili</div>';
+      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-line"></i>Dati non disponibili</div>';
     }
 
-    // Occupancy vs costo scatter
+    // E-12: Occupancy vs costo scatter con quadrante spreco
     if (occ && occ.length) {
+      const xVals = occ.map(r => r.occ_pct_media);
+      const yVals = occ.map(r => r.costo_eur);
+      const xMed = xVals.reduce((s, v) => s + v, 0) / xVals.length;
+      const yMed = yVals.reduce((s, v) => s + v, 0) / yVals.length;
+      const xMax = Math.max(...xVals) * 1.1;
+      const yMax = Math.max(...yVals) * 1.1;
+
+      // Colore punti: rosso se bassa occupancy + alto costo (quadrante spreco)
+      const ptColors = occ.map(r =>
+        r.occ_pct_media < xMed && r.costo_eur > yMed ? '#E74C3C' : '#58A6FF'
+      );
+
       Plotly.newPlot(`ee-chart-occ-${assetId}`,
-        [{ type: 'scatter', mode: 'markers+lines',
-           x: occ.map(r => r.occ_pct_media), y: occ.map(r => r.costo_eur),
-           text: occ.map(r => r.data),
-           marker: { color: '#58A6FF', size: 7 },
-           line: { color: 'rgba(88,166,255,0.3)', width: 1 },
-           hovertemplate: '<b>%{text}</b><br>Occupancy: %{x:.0f}%<br>Costo: € %{y:.2f}<extra></extra>' }],
-        plotLayout({ xaxis: { title: 'Occupancy media (%)' }, yaxis: { title: 'Costo (€)' } }), plotCfg);
+        [
+          // Rettangolo quadrante spreco (bassa occ, alto costo)
+          { type: 'scatter', mode: 'lines', name: 'Quadrante spreco',
+            x: [0, xMed, xMed, 0, 0], y: [yMed, yMed, yMax, yMax, yMed],
+            fill: 'toself', fillcolor: 'rgba(231,76,60,0.07)',
+            line: { color: 'rgba(231,76,60,0.3)', width: 1, dash: 'dot' },
+            hoverinfo: 'skip', showlegend: false },
+          // Scatter punti
+          { type: 'scatter', mode: 'markers',
+            x: xVals, y: yVals,
+            text: occ.map(r => r.data),
+            marker: { color: ptColors, size: 8, opacity: 0.85,
+              line: { color: 'rgba(255,255,255,0.2)', width: 1 } },
+            hovertemplate: '<b>%{text}</b><br>Occupancy: %{x:.0f}%<br>Costo: € %{y:.2f}<extra></extra>',
+            showlegend: false },
+          // Linee mediane tratteggiate
+          { type: 'scatter', mode: 'lines', name: 'Media occupancy',
+            x: [xMed, xMed], y: [0, yMax],
+            line: { color: 'rgba(88,166,255,0.4)', width: 1, dash: 'dash' },
+            hoverinfo: 'skip' },
+          { type: 'scatter', mode: 'lines', name: 'Media costo',
+            x: [0, xMax], y: [yMed, yMed],
+            line: { color: 'rgba(88,166,255,0.4)', width: 1, dash: 'dash' },
+            hoverinfo: 'skip' }
+        ],
+        plotLayout({
+          margin: { t: 8, r: 12, b: 40, l: 55 },
+          xaxis: { title: { text: 'Occupancy media (%)', standoff: 4 }, range: [0, xMax], gridcolor: 'rgba(30,58,95,0.5)' },
+          yaxis: { title: { text: 'Costo (€)', standoff: 6 }, range: [0, yMax], tickformat: ',.2f', gridcolor: 'rgba(30,58,95,0.5)' },
+          legend: { orientation: 'h', y: -0.28, font: { size: 10 } },
+          annotations: [{ x: xMed * 0.5, y: yMax * 0.95, text: '⚠ Spreco potenziale',
+            showarrow: false, font: { size: 9, color: '#E74C3C' } }]
+        }), plotCfg);
     } else {
       const el2 = document.getElementById(`ee-chart-occ-${assetId}`);
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-scatter"></i>Dati non disponibili</div>';
     }
 
-    // Trend kWh — linea + area fill
+    // E-13: Trend YoY — Grouped Bar Chart anno su anno con toggle kWh / €
     if (trend && trend.length) {
-      Plotly.newPlot(`ee-chart-trend-kwh-${assetId}`,
-        [{ type: 'scatter', mode: 'lines',
-           x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
-           name: 'kWh', line: { color: '#58A6FF', width: 2.5, shape: 'spline' },
-           fill: 'tozeroy', fillcolor: 'rgba(88,166,255,0.12)',
-           hovertemplate: '<b>%{x}</b><br>%{y:,.0f} kWh<extra></extra>' }],
-        plotLayout({
-          margin: { t: 8, r: 12, b: 35, l: 50 },
-          yaxis: { title: { text: 'kWh', standoff: 6 }, tickformat: ',.0f' },
-          xaxis: { tickangle: -30 }, showlegend: false
-        }), plotCfg);
+      // Raggruppa per anno
+      const anniTrend = [...new Set(trend.map(r => {
+        const d = new Date(r.mese + '-01'); return d.getFullYear();
+      }))].sort();
+      const annoColors = ['#58A6FF', '#27AE60', '#F39C12', '#DDA0DD'];
+      const mesiLabel = trend.map(r => {
+        const d = new Date(r.mese + '-01');
+        return d.toLocaleDateString('it-IT', { month: 'short' });
+      });
+      // Mesi unici per asse X (Jan-Dec)
+      const mesiUniqTrend = [...new Set(trend.map(r => {
+        const d = new Date(r.mese + '-01');
+        return d.toLocaleDateString('it-IT', { month: 'short' });
+      }))];
+
+      // Costruisce tracce per kWh
+      const buildTracesKwh = () => anniTrend.map((anno, i) => {
+        const rows = trend.filter(r => new Date(r.mese + '-01').getFullYear() === anno);
+        return { type: 'bar', name: String(anno),
+          x: rows.map(r => new Date(r.mese + '-01').toLocaleDateString('it-IT', { month: 'short' })),
+          y: rows.map(r => r.kwh),
+          marker: { color: annoColors[i % annoColors.length] },
+          hovertemplate: `<b>${anno} — %{x}</b><br>%{y:,.0f} kWh<extra></extra>` };
+      });
+
+      // Costruisce tracce per €
+      const buildTracesEur = () => anniTrend.map((anno, i) => {
+        const rows = trend.filter(r => new Date(r.mese + '-01').getFullYear() === anno);
+        return { type: 'bar', name: String(anno),
+          x: rows.map(r => new Date(r.mese + '-01').toLocaleDateString('it-IT', { month: 'short' })),
+          y: rows.map(r => r.costo_eur),
+          marker: { color: annoColors[i % annoColors.length] },
+          hovertemplate: `<b>${anno} — %{x}</b><br>€ %{y:,.2f}<extra></extra>` };
+      });
+
+      let modoTrendKwh = true; // true = kWh, false = €
+
+      const renderTrendYoy = (kwh) => {
+        const traces = kwh ? buildTracesKwh() : buildTracesEur();
+        const yTitle = kwh ? 'kWh' : '€';
+        Plotly.react(`ee-chart-trend-kwh-${assetId}`, traces,
+          plotLayout({
+            barmode: 'group',
+            margin: { t: 8, r: 12, b: 50, l: 55 },
+            yaxis: { title: { text: yTitle, standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
+            xaxis: { tickangle: -30, gridcolor: 'rgba(30,58,95,0.5)' },
+            legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+          }), plotCfg);
+      };
+
+      renderTrendYoy(true);
+
+      // Toggle button: inserisce sopra il grafico
+      const trendEl = document.getElementById(`ee-chart-trend-kwh-${assetId}`);
+      if (trendEl) {
+        const toggleWrap = document.createElement('div');
+        toggleWrap.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
+        toggleWrap.innerHTML = `
+          <button id="ee-toggle-kwh-${assetId}" style="background:rgba(88,166,255,0.2);color:#58A6FF;border:1px solid rgba(88,166,255,0.4);border-radius:6px;padding:2px 10px;font-size:10px;font-weight:600;cursor:pointer;">kWh</button>
+          <button id="ee-toggle-eur-${assetId}" style="background:transparent;color:var(--text-secondary);border:1px solid rgba(30,58,95,0.6);border-radius:6px;padding:2px 10px;font-size:10px;cursor:pointer;">€</button>`;
+        trendEl.parentNode.insertBefore(toggleWrap, trendEl);
+        document.getElementById(`ee-toggle-kwh-${assetId}`).addEventListener('click', () => {
+          modoTrendKwh = true;
+          renderTrendYoy(true);
+          document.getElementById(`ee-toggle-kwh-${assetId}`).style.background = 'rgba(88,166,255,0.2)';
+          document.getElementById(`ee-toggle-kwh-${assetId}`).style.color = '#58A6FF';
+          document.getElementById(`ee-toggle-eur-${assetId}`).style.background = 'transparent';
+          document.getElementById(`ee-toggle-eur-${assetId}`).style.color = 'var(--text-secondary)';
+        });
+        document.getElementById(`ee-toggle-eur-${assetId}`).addEventListener('click', () => {
+          modoTrendKwh = false;
+          renderTrendYoy(false);
+          document.getElementById(`ee-toggle-eur-${assetId}`).style.background = 'rgba(243,156,18,0.2)';
+          document.getElementById(`ee-toggle-eur-${assetId}`).style.color = '#F39C12';
+          document.getElementById(`ee-toggle-kwh-${assetId}`).style.background = 'transparent';
+          document.getElementById(`ee-toggle-kwh-${assetId}`).style.color = 'var(--text-secondary)';
+        });
+      }
     } else {
       const el2 = document.getElementById(`ee-chart-trend-kwh-${assetId}`);
-      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-line"></i>Dati non disponibili</div>';
+      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-bar"></i>Dati non disponibili</div>';
     }
 
-    // Trend costi — linea + area fill
-    if (trend && trend.length) {
-      Plotly.newPlot(`ee-chart-trend-cost-${assetId}`,
-        [{ type: 'scatter', mode: 'lines',
-           x: trend.map(r => r.mese), y: trend.map(r => r.costo_eur),
-           name: '€', line: { color: '#F39C12', width: 2.5, shape: 'spline' },
-           fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.12)',
-           hovertemplate: '<b>%{x}</b><br>€ %{y:,.2f}<extra></extra>' }],
-        plotLayout({
-          margin: { t: 8, r: 12, b: 35, l: 55 },
-          yaxis: { title: { text: '€', standoff: 6 }, tickformat: ',.0f' },
-          xaxis: { tickangle: -30 }, showlegend: false
-        }), plotCfg);
-    } else {
-      const el2 = document.getElementById(`ee-chart-trend-cost-${assetId}`);
-      if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-line"></i>Dati non disponibili</div>';
-    }
+    // Grafico costi mensili (nascosto, dati ora nel toggle YoY)
+    const el2Cost = document.getElementById(`ee-chart-trend-cost-${assetId}`);
+    if (el2Cost) el2Cost.style.display = 'none';
 
     // ── E-11: HVAC vs Temperatura esterna — Scatter + regressione ───────────────
     try {
@@ -1977,14 +2148,14 @@ async function _edmCaricaEfficienza(assetId) {
         if (hvac.data && hvac.data.length > 0) {
           const hvacTraces = [
             { type: 'scatter', mode: 'markers', name: 'HVAC kWh/giorno',
-              x: hvac.data.map(r => r.temp_media), y: hvac.data.map(r => r.hvac_kwh),
+              x: hvac.data.map(r => r.temp_c), y: hvac.data.map(r => r.kwh_hvac),
               marker: { color: '#58A6FF', size: 6, opacity: 0.7 },
               hovertemplate: '<b>%{x:.1f}°C</b><br>HVAC: %{y:.1f} kWh<extra></extra>' }
           ];
-          if (hvac.regressione) {
-            const xMin = Math.min(...hvac.data.map(r => r.temp_media));
-            const xMax = Math.max(...hvac.data.map(r => r.temp_media));
-            const { m, q } = hvac.regressione;
+
+            const xMin = Math.min(...hvac.data.map(r => r.temp_c));
+            const xMax = Math.max(...hvac.data.map(r => r.temp_c));
+            const { slope: m, intercept: q } = hvac.regressione;
             hvacTraces.push({
               type: 'scatter', mode: 'lines', name: `Regressione (R²=${(hvac.regressione.r2||0).toFixed(2)})`,
               x: [xMin, xMax], y: [m*xMin+q, m*xMax+q],
@@ -2013,30 +2184,39 @@ async function _edmCaricaEfficienza(assetId) {
       if (commRes.ok) {
         const comm = await commRes.json();
         if (comm.data && comm.data.length > 0) {
-          const commodities = [...new Set(comm.data.map(r => r.commodity))];
-          const commColors = { ELECTRICITY: '#58A6FF', GAS_METHANE: '#F39C12', WATER: '#3498DB', GAS_GPL: '#E67E22', HEATING_OIL: '#8E44AD' };
-          const commLabels = { ELECTRICITY: 'Elettricità', GAS_METHANE: 'Gas Metano', WATER: 'Acqua', GAS_GPL: 'GPL', HEATING_OIL: 'Gasolio' };
-          const mesiUniq = [...new Set(comm.data.map(r => r.mese_label))];
-          const commTraces = commodities.map(c => {
-            const rows = comm.data.filter(r => r.commodity === c);
-            const byMese = {};
-            rows.forEach(r => { byMese[r.mese_label] = r.costo_eur; });
-            return {
-              type: 'bar', name: commLabels[c] || c,
-              x: mesiUniq, y: mesiUniq.map(m => byMese[m] || 0),
-              marker: { color: commColors[c] || '#888' },
-              hovertemplate: `<b>${commLabels[c] || c} — %{x}</b><br>€ %{y:,.2f}<extra></extra>`
-            };
+          // Backend restituisce {mese, electricity_eur, gas_eur, water_eur} — schema flat
+          const mesiNomi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+          const mesiX = comm.data.map(r => {
+            const m = r.mese ? parseInt(r.mese.split('-')[1]) : 1;
+            return mesiNomi[m - 1] || r.mese;
           });
+          const commDef = [
+            { key: 'electricity_eur', label: 'Elettricità', color: '#58A6FF' },
+            { key: 'gas_eur',         label: 'Gas Metano',  color: '#F39C12' },
+            { key: 'water_eur',       label: 'Acqua',       color: '#3498DB' }
+          ];
+          const commTraces = commDef
+            .filter(c => comm.data.some(r => (r[c.key] || 0) > 0))
+            .map(c => ({
+              type: 'bar', name: c.label,
+              x: mesiX,
+              y: comm.data.map(r => r[c.key] || 0),
+              marker: { color: c.color },
+              hovertemplate: `<b>${c.label} — %{x}</b><br>€ %{y:,.2f}<extra></extra>`
+            }));
           const commEl = document.getElementById(`ee-chart-commodity14-${assetId}`);
-          if (commEl) Plotly.newPlot(`ee-chart-commodity14-${assetId}`, commTraces,
-            plotLayout({
-              barmode: 'stack',
-              margin: { t: 8, r: 12, b: 50, l: 55 },
-              yaxis: { title: { text: '€', standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
-              xaxis: { tickangle: -30, gridcolor: 'rgba(30,58,95,0.5)' },
-              legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
-            }), plotCfg);
+          if (commEl && commTraces.length > 0) {
+            Plotly.newPlot(`ee-chart-commodity14-${assetId}`, commTraces,
+              plotLayout({
+                barmode: 'stack',
+                margin: { t: 8, r: 12, b: 50, l: 55 },
+                yaxis: { title: { text: '€', standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
+                xaxis: { tickangle: -30, gridcolor: 'rgba(30,58,95,0.5)' },
+                legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+              }), plotCfg);
+          } else if (commEl) {
+            commEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-layer-group"></i>Solo elettricità disponibile</div>';
+          }
         } else {
           const commEl = document.getElementById(`ee-chart-commodity14-${assetId}`);
           if (commEl) commEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-layer-group"></i>Dati commodity non disponibili</div>';

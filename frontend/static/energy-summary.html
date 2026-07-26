@@ -254,18 +254,58 @@
           <div class="es-kpi-value">${port.n_asset_attivi}</div>
           <div class="es-kpi-unit">${port.n_asset_telemetria || 0} con telemetria IoT</div>
         </div>
-        ${port.asset_migliore ? `
-        <div class="es-kpi-card" style="border-color:rgba(39,174,96,0.4);">
-          <div class="es-kpi-label">Asset più efficiente</div>
-          <div class="es-kpi-value" style="font-size:14px;color:#27AE60;">${port.asset_migliore.nome}</div>
-          <div class="es-kpi-unit">EUI ${fmt(port.asset_migliore.eui)} · Classe ${port.asset_migliore.eui_class}</div>
-        </div>` : ''}
-        ${port.asset_peggiore ? `
-        <div class="es-kpi-card" style="border-color:rgba(231,76,60,0.4);">
-          <div class="es-kpi-label">Asset meno efficiente</div>
-          <div class="es-kpi-value" style="font-size:14px;color:#E74C3C;">${port.asset_peggiore.nome}</div>
-          <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
-        </div>` : ''}`;
+        ${(() => {
+          // P-4: Top 3 efficienti per categoria
+          const top3eff = port.top3_efficienti_per_categoria || {};
+          const catLabels = { OFFICE: 'Uffici', WAREHOUSE: 'Magazzini', STORAGE: 'Depositi', OTHER: 'Altro' };
+          const catList = Object.entries(top3eff);
+          if (catList.length === 0 && port.asset_migliore) {
+            return `<div class="es-kpi-card" style="border-color:rgba(39,174,96,0.4);">
+              <div class="es-kpi-label">Asset più efficiente</div>
+              <div class="es-kpi-value" style="font-size:14px;color:#27AE60;">${port.asset_migliore.nome}</div>
+              <div class="es-kpi-unit">EUI ${fmt(port.asset_migliore.eui)} · Classe ${port.asset_migliore.eui_class}</div>
+            </div>`;
+          }
+          return catList.map(([cat, assets]) => {
+            if (!assets || assets.length === 0) return '';
+            const best = assets[0];
+            const rest = assets.slice(1);
+            return `<div class="es-kpi-card" style="border-color:rgba(39,174,96,0.3);min-width:160px;">
+              <div class="es-kpi-label" style="color:#27AE60;"><i class="fa fa-star" style="margin-right:3px;"></i>Top efficienti — ${catLabels[cat] || cat}</div>
+              <div style="margin-top:4px;">
+                <div style="font-size:12px;font-weight:700;color:#27AE60;">${best.nome}</div>
+                <div style="font-size:10px;color:var(--text-muted);">EUI ${fmt(best.eui)} · Classe ${best.eui_class}</div>
+                ${rest.map(a => `<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">${a.nome} <span style="color:var(--text-muted);">EUI ${fmt(a.eui)}</span></div>`).join('')}
+              </div>
+            </div>`;
+          }).join('');
+        })()}
+        ${(() => {
+          // P-5: Top 3 inefficienti per categoria
+          const top3ineff = port.top3_inefficienti_per_categoria || {};
+          const catLabels = { OFFICE: 'Uffici', WAREHOUSE: 'Magazzini', STORAGE: 'Depositi', OTHER: 'Altro' };
+          const catList = Object.entries(top3ineff);
+          if (catList.length === 0 && port.asset_peggiore) {
+            return `<div class="es-kpi-card" style="border-color:rgba(231,76,60,0.4);">
+              <div class="es-kpi-label">Asset meno efficiente</div>
+              <div class="es-kpi-value" style="font-size:14px;color:#E74C3C;">${port.asset_peggiore.nome}</div>
+              <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
+            </div>`;
+          }
+          return catList.map(([cat, assets]) => {
+            if (!assets || assets.length === 0) return '';
+            const worst = assets[0];
+            const rest = assets.slice(1);
+            return `<div class="es-kpi-card" style="border-color:rgba(231,76,60,0.3);min-width:160px;">
+              <div class="es-kpi-label" style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:3px;"></i>Da migliorare — ${catLabels[cat] || cat}</div>
+              <div style="margin-top:4px;">
+                <div style="font-size:12px;font-weight:700;color:#E74C3C;">${worst.nome}</div>
+                <div style="font-size:10px;color:var(--text-muted);">EUI ${fmt(worst.eui)} · Classe ${worst.eui_class}</div>
+                ${rest.map(a => `<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">${a.nome} <span style="color:var(--text-muted);">EUI ${fmt(a.eui)}</span></div>`).join('')}
+              </div>
+            </div>`;
+          }).join('');
+        })()}`;
 
       // ── Trend consumi: multi-linea — solo asset con telemetria reale ────────────
       const assetsConDati = (port.ranking_asset || []).filter(a => a.has_telemetry && a.kwh_mese > 0);
@@ -307,31 +347,39 @@
           '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-satellite-dish" style="margin-right:8px;"></i>Nessun asset con telemetria IoT attiva nel portafoglio</div>';
       }
 
-      // ── Ranking EUI — lollipop orizzontale ───────────────────────────────────
+      // ── P-6: Ranking EUI — Bar Chart orizzontale raggruppato per categoria ────
       const ranking = [...(port.ranking_asset || [])].sort((a, b) => b.eui - a.eui);
       if (ranking.length > 0) {
-        // Adatta altezza al numero di asset
-        const rankH = Math.max(180, ranking.length * 32 + 50);
+        const rankH = Math.max(220, ranking.length * 28 + 60);
         document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
 
-        Plotly.newPlot('chart-ranking-eui',
-          [{ type: 'scatter', mode: 'markers',
-             y: ranking.map(r => r.nome),
-             x: ranking.map(r => r.eui),
-             marker: {
-               color: ranking.map(r => EUI_CLASS_COLOR[r.eui_class] || '#58A6FF'),
-               size: 10, symbol: 'circle',
-               line: { color: 'rgba(255,255,255,0.25)', width: 1 }
-             },
-             text: ranking.map(r => `Classe ${r.eui_class}`),
-             hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<br>%{text}<extra></extra>' }],
+        // Raggruppa per categoria con colori per classe energetica
+        const catColors  = { OFFICE: '#58A6FF', WAREHOUSE: '#F39C12', STORAGE: '#27AE60', OTHER: '#DDA0DD' };
+        const catLabels  = { OFFICE: 'Uffici', WAREHOUSE: 'Magazzini', STORAGE: 'Depositi', OTHER: 'Altro' };
+        const categorie  = [...new Set(ranking.map(r => r.categoria || 'OTHER'))];
+
+        const rankTraces = categorie.map(cat => {
+          const rows = ranking.filter(r => (r.categoria || 'OTHER') === cat);
+          return {
+            type: 'bar', orientation: 'h',
+            name: catLabels[cat] || cat,
+            y: rows.map(r => r.nome),
+            x: rows.map(r => r.eui),
+            marker: { color: rows.map(r => EUI_CLASS_COLOR[r.eui_class] || catColors[cat] || '#58A6FF'), opacity: 0.85 },
+            text: rows.map(r => fmt(r.eui)),
+            textposition: 'outside',
+            textfont: { size: 9, color: '#7BAFC4' },
+            hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<extra></extra>'
+          };
+        });
+
+        Plotly.newPlot('chart-ranking-eui', rankTraces,
           Object.assign({}, baseLayout, {
-            margin: { t: 8, r: 16, b: 30, l: 150 },
-            xaxis: Object.assign({}, baseLayout.xaxis, {
-              title: { text: 'kWh/m²/anno', font: { size: 10 }, standoff: 4 }
-            }),
+            barmode: 'overlay',
+            margin: { t: 8, r: 60, b: 35, l: 160 },
+            xaxis: Object.assign({}, baseLayout.xaxis, { title: { text: 'kWh/m²/anno', font: { size: 10 }, standoff: 4 } }),
             yaxis: Object.assign({}, baseLayout.yaxis, { automargin: true }),
-            showlegend: false
+            legend: { orientation: 'h', y: -0.12, font: { size: 10 }, bgcolor: 'transparent' }
           }), plotCfg);
       }
 
@@ -363,16 +411,16 @@
         if (yoyRes.ok) {
           const yoy = await yoyRes.json();
           if (yoy.data && yoy.data.length > 0) {
-            // Raggruppa per anno
+            // Backend restituisce {mese, anno, mese_num, kwh, costo_eur}
             const anni = [...new Set(yoy.data.map(r => r.anno))].sort();
-            const mesiLabels = [...new Set(yoy.data.map(r => r.mese_label))];
             const annoColors = ['#58A6FF', '#27AE60', '#F39C12', '#DDA0DD'];
+            const mesiNomi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
             const yoyTraces = anni.map((anno, i) => {
-              const rows = yoy.data.filter(r => r.anno === anno);
+              const rows = yoy.data.filter(r => r.anno === anno).sort((a,b) => a.mese_num - b.mese_num);
               return {
                 type: 'bar', name: String(anno),
-                x: rows.map(r => r.mese_label),
-                y: rows.map(r => r.kwh_totale),
+                x: rows.map(r => mesiNomi[(r.mese_num || 1) - 1] || r.mese),
+                y: rows.map(r => r.kwh),
                 marker: { color: annoColors[i % annoColors.length] },
                 hovertemplate: `<b>${anno} — %{x}</b><br>%{y:,.0f} kWh<extra></extra>`
               };
@@ -397,29 +445,35 @@
         if (commRes.ok) {
           const comm = await commRes.json();
           if (comm.data && comm.data.length > 0) {
-            const commodities = [...new Set(comm.data.map(r => r.commodity))];
-            const commColors = { ELECTRICITY: '#58A6FF', GAS_METHANE: '#F39C12', WATER: '#3498DB', GAS_GPL: '#E67E22', HEATING_OIL: '#8E44AD' };
-            const commLabels = { ELECTRICITY: 'Elettricità', GAS_METHANE: 'Gas Metano', WATER: 'Acqua', GAS_GPL: 'GPL', HEATING_OIL: 'Gasolio' };
-            const mesiUniq = [...new Set(comm.data.map(r => r.mese_label))];
-            const commTraces = commodities.map(c => {
-              const rows = comm.data.filter(r => r.commodity === c);
-              const byMese = {};
-              rows.forEach(r => { byMese[r.mese_label] = r.costo_eur; });
-              return {
-                type: 'bar', name: commLabels[c] || c,
-                x: mesiUniq, y: mesiUniq.map(m => byMese[m] || 0),
-                marker: { color: commColors[c] || '#888' },
-                hovertemplate: `<b>${commLabels[c] || c} — %{x}</b><br>€ %{y:,.2f}<extra></extra>`
-              };
-            });
-            Plotly.newPlot('chart-commodity', commTraces,
-              Object.assign({}, baseLayout, {
-                barmode: 'stack',
-                margin: { t: 8, r: 16, b: 50, l: 62 },
-                yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: '€', font: { size: 10 }, standoff: 6 }, tickformat: ',.0f' }),
-                xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30 }),
-                legend: { orientation: 'h', y: -0.28, font: { size: 10 }, bgcolor: 'transparent' }
-              }), plotCfg);
+            // Backend restituisce record per mese con colonne electricity_eur, gas_eur, water_eur
+            const mesiNomi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+            const mesiX = comm.data.map(r => mesiNomi[(r.mese_num || 1) - 1] || r.mese);
+            const commDef = [
+              { key: 'electricity_eur', label: 'Elettricità', color: '#58A6FF' },
+              { key: 'gas_eur',         label: 'Gas Metano',  color: '#F39C12' },
+              { key: 'water_eur',       label: 'Acqua',       color: '#3498DB' }
+            ];
+            const commTraces = commDef
+              .filter(c => comm.data.some(r => (r[c.key] || 0) > 0))
+              .map(c => ({
+                type: 'bar', name: c.label,
+                x: mesiX,
+                y: comm.data.map(r => r[c.key] || 0),
+                marker: { color: c.color },
+                hovertemplate: `<b>${c.label} — %{x}</b><br>€ %{y:,.2f}<extra></extra>`
+              }));
+            if (commTraces.length > 0) {
+              Plotly.newPlot('chart-commodity', commTraces,
+                Object.assign({}, baseLayout, {
+                  barmode: 'stack',
+                  margin: { t: 8, r: 16, b: 50, l: 62 },
+                  yaxis: Object.assign({}, baseLayout.yaxis, { title: { text: '€', font: { size: 10 }, standoff: 6 }, tickformat: ',.0f' }),
+                  xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30 }),
+                  legend: { orientation: 'h', y: -0.28, font: { size: 10 }, bgcolor: 'transparent' }
+                }), plotCfg);
+            } else {
+              document.getElementById('chart-commodity').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-layer-group" style="margin-right:8px;"></i>Solo elettricità disponibile</div>';
+            }
           } else {
             document.getElementById('chart-commodity').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-layer-group" style="margin-right:8px;"></i>Dati non disponibili</div>';
           }
@@ -459,21 +513,26 @@
         if (budRes.ok) {
           const bud = await budRes.json();
           if (bud.data && bud.data.length > 0) {
+            // Backend restituisce {mese, mese_num, costo_cumulato_eur, budget_lineare_eur, budget_totale_eur}
+            const mesiNomi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+            const mesiX = bud.data.map(r => mesiNomi[(r.mese_num || 1) - 1] || r.mese);
             const budTraces = [
-              { type: 'scatter', mode: 'lines', name: 'Costo cumulato YTD',
-                x: bud.data.map(r => r.mese_label), y: bud.data.map(r => r.costo_ytd),
+              { type: 'scatter', mode: 'lines+markers', name: 'Costo cumulato YTD',
+                x: mesiX, y: bud.data.map(r => r.costo_cumulato_eur || r.costo_ytd || 0),
                 line: { color: '#E74C3C', width: 2.5 },
+                marker: { color: '#E74C3C', size: 6 },
                 hovertemplate: '<b>%{x}</b><br>Costo YTD: € %{y:,.0f}<extra></extra>' },
               { type: 'scatter', mode: 'lines', name: 'Budget lineare',
-                x: bud.data.map(r => r.mese_label), y: bud.data.map(r => r.budget_lineare),
+                x: mesiX, y: bud.data.map(r => r.budget_lineare_eur || r.budget_lineare || 0),
                 line: { color: '#27AE60', width: 2, dash: 'dash' },
                 hovertemplate: '<b>%{x}</b><br>Budget: € %{y:,.0f}<extra></extra>' }
             ];
-            if (bud.budget_annuale) {
+            const budTot = bud.data[bud.data.length-1]?.budget_totale_eur || bud.budget_annuale;
+            if (budTot) {
               budTraces.push({
                 type: 'scatter', mode: 'lines', name: 'Budget annuale',
-                x: [bud.data[0]?.mese_label, bud.data[bud.data.length-1]?.mese_label],
-                y: [bud.budget_annuale, bud.budget_annuale],
+                x: [mesiX[0], mesiX[mesiX.length-1]],
+                y: [budTot, budTot],
                 line: { color: '#27AE60', width: 1, dash: 'dot' },
                 hovertemplate: 'Budget annuale: € %{y:,.0f}<extra></extra>'
               });
