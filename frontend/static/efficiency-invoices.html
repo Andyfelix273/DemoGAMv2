@@ -49,6 +49,17 @@
     <!-- BARRA FILTRI -->
     <div class="page-body" style="padding-top:8px;padding-bottom:8px">
       <div class="filter-bar">
+        <div class="search-wrap">
+          <i class="fa fa-search"></i>
+          <input type="text" id="search-input" placeholder="Cerca asset, codice bolletta, fornitore…">
+        </div>
+        <select id="filter-periodo">
+          <option value="">Tutto il periodo</option>
+          <option value="1">Ultimo mese</option>
+          <option value="2">Ultimo bimestre</option>
+          <option value="3">Ultimi 3 mesi</option>
+          <option value="6">Ultimi 6 mesi</option>
+        </select>
         <select id="filter-commodity">
           <option value="">Tutte le forniture</option>
           <option value="ELECTRICITY">Elettricità</option>
@@ -74,10 +85,6 @@
           <option value="error">Errore</option>
           <option value="processing">In elaborazione</option>
         </select>
-        <div class="search-wrap">
-          <i class="fa fa-search"></i>
-          <input type="text" id="search-input" placeholder="Cerca asset, codice bolletta, fornitore…">
-        </div>
         <span class="record-count" id="record-count"></span>
       </div>
     </div>
@@ -208,9 +215,17 @@
     // ── Filtri ────────────────────────────────────────────────────────────────
     function applicaFiltri() {
       const q         = (document.getElementById('search-input').value || '').toLowerCase();
+      const periodo   = parseInt(document.getElementById('filter-periodo').value) || 0;
       const commodity = document.getElementById('filter-commodity').value;
       const categoria = document.getElementById('filter-categoria').value;
       const stato     = document.getElementById('filter-stato').value;
+
+      // Calcola soglia data per il filtro periodo (basato su issue_date o period_to)
+      let soglia = null;
+      if (periodo > 0) {
+        soglia = new Date();
+        soglia.setMonth(soglia.getMonth() - periodo);
+      }
 
       const filtered = allRows.filter(r => {
         const a = r._asset || {};
@@ -223,7 +238,13 @@
           (a.citta || '').toLowerCase().includes(q) ||
           (r.supplier_name || '').toLowerCase().includes(q) ||
           (r.point_code    || '').toLowerCase().includes(q);
-        return matchC && matchK && matchS && matchQ;
+        let matchP = true;
+        if (soglia) {
+          // Usa period_to se disponibile, altrimenti issue_date, altrimenti created_at
+          const dataRef = r.period_to || r.issue_date || r.created_at;
+          matchP = dataRef ? new Date(dataRef) >= soglia : false;
+        }
+        return matchC && matchK && matchS && matchQ && matchP;
       });
 
       document.getElementById('record-count').textContent =
@@ -287,6 +308,7 @@
     i18n.apply();
 
     document.getElementById('search-input').addEventListener('input', applicaFiltri);
+    document.getElementById('filter-periodo').addEventListener('change', applicaFiltri);
     document.getElementById('filter-commodity').addEventListener('change', applicaFiltri);
     document.getElementById('filter-categoria').addEventListener('change', applicaFiltri);
     document.getElementById('filter-stato').addEventListener('change', applicaFiltri);
