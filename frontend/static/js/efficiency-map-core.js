@@ -108,8 +108,12 @@ async function caricaHUD() {
     // Aggiorna _assetEfficienze e ricolora i marker
     _assetEfficienze = {};
     items.forEach(item => {
-      // color dall'API: '#27AE60'=alta, '#F39C12'=media, '#E74C3C'=bassa
+      // color dall'API: 'green'=alta, 'orange'=media, 'red'=bassa
       const colorMap = {
+        'green':   'alta',
+        'orange':  'media',
+        'red':     'bassa',
+        // fallback per valori hex legacy
         '#27AE60': 'alta',
         '#F39C12': 'media',
         '#E74C3C': 'bassa',
@@ -128,9 +132,9 @@ async function caricaHUD() {
     // Aggiorna KPI nel pannello laterale se presenti
     const kpiEl = document.getElementById('eff-kpi-summary');
     if (kpiEl) {
-      const alta  = items.filter(i => i.color === '#27AE60').length;
-      const media = items.filter(i => i.color === '#F39C12').length;
-      const bassa = items.filter(i => i.color === '#E74C3C').length;
+      const alta  = items.filter(i => i.color === 'green'  || i.color === '#27AE60').length;
+      const media = items.filter(i => i.color === 'orange' || i.color === '#F39C12').length;
+      const bassa = items.filter(i => i.color === 'red'    || i.color === '#E74C3C').length;
       kpiEl.innerHTML = `
         <div class="op-kpi-card" style="text-decoration:none;">
           <div class="op-kpi-val" style="color:#27AE60;">${alta}</div>
