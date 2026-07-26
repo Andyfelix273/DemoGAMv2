@@ -1140,11 +1140,11 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
         db.commit()
         return {"ok": True}
 
-    # ── Dashboard aggregata flotta ─────────────────────────────────────────────
+    # ── Dashboard aggregata asset ─────────────────────────────────────────────
 
-    @app.get("/api/bems/fleet/energy-costs", tags=["invoices"])
-    def costi_flotta(commodity: Optional[str] = None, db=None, utente=None):
-        """Restituisce i costi unitari aggregati per tutti gli asset della flotta."""
+    @app.get("/api/bems/assets/energy-costs", tags=["invoices"])
+    def costi_asset(commodity: Optional[str] = None, db=None, utente=None):
+        """Restituisce i costi unitari aggregati per tutti gli asset degli asset."""
         db = db or next(get_db())
         utente = utente or get_utente_corrente()
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -1171,6 +1171,6 @@ def register_invoices_routes(app, get_db, get_utente_corrente):
             if isinstance(d.get("last_updated"), (date, datetime)):
                 d["last_updated"] = d["last_updated"].isoformat()
             result.append(d)
-        return {"fleet_costs": result}
+        return {"asset_costs": result}
 
     print("[invoices] Route Tariffe & Bollette registrate OK")

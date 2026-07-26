@@ -48,21 +48,21 @@
         <div class="kpi-icon"><i class="fa fa-bolt"></i></div>
         <div class="kpi-body">
           <div class="kpi-val" id="kpi-elec-val">–</div>
-          <div class="kpi-lbl">€/kWh Elettricità (media flotta)</div>
+          <div class="kpi-lbl">€/kWh Elettricità (media asset)</div>
         </div>
       </div>
       <div class="kpi-card" id="kpi-gas">
         <div class="kpi-icon"><i class="fa fa-fire"></i></div>
         <div class="kpi-body">
           <div class="kpi-val" id="kpi-gas-val">–</div>
-          <div class="kpi-lbl">€/Smc Gas (media flotta)</div>
+          <div class="kpi-lbl">€/Smc Gas (media asset)</div>
         </div>
       </div>
       <div class="kpi-card" id="kpi-water">
         <div class="kpi-icon"><i class="fa fa-tint"></i></div>
         <div class="kpi-body">
           <div class="kpi-val" id="kpi-water-val">–</div>
-          <div class="kpi-lbl">€/m³ Acqua (media flotta)</div>
+          <div class="kpi-lbl">€/m³ Acqua (media asset)</div>
         </div>
       </div>
       <div class="kpi-card">
@@ -145,9 +145,9 @@
         ? geoJson.features.map(f => ({ id: f.properties.id, ...f.properties }))
         : (geoJson.assets || []);
 
-      // 2. Costi flotta aggregati
-      const rFlotta = await fetch('/api/bems/fleet/energy-costs', AUTH);
-      const flotta  = rFlotta.ok ? (await rFlotta.json()) : {};
+      // 2. Costi asset aggregati
+      const rAssetCosts = await fetch('/api/bems/assets/energy-costs', AUTH);
+      const assetCosts  = rAssetCosts.ok ? (await rAssetCosts.json()) : {};
 
       // 3. Bollette per asset (richiesta parallela)
       const invPerAsset = {};
@@ -167,8 +167,8 @@
         } catch { costsPerAsset[a.id] = []; }
       }));
 
-      // ── KPI flotta ──────────────────────────────────────────────────────────
-      const fc = flotta.fleet_costs || {};
+      // ── KPI asset ──────────────────────────────────────────────────────────
+      const fc = assetCosts.asset_costs || {};
       document.getElementById('kpi-elec-val').textContent =
         fc.ELECTRICITY ? '€ ' + parseFloat(fc.ELECTRICITY).toFixed(4) : '–';
       document.getElementById('kpi-gas-val').textContent =
