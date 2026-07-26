@@ -34,14 +34,12 @@ const DeadlinesPanel = (() => {
     if (!s) return '—';
     return new Date(s).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
+  const STATO_LABEL = { aperta: 'Aperta', chiusa: 'Chiusa', scaduta: 'Scaduta' };
   function badgeStato(stato) {
-    const col = STATO_COLOR[stato] || 'var(--text-muted)';
-    const label = { aperta: 'Aperta', chiusa: 'Chiusa', scaduta: 'Scaduta' }[stato] || stato;
-    return `<span style="background:${col}22;color:${col};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${label}</span>`;
+    return `<span class="badge badge-${stato || 'aperta'}">${STATO_LABEL[stato] || stato}</span>`;
   }
   function badgePrio(prio) {
-    const col = PRIO_COLOR[prio] || 'var(--text-muted)';
-    return `<span style="color:${col};font-size:11px;font-weight:700">${(prio || '').toUpperCase()}</span>`;
+    return `<span class="prio prio-${prio || 'bassa'}">${(prio || '').toUpperCase()}</span>`;
   }
 
   // ── Gestione modale ───────────────────────────────────────────────────────────
@@ -159,7 +157,7 @@ const DeadlinesPanel = (() => {
       _listaFiltrata = [..._lista];
       _render();
     } catch (e) {
-      _container.innerHTML = `<p style="color:var(--accent-red);font-size:13px"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
+      _container.innerHTML = `<p class="error-msg"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
     }
   }
 
@@ -190,7 +188,7 @@ const DeadlinesPanel = (() => {
     const n = _listaFiltrata.length;
     if (count) count.textContent = `${n} scadenz${n === 1 ? 'a' : 'e'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}`;
     if (n === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Nessuna scadenza trovata</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Nessuna scadenza trovata</td></tr>`;
       return;
     }
     const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
@@ -204,24 +202,24 @@ const DeadlinesPanel = (() => {
       let giorniLabel = '';
       if (d.stato !== 'chiusa') {
         giorniLabel = giorni < 0
-          ? `<span style="color:var(--accent-red);font-size:11px;font-weight:600">${Math.abs(giorni)}gg scaduta</span>`
+          ? `<span class="giorni-scaduti">${Math.abs(giorni)}gg scaduta</span>`
           : giorni <= 7
-            ? `<span style="color:var(--accent-orange);font-size:11px;font-weight:600">${giorni}gg</span>`
-            : `<span style="color:var(--text-muted);font-size:11px">${giorni}gg</span>`;
+            ? `<span class="giorni-urgenti">${giorni}gg</span>`
+            : `<span class="giorni-ok">${giorni}gg</span>`;
       }
-      const rowBg = isScaduta ? 'rgba(248,81,73,0.04)' : isUrgente ? 'rgba(210,153,34,0.04)' : '';
+      const rowClass = isScaduta ? 'row-scaduto' : isUrgente ? 'row-urgente' : '';
       return `
-        <tr style="background:${rowBg}">
-          <td><i class="fa ${tipoIcon}" style="color:${prioCol};font-size:14px" title="${d.tipo || ''}"></i></td>
+        <tr class="${rowClass}">
+          <td><i class="fa ${tipoIcon} tipo-icon prio-icon-${d.priorita || 'bassa'}" title="${d.tipo || ''}"></i></td>
           <td>
-            <div style="font-weight:500;font-size:13px">${d.titolo}</div>
-            ${!_opts.assetId ? `<div style="font-size:11px;color:var(--text-muted)">${d.asset_nome || ''}</div>` : ''}
+            <div class="cell-main">${d.titolo}</div>
+            ${!_opts.assetId ? `<div class="cell-sub">${d.asset_nome || ''}</div>` : ''}
           </td>
           <td>${badgePrio(d.priorita)}</td>
           <td>${badgeStato(isScaduta && d.stato !== 'chiusa' ? 'scaduta' : d.stato)}</td>
-          <td style="font-size:12px">${fmtData(d.data_scadenza)}</td>
+          <td class="cell-sm">${fmtData(d.data_scadenza)}</td>
           <td>${giorniLabel}</td>
-          <td style="font-size:12px">${d.assegnatario || '<span style="color:var(--text-muted)">—</span>'}</td>
+          <td class="cell-sm">${d.assegnatario || '<span class="text-muted">—</span>'}</td>
           <td>
             <div class="row-actions">
               ${canEdit && d.stato === 'aperta' ? `<button class="btn-icon" title="Segna chiusa" onclick="DeadlinesPanel._chiudiScadenza(${d.id})"><i class="fa fa-circle-check"></i></button>` : ''}

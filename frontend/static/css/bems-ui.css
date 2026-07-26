@@ -315,7 +315,42 @@ table.bems-table {
 }
 
 /* ─── MODALE STANDARD ────────────────────────────────────────────────────────
- * Uso: <div class="modal-overlay" id="..."> <div class="modal-box">...
+ *
+ * STRUTTURA OBBLIGATORIA:
+ *
+ * <div class="modal-overlay" id="modal-xxx">
+ *   <div class="modal-box">                  <!-- aggiungere modal-lg (800px) o modal-sm (400px) se necessario -->
+ *     <div class="modal-header">
+ *       <h3 id="modal-xxx-titolo">Nuovo elemento</h3>
+ *       <button class="btn-icon" onclick="chiudiModal('modal-xxx')" title="Chiudi">
+ *         <i class="fa fa-xmark"></i>
+ *       </button>
+ *     </div>
+ *     <div class="modal-body">
+ *       <input type="hidden" id="f-id">   <!-- id nascosto per modalità modifica -->
+ *       <div class="form-grid">            <!-- griglia 2 colonne; aggiungere class="full" per campo a larghezza intera -->
+ *         <div class="form-group full">
+ *           <label>Campo *</label>
+ *           <input type="text" id="f-campo" placeholder="..." required>
+ *         </div>
+ *       </div>
+ *       <div id="form-error" class="form-error"></div>  <!-- errori di validazione -->
+ *     </div>
+ *     <div class="modal-footer">
+ *       <button class="btn btn-secondary" onclick="chiudiModal('modal-xxx')">Annulla</button>
+ *       <button class="btn btn-primary" onclick="salvaXxx()">
+ *         <i class="fa fa-floppy-disk"></i> Salva
+ *       </button>
+ *     </div>
+ *   </div>
+ * </div>
+ *
+ * REGOLE:
+ * - Aprire con: document.getElementById('modal-xxx').classList.add('open')
+ * - Chiudere con: document.getElementById('modal-xxx').classList.remove('open')
+ * - Titolo dinamico: document.getElementById('modal-xxx-titolo').textContent = 'Modifica ...'
+ * - Campi obbligatori: aggiungere "required" e validare prima di salvare
+ * - Errori: mostrare in #form-error con classe form-error (già stilizzata)
  */
 .modal-overlay {
   display: none;
@@ -327,7 +362,10 @@ table.bems-table {
   justify-content: center;
 }
 .modal-overlay.open { display: flex; }
-.modal-box {
+
+/* Alias per retrocompatibilità: .modal si comporta come .modal-box */
+.modal-box,
+.modal {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -337,28 +375,121 @@ table.bems-table {
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
-.modal-box.modal-lg { max-width: 800px; }
-.modal-box.modal-sm { max-width: 400px; }
+.modal-box.modal-lg,
+.modal.modal-lg { max-width: 800px; }
+.modal-box.modal-sm,
+.modal.modal-sm { max-width: 400px; }
+
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  z-index: 1;
 }
-.modal-header h3 {
+.modal-header h3,
+.modal-title {
   font-size: 16px;
   font-weight: 600;
   margin: 0;
 }
+/* Pulsante chiudi standard */
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.modal-close:hover { color: var(--text-primary); }
+
 .modal-body { padding: 20px; }
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 20px;
   border-top: 1px solid var(--border-color);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-primary);
 }
+
+/* Messaggio di errore nel form */
+.form-error {
+  font-size: 12px;
+  color: var(--accent-red);
+  margin-top: 8px;
+  min-height: 16px;
+}
+
+/* Input e select dentro modal-body: altezza e stile uniformi */
+.modal-body input[type="text"],
+.modal-body input[type="email"],
+.modal-body input[type="number"],
+.modal-body input[type="date"],
+.modal-body input[type="url"],
+.modal-body select,
+.modal-body textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 7px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+.modal-body textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+/* Bottoni standard nel footer */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+.btn-secondary:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ─── TAB STANDARD ───────────────────────────────────────────────────────────
  * Uso: <div class="tabs"> <button class="tab-btn active">...
@@ -421,6 +552,123 @@ table.bems-table {
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+/* ─── DATA TABLE (alias per panel modules) ──────────────────────────────────
+ * Alias di .bems-table per i panel modules che usano class="data-table"
+ */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table thead th {
+  background: var(--bg-secondary);
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.data-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.1s;
+}
+.data-table tbody tr:last-child { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--bg-hover); }
+.data-table tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+
+/* ─── CLASSI UTILITY CELLE TABELLA ──────────────────────────────────────────*/
+.cell-sm   { font-size: 12px; }
+.cell-main { font-size: 13px; font-weight: 500; }
+.cell-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.cell-ellipsis {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+.col-titolo { max-width: 280px; }
+.text-muted { color: var(--text-muted); }
+
+/* Codice asset/WO in monospace */
+.codice-badge {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Riga vuota nella tabella */
+.empty-row {
+  text-align: center;
+  padding: 32px !important;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Messaggio errore generico */
+.error-msg {
+  color: var(--accent-red);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* ─── RIGHE COLORATE (scaduto / urgente) ─────────────────────────────────────*/
+.row-scaduto { background: rgba(248,81,73,0.04) !important; }
+.row-urgente { background: rgba(210,153,34,0.04) !important; }
+
+/* ─── BADGE GIORNI SCADENZA ──────────────────────────────────────────────────*/
+.giorni-scaduti { color: var(--accent-red);    font-size: 11px; font-weight: 600; }
+.giorni-urgenti { color: var(--accent-orange); font-size: 11px; font-weight: 600; }
+.giorni-ok      { color: var(--text-muted);    font-size: 11px; }
+
+/* Etichetta SCADUTO inline nella data */
+.badge-scaduto {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-red);
+  background: rgba(248,81,73,0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* ─── ICONA TIPO CON COLORE PRIORITÀ ─────────────────────────────────────────*/
+.tipo-icon           { font-size: 14px; }
+.prio-icon-critica   { color: var(--accent-red); }
+.prio-icon-alta      { color: var(--accent-orange); }
+.prio-icon-media     { color: var(--accent-blue); }
+.prio-icon-bassa     { color: var(--text-muted); }
+
+/* ─── BADGE STATO SCADENZE (aggiunta aperta) ─────────────────────────────────*/
+.badge-aperta { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+
+/* ─── MIME BADGE (documenti) ─────────────────────────────────────────────────*/
+.mime-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--border-color);
+}
+.mime-pdf   { color: #e74c3c; background: rgba(231,76,60,0.1);   border-color: rgba(231,76,60,0.3); }
+.mime-word  { color: #2980b9; background: rgba(41,128,185,0.1);  border-color: rgba(41,128,185,0.3); }
+.mime-xls   { color: #27ae60; background: rgba(39,174,96,0.1);   border-color: rgba(39,174,96,0.3); }
+.mime-img   { color: #8e44ad; background: rgba(142,68,173,0.1);  border-color: rgba(142,68,173,0.3); }
+.mime-other { color: var(--text-muted); background: var(--bg-secondary); }
 
 /* ─── RESPONSIVE ─────────────────────────────────────────────────────────────*/
 @media (max-width: 768px) {

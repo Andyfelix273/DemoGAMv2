@@ -63,12 +63,10 @@ const WoPanel = (() => {
     } catch (e) { return dt; }
   }
   function badgeStato(stato) {
-    const col = STATO_COLOR[stato] || 'var(--text-muted)';
-    return `<span style="background:${col}22;color:${col};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${STATO_LABEL[stato] || stato}</span>`;
+    return `<span class="badge badge-${stato || 'sconosciuto'}">${STATO_LABEL[stato] || stato}</span>`;
   }
   function badgePrio(prio) {
-    const col = PRIO_COLOR[prio] || 'var(--text-muted)';
-    return `<span style="color:${col};font-size:11px;font-weight:700">${(prio || '').toUpperCase()}</span>`;
+    return `<span class="prio prio-${prio || 'bassa'}">${(prio || '').toUpperCase()}</span>`;
   }
   function oggi() { return new Date().toISOString().split('T')[0]; }
 
@@ -269,7 +267,7 @@ const WoPanel = (() => {
       _listaFiltrata = [..._lista];
       _render();
     } catch (e) {
-      _container.innerHTML = `<p style="color:var(--accent-red);font-size:13px"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
+      _container.innerHTML = `<p class="error-msg"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
     }
   }
 
@@ -300,7 +298,7 @@ const WoPanel = (() => {
     if (!tbody) return;
     if (count) count.textContent = `${_listaFiltrata.length} work order${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}`;
     if (_listaFiltrata.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun work order trovato</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-row">Nessun work order trovato</td></tr>`;
       return;
     }
     tbody.innerHTML = _listaFiltrata.map(wo => {
@@ -308,22 +306,22 @@ const WoPanel = (() => {
                       !['completato', 'annullato'].includes(wo.stato);
       const rowStyle = scaduto ? 'background:rgba(248,81,73,0.04)' : '';
       const dataPian = wo.data_pianificata
-        ? `${fmtData(wo.data_pianificata)}${scaduto ? ' <span style="font-size:10px;color:var(--accent-red);font-weight:600">SCADUTO</span>' : ''}`
-        : '<span style="color:var(--text-muted)">—</span>';
+        ? `${fmtData(wo.data_pianificata)}${scaduto ? ' <span class="badge-scaduto">SCADUTO</span>' : ''}`
+        : '<span class="text-muted">—</span>';
       const canStato = canEdit && !['completato', 'annullato'].includes(wo.stato);
       return `
-        <tr style="${rowStyle}" ondblclick="WoPanel._apriDettaglio(${wo.id})">
-          <td><span style="font-family:monospace;font-size:12px;font-weight:600">${wo.codice}</span></td>
-          <td style="max-width:260px">
-            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${wo.titolo}">${wo.titolo}</div>
+        <tr class="${scaduto ? 'row-scaduto' : ''}" ondblclick="WoPanel._apriDettaglio(${wo.id})">
+          <td><span class="codice-badge">${wo.codice}</span></td>
+          <td class="col-titolo">
+            <div class="cell-ellipsis" title="${wo.titolo}">${wo.titolo}</div>
           </td>
-          ${!_opts.assetId ? `<td><div style="font-size:12px">${wo.asset_nome}</div><div style="font-size:11px;color:var(--text-muted)">${wo.asset_citta || ''}</div></td>` : ''}
+          ${!_opts.assetId ? `<td><div class="cell-main">${wo.asset_nome}</div><div class="cell-sub">${wo.asset_citta || ''}</div></td>` : ''}
           <td><span class="tipo-badge">${wo.tipo}</span></td>
           <td>${badgePrio(wo.priorita)}</td>
           <td>${badgeStato(wo.stato)}</td>
-          <td style="font-size:12px">${wo.assegnatario || '<span style="color:var(--text-muted)">—</span>'}</td>
-          <td style="font-size:12px">${dataPian}</td>
-          <td style="font-size:12px">${fmtDataOra(wo.data_apertura)}</td>
+          <td class="cell-sm">${wo.assegnatario || '<span class="text-muted">—</span>'}</td>
+          <td class="cell-sm">${dataPian}</td>
+          <td class="cell-sm">${fmtDataOra(wo.data_apertura)}</td>
           <td>
             <div class="row-actions">
               <button class="btn-icon" title="Dettaglio" onclick="WoPanel._apriDettaglio(${wo.id})"><i class="fa fa-eye"></i></button>

@@ -181,7 +181,7 @@ const DocsPanel = (() => {
       _listaFiltrata = [..._lista];
       _render();
     } catch (e) {
-      _container.innerHTML = `<p style="color:var(--accent-red);font-size:13px"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
+      _container.innerHTML = `<p class="error-msg"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
     }
   }
 
@@ -207,7 +207,7 @@ const DocsPanel = (() => {
     const n = _listaFiltrata.length;
     if (count) count.textContent = `${n} document${n === 1 ? 'o' : 'i'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}`;
     if (n === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun documento trovato</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Nessun documento trovato</td></tr>`;
       return;
     }
     tbody.innerHTML = _listaFiltrata.map(doc => {
@@ -217,13 +217,13 @@ const DocsPanel = (() => {
       return `
         <tr>
           <td>${mimeBadge(doc.mime_type, doc.nome_file)}</td>
-          <td style="max-width:280px">
-            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${doc.nome_file || ''}">${doc.nome_file || '—'}</div>
-            ${!_opts.assetId ? `<div style="font-size:11px;color:var(--text-muted)">${doc.asset_nome || ''}</div>` : ''}
+          <td class="col-titolo">
+            <div class="cell-ellipsis" title="${doc.nome_file || ''}">${doc.nome_file || '—'}</div>
+            ${!_opts.assetId ? `<div class="cell-sub">${doc.asset_nome || ''}</div>` : ''}
           </td>
-          <td style="font-size:12px;color:var(--text-muted)">${fmtDim(doc.dimensione_bytes)}</td>
-          <td style="font-size:12px">${fmtData(doc.data_caricamento)}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${doc.caricato_da || '—'}</td>
+          <td class="cell-sm text-muted">${fmtDim(doc.dimensione_bytes)}</td>
+          <td class="cell-sm">${fmtData(doc.data_caricamento)}</td>
+          <td class="cell-sm text-muted">${doc.caricato_da || '—'}</td>
           <td>
             <div class="row-actions">
               ${pdfPreview}
