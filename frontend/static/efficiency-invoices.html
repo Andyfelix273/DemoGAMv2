@@ -337,6 +337,7 @@
     }
 
     // ── Init ──────────────────────────────────────────────────────────────────
+    requireAuth();
     renderSidebar('eff-bollette', 'efficiency');
     renderTopbar('eff-bollette', { titolo: 'Asset Efficiency', modulo: 'efficiency' });
 
@@ -344,7 +345,10 @@
     document.getElementById('filter-commodity').addEventListener('change', applicaFiltri);
     document.getElementById('filter-tipo').addEventListener('change', applicaFiltri);
 
-    caricaDashboard();
+    caricaDashboard().catch(err => {
+      console.error('caricaDashboard error:', err);
+      renderErrore('Errore caricamento dati: ' + (err.message || err));
+    });
   </script>
 
   <!-- Modale dettaglio asset condivisa (per apertura da click riga) -->
