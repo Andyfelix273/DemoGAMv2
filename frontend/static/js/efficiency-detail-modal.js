@@ -2186,17 +2186,30 @@ async function _edmCaricaEfficienza(assetId) {
       if (commRes.ok) {
         const comm = await commRes.json();
         if (comm.data && comm.data.length > 0) {
-          // Backend restituisce {mese, electricity_eur, gas_eur, water_eur} — schema flat
           const mesiNomi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
           const mesiX = comm.data.map(r => {
             const m = r.mese ? parseInt(r.mese.split('-')[1]) : 1;
             return mesiNomi[m - 1] || r.mese;
           });
-          const commDef = [
-            { key: 'electricity_eur', label: 'Elettricità', color: '#58A6FF' },
-            { key: 'gas_eur',         label: 'Gas Metano',  color: '#F39C12' },
-            { key: 'water_eur',       label: 'Acqua',       color: '#3498DB' }
-          ];
+          // Usa commodity_def dal backend (con tutte e 7 le commodity) o fallback
+          const commDefRaw = (comm.commodity_def && comm.commodity_def.length > 0)
+            ? comm.commodity_def
+            : [
+                { key: 'ELECTRICITY',  label: 'Elettricità',          color: '#00A3E0' },
+                { key: 'GAS_METHANE',  label: 'Gas Metano',            color: '#F39C12' },
+                { key: 'GAS_GPL',      label: 'GPL',                   color: '#E67E22' },
+                { key: 'WATER',        label: 'Acqua',                 color: '#3498DB' },
+                { key: 'HEATING_OIL', label: 'Gasolio riscaldamento', color: '#8E44AD' },
+                { key: 'DIESEL',       label: 'Gasolio autotrazione',  color: '#7F8C8D' },
+                { key: 'PETROL',       label: 'Benzina',               color: '#27AE60' }
+              ];
+          // Mappa key backend: ELECTRICITY -> electricity_eur
+          const commDef = commDefRaw.map(c => ({
+            key:   c.key.toLowerCase() + '_eur',
+            label: c.label,
+            color: c.color
+          }));
+          // Mostra solo le commodity con dati > 0
           const commTraces = commDef
             .filter(c => comm.data.some(r => (r[c.key] || 0) > 0))
             .map(c => ({

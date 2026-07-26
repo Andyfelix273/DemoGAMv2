@@ -507,11 +507,33 @@
         const commEl = document.getElementById('chart-commodity-list');
         if (commRes.ok && commEl) {
           const comm = await commRes.json();
-          const commDef = [
-            { key: 'electricity_eur', label: 'Elettricità', color: '#58A6FF', icon: 'fa-bolt' },
-            { key: 'gas_eur',         label: 'Gas Metano',  color: '#F39C12', icon: 'fa-fire' },
-            { key: 'water_eur',       label: 'Acqua',       color: '#3498DB', icon: 'fa-tint' }
-          ];
+          // Icone per commodity (fallback se non nel backend)
+          const COMM_ICONS = {
+            ELECTRICITY: 'fa-bolt',
+            GAS_METHANE: 'fa-fire',
+            GAS_GPL:     'fa-fire-alt',
+            WATER:       'fa-tint',
+            HEATING_OIL: 'fa-oil-can',
+            DIESEL:      'fa-gas-pump',
+            PETROL:      'fa-gas-pump'
+          };
+          // Usa commodity_def dal backend se disponibile, altrimenti fallback
+          const commDef = (comm.commodity_def && comm.commodity_def.length > 0)
+            ? comm.commodity_def.map(c => ({
+                key:   c.key.toLowerCase() + '_eur',
+                label: c.label,
+                color: c.color,
+                icon:  COMM_ICONS[c.key] || 'fa-layer-group'
+              }))
+            : [
+                { key: 'electricity_eur', label: 'Elettricità', color: '#00A3E0', icon: 'fa-bolt' },
+                { key: 'gas_methane_eur', label: 'Gas Metano',  color: '#F39C12', icon: 'fa-fire' },
+                { key: 'gas_gpl_eur',     label: 'GPL',         color: '#E67E22', icon: 'fa-fire-alt' },
+                { key: 'water_eur',       label: 'Acqua',       color: '#3498DB', icon: 'fa-tint' },
+                { key: 'heating_oil_eur', label: 'Gasolio risc.', color: '#8E44AD', icon: 'fa-oil-can' },
+                { key: 'diesel_eur',      label: 'Gasolio auto.', color: '#7F8C8D', icon: 'fa-gas-pump' },
+                { key: 'petrol_eur',      label: 'Benzina',     color: '#27AE60', icon: 'fa-gas-pump' }
+              ];
           if (comm.data && comm.data.length > 0) {
             // Somma totali per commodity su tutto il periodo
             const totali = {};
@@ -519,7 +541,7 @@
               totali[c.key] = comm.data.reduce((s, r) => s + (r[c.key] || 0), 0);
             });
             const totGlobale = Object.values(totali).reduce((s, v) => s + v, 0);
-            // Includi sempre tutte le commodity, anche quelle a 0
+            // Includi tutte le commodity (anche quelle a 0)
             const items = commDef.map(c => ({
               ...c,
               totale: totali[c.key] || 0,

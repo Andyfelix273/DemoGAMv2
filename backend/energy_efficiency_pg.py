@@ -1037,83 +1037,98 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
     def get_portfolio_commodity(mesi: int = 12,
                                 _=Depends(get_utente_corrente),
                                 db=Depends(get_db)):
-        """P-9: Costo mensile totale portafoglio scomposto per commodity (Stacked Bar).
-        Commodity: ELECTRICITY, GAS_METHANE, WATER."""
+        """P-9: Costo mensile totale portafoglio scomposto per commodity.
+        Fonte primaria: tabella invoices.commodity.
+        Commodity supportate: ELECTRICITY, GAS_METHANE, GAS_GPL, WATER, FUEL, OTHER."""
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         now = datetime.now(timezone.utc)
         data_inizio = now.replace(day=1) - timedelta(days=mesi * 31)
 
-        # Elettricità da telemetria
+        # Tutte le commodity possibili — codici allineati al frontend COMMODITY_META
+        COMMODITY_DEF = [
+            {"key": "ELECTRICITY",  "label": "Elettricità",           "unit": "kWh",   "color": "#00A3E0", "icon": "fa-bolt"},
+            {"key": "GAS_METHANE",  "label": "Gas Metano",             "unit": "Smc",   "color": "#F39C12", "icon": "fa-fire"},
+            {"key": "GAS_GPL",      "label": "GPL",                    "unit": "kg",    "color": "#E67E22", "icon": "fa-fire-alt"},
+            {"key": "WATER",        "label": "Acqua",                  "unit": "m³",    "color": "#3498DB", "icon": "fa-tint"},
+            {"key": "HEATING_OIL",  "label": "Gasolio riscaldamento",  "unit": "litri", "color": "#8E44AD", "icon": "fa-oil-can"},
+            {"key": "DIESEL",       "label": "Gasolio autotrazione",   "unit": "litri", "color": "#7F8C8D", "icon": "fa-gas-pump"},
+            {"key": "PETROL",       "label": "Benzina",                "unit": "litri", "color": "#27AE60", "icon": "fa-gas-pump"},
+        ]
+
+        # 1. Dati da invoices (fonte primaria — bollette reali)
         cur.execute("""
             SELECT
-                DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                SUM(t.power_kw) * 0.25 AS kwh
-            FROM telemetry t
-            JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
-            WHERE t.ts >= %s AND t.ts <= %s
-              AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
-            GROUP BY mese ORDER BY mese
-        """, (data_inizio, now))
-        elec_telem = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+                commodity,
+                DATE_TRUNC('month', issue_date) AS mese,
+                SUM(total_amount_eur) AS totale_eur,
+                SUM(consumption_quantity) AS quantita
+            FROM invoices
+            WHERE issue_date >= %s AND issue_date <= %s
+              AND extraction_status IN ('ok','manual','validated')
+            GROUP BY commodity, mese
+            ORDER BY mese, commodity
+        """, (data_inizio.date(), now.date()))
+        invoice_rows = cur.fetchall()
 
-        # Elettricità da energy_readings
-        cur.execute("""
-            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                   SUM(r.valore) AS kwh
-            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
-            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
-            GROUP BY mese ORDER BY mese
-        """, (data_inizio, now))
-        elec_readings = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
+        # 2. Fallback elettricità da telemetria (se non ci sono bollette elettriche)
+        has_elec_invoices = any(r["commodity"] == "ELECTRICITY" for r in invoice_rows)
+        elec_telem = {}
+        if not has_elec_invoices:
+            cur.execute("""
+                SELECT DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                       SUM(t.power_kw) * 0.25 AS kwh
+                FROM telemetry t
+                JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                WHERE t.ts >= %s AND t.ts <= %s
+                  AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+                GROUP BY mese ORDER BY mese
+            """, (data_inizio, now))
+            cost_elec = 0.285
+            for r in cur.fetchall():
+                key = str(r["mese"])[:7]
+                kwh = float(r["kwh"] or 0)
+                elec_telem[key] = elec_telem.get(key, 0) + kwh * cost_elec
 
-        # Gas da energy_readings
-        cur.execute("""
-            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                   SUM(r.valore) AS smc
-            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
-            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'gas'
-            GROUP BY mese ORDER BY mese
-        """, (data_inizio, now))
-        gas_rows = {str(r["mese"])[:7]: float(r["smc"] or 0) for r in cur.fetchall()}
+        # Costruisci dizionario {commodity: {mese_key: eur}}
+        comm_data = {c["key"]: {} for c in COMMODITY_DEF}
+        for r in invoice_rows:
+            comm = r["commodity"] or "OTHER"
+            if comm not in comm_data:
+                comm_data[comm] = {}
+            key = str(r["mese"])[:7]
+            comm_data[comm][key] = comm_data[comm].get(key, 0) + float(r["totale_eur"] or 0)
+        # Aggiungi fallback elettricità da telemetria
+        for key, eur in elec_telem.items():
+            comm_data["ELECTRICITY"][key] = comm_data["ELECTRICITY"].get(key, 0) + eur
 
-        # Acqua da energy_readings
-        cur.execute("""
-            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                   SUM(r.valore) AS mc
-            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
-            WHERE r.ts >= %s AND r.ts <= %s AND m.tipo = 'acqua'
-            GROUP BY mese ORDER BY mese
-        """, (data_inizio, now))
-        water_rows = {str(r["mese"])[:7]: float(r["mc"] or 0) for r in cur.fetchall()}
-
-        # Costi unitari default
-        cost_elec  = 0.285   # €/kWh
-        cost_gas   = 0.980   # €/Smc
-        cost_water = 2.15    # €/m³
-
+        # Costruisci serie mensile
         result = []
         for i in range(mesi - 1, -1, -1):
             d = now.replace(day=1)
             for _ in range(i):
                 d = (d - timedelta(days=1)).replace(day=1)
             key = str(d)[:7]
-            kwh_elec = (elec_telem.get(key, 0) + elec_readings.get(key, 0))
-            smc_gas  = gas_rows.get(key, 0)
-            mc_water = water_rows.get(key, 0)
-            result.append({
-                "mese": key,
-                "electricity_kwh": round(kwh_elec, 1),
-                "electricity_eur": round(kwh_elec * cost_elec, 2),
-                "gas_smc": round(smc_gas, 1),
-                "gas_eur": round(smc_gas * cost_gas, 2),
-                "water_mc": round(mc_water, 1),
-                "water_eur": round(mc_water * cost_water, 2),
-                "totale_eur": round(
-                    kwh_elec * cost_elec + smc_gas * cost_gas + mc_water * cost_water, 2
-                ),
-            })
+            row = {"mese": key, "mese_num": d.month, "anno": d.year}
+            totale = 0.0
+            for c in COMMODITY_DEF:
+                eur = round(comm_data.get(c["key"], {}).get(key, 0), 2)
+                row[c["key"].lower() + "_eur"] = eur
+                totale += eur
+            row["totale_eur"] = round(totale, 2)
+            result.append(row)
 
-        return {"data": result, "mesi": mesi}
+        # Commodity presenti (con almeno un valore > 0)
+        commodity_presenti = [
+            c for c in COMMODITY_DEF
+            if any(row.get(c["key"].lower() + "_eur", 0) > 0 for row in result)
+        ]
+
+        return {
+            "data": result,
+            "mesi": mesi,
+            "commodity_def": COMMODITY_DEF,
+            "commodity_presenti": [c["key"] for c in commodity_presenti]
+        }
 
 
     # ── P-10: Costo Cumulato vs Budget Annuale Portafoglio ────────────────────
@@ -1289,55 +1304,72 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
                             _=Depends(get_utente_corrente),
                             db=Depends(get_db)):
         """E-14: Costo mensile scomposto per commodity per singolo asset.
-        Stacked bar chart degli ultimi N mesi."""
+        Fonte primaria: invoices. Fallback elettricità da telemetria/energy_readings."""
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         now = datetime.now(timezone.utc)
         data_inizio = now.replace(day=1) - timedelta(days=mesi * 31)
 
-        unit_cost_elec  = _get_unit_cost(cur, asset_id, "ELECTRICITY")
-        unit_cost_gas   = _get_unit_cost(cur, asset_id, "GAS_METHANE")
-        unit_cost_water = _get_unit_cost(cur, asset_id, "WATER")
+        # Stessa definizione commodity del portfolio
+        COMMODITY_DEF = [
+            {"key": "ELECTRICITY",  "label": "Elettricità",           "unit": "kWh",   "color": "#00A3E0"},
+            {"key": "GAS_METHANE",  "label": "Gas Metano",             "unit": "Smc",   "color": "#F39C12"},
+            {"key": "GAS_GPL",      "label": "GPL",                    "unit": "kg",    "color": "#E67E22"},
+            {"key": "WATER",        "label": "Acqua",                  "unit": "m³",    "color": "#3498DB"},
+            {"key": "HEATING_OIL",  "label": "Gasolio riscaldamento",  "unit": "litri", "color": "#8E44AD"},
+            {"key": "DIESEL",       "label": "Gasolio autotrazione",   "unit": "litri", "color": "#7F8C8D"},
+            {"key": "PETROL",       "label": "Benzina",                "unit": "litri", "color": "#27AE60"},
+        ]
 
+        # 1. Dati da invoices (fonte primaria)
+        cur.execute("""
+            SELECT commodity,
+                   DATE_TRUNC('month', issue_date) AS mese,
+                   SUM(total_amount_eur) AS totale_eur
+            FROM invoices
+            WHERE asset_id = %s AND issue_date >= %s AND issue_date <= %s
+              AND extraction_status IN ('ok','manual','validated')
+            GROUP BY commodity, mese ORDER BY mese, commodity
+        """, (asset_id, data_inizio.date(), now.date()))
+        invoice_rows = cur.fetchall()
+
+        # 2. Fallback elettricità da telemetria o energy_readings
+        has_elec_invoices = any(r["commodity"] == "ELECTRICITY" for r in invoice_rows)
+        elec_fallback = {}
         use_telemetry = _telemetry_available(cur, asset_id)
+        if not has_elec_invoices:
+            unit_cost_elec = _get_unit_cost(cur, asset_id, "ELECTRICITY")
+            if use_telemetry:
+                cur.execute("""
+                    SELECT DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                           SUM(t.power_kw) * 0.25 AS kwh
+                    FROM telemetry t
+                    JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                    WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
+                      AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+                    GROUP BY mese ORDER BY mese
+                """, (asset_id, data_inizio, now))
+            else:
+                cur.execute("""
+                    SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
+                           SUM(r.valore) AS kwh
+                    FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
+                    WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
+                    GROUP BY mese ORDER BY mese
+                """, (asset_id, data_inizio, now))
+            for r in cur.fetchall():
+                key = str(r["mese"])[:7]
+                elec_fallback[key] = float(r.get("kwh", 0) or 0) * unit_cost_elec
 
-        if use_telemetry:
-            cur.execute("""
-                SELECT DATE_TRUNC('month', t.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                       SUM(t.power_kw) * 0.25 AS kwh
-                FROM telemetry t
-                JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
-                WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
-                  AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
-                GROUP BY mese ORDER BY mese
-            """, (asset_id, data_inizio, now))
-            elec_rows = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
-        else:
-            cur.execute("""
-                SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                       SUM(r.valore) AS kwh
-                FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
-                WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'elettrico'
-                GROUP BY mese ORDER BY mese
-            """, (asset_id, data_inizio, now))
-            elec_rows = {str(r["mese"])[:7]: float(r["kwh"] or 0) for r in cur.fetchall()}
-
-        cur.execute("""
-            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                   SUM(r.valore) AS smc
-            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
-            WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'gas'
-            GROUP BY mese ORDER BY mese
-        """, (asset_id, data_inizio, now))
-        gas_rows = {str(r["mese"])[:7]: float(r["smc"] or 0) for r in cur.fetchall()}
-
-        cur.execute("""
-            SELECT DATE_TRUNC('month', r.ts AT TIME ZONE 'Europe/Rome') AS mese,
-                   SUM(r.valore) AS mc
-            FROM energy_readings r JOIN energy_meters m ON m.id = r.meter_id
-            WHERE r.asset_id = %s AND r.ts >= %s AND r.ts <= %s AND m.tipo = 'acqua'
-            GROUP BY mese ORDER BY mese
-        """, (asset_id, data_inizio, now))
-        water_rows = {str(r["mese"])[:7]: float(r["mc"] or 0) for r in cur.fetchall()}
+        # Costruisci dizionario {commodity: {mese_key: eur}}
+        comm_data = {c["key"]: {} for c in COMMODITY_DEF}
+        for r in invoice_rows:
+            comm = r["commodity"] or "ELECTRICITY"
+            if comm not in comm_data:
+                comm_data[comm] = {}
+            key = str(r["mese"])[:7]
+            comm_data[comm][key] = comm_data[comm].get(key, 0) + float(r["totale_eur"] or 0)
+        for key, eur in elec_fallback.items():
+            comm_data["ELECTRICITY"][key] = comm_data["ELECTRICITY"].get(key, 0) + eur
 
         result = []
         for i in range(mesi - 1, -1, -1):
@@ -1345,20 +1377,24 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             for _ in range(i):
                 d = (d - timedelta(days=1)).replace(day=1)
             key = str(d)[:7]
-            kwh_e = elec_rows.get(key, 0)
-            smc_g = gas_rows.get(key, 0)
-            mc_w  = water_rows.get(key, 0)
-            result.append({
-                "mese": key,
-                "electricity_kwh": round(kwh_e, 1),
-                "electricity_eur": round(kwh_e * unit_cost_elec, 2),
-                "gas_smc": round(smc_g, 1),
-                "gas_eur": round(smc_g * unit_cost_gas, 2),
-                "water_mc": round(mc_w, 1),
-                "water_eur": round(mc_w * unit_cost_water, 2),
-                "totale_eur": round(
-                    kwh_e * unit_cost_elec + smc_g * unit_cost_gas + mc_w * unit_cost_water, 2
-                ),
-            })
+            row = {"mese": key, "mese_num": d.month, "anno": d.year}
+            totale = 0.0
+            for c in COMMODITY_DEF:
+                eur = round(comm_data.get(c["key"], {}).get(key, 0), 2)
+                row[c["key"].lower() + "_eur"] = eur
+                totale += eur
+            row["totale_eur"] = round(totale, 2)
+            result.append(row)
 
-        return {"data": result, "mesi": mesi, "has_telemetry": use_telemetry}
+        commodity_presenti = [
+            c["key"] for c in COMMODITY_DEF
+            if any(row.get(c["key"].lower() + "_eur", 0) > 0 for row in result)
+        ]
+
+        return {
+            "data": result,
+            "mesi": mesi,
+            "has_telemetry": use_telemetry,
+            "commodity_def": COMMODITY_DEF,
+            "commodity_presenti": commodity_presenti
+        }
