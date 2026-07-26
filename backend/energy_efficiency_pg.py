@@ -682,11 +682,14 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             eui_class = _eui_class(eui)
             eui_list.append(eui)
 
-            totale_kwh_mese      += kwh_mese
-            totale_costo_mese    += costo_mese
-            totale_co2_mese      += co2_mese
-            totale_kwh_mese_prec += kwh_mese_prec
-            totale_kwh_anno      += kwh_anno
+            # I totali KPI aggregano solo asset con telemetria reale
+            # (gli asset con energy_readings sintetici distorcerebbero i KPI)
+            if use_telemetry:
+                totale_kwh_mese      += kwh_mese
+                totale_costo_mese    += costo_mese
+                totale_co2_mese      += co2_mese
+                totale_kwh_mese_prec += kwh_mese_prec
+                totale_kwh_anno      += kwh_anno
 
             asset_ranking.append({
                 "asset_id": asset_id,
@@ -723,8 +726,9 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             "eui_medio": eui_medio,
             # P-5: Trend
             "trend_vs_mese_prec_pct": trend_pct,
-            # P-6: N. asset attivi
+            # P-6: N. asset attivi con telemetria
             "n_asset_attivi": len(assets),
+            "n_asset_telemetria": sum(1 for a in asset_ranking if a["has_telemetry"]),
             # P-7: Ranking asset per EUI (peggiori prima)
             "ranking_asset": asset_ranking,
             # P-8: Asset più efficiente

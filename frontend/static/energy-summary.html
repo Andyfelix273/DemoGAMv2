@@ -228,7 +228,7 @@
         <div class="es-kpi-card">
           <div class="es-kpi-label">Asset attivi</div>
           <div class="es-kpi-value">${port.n_asset_attivi}</div>
-          <div class="es-kpi-unit">nel portafoglio</div>
+          <div class="es-kpi-unit">${port.n_asset_telemetria || 0} con telemetria IoT</div>
         </div>
         ${port.asset_migliore ? `
         <div class="es-kpi-card" style="border-color:rgba(39,174,96,0.4);">
