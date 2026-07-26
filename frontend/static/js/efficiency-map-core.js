@@ -34,12 +34,23 @@ const COLORI_EFFICIENZA = {
   nd:      '#95A5A6',  // nessun dato disponibile
 };
 
+// Colori stato asset — stessi valori di .stato-attivo/.stato-manutenzione/.stato-inattivo in bems-ui.css
+const COLORI_STATO = {
+  attivo:       null,           // usa colore efficienza energetica (comportamento normale)
+  manutenzione: '#F39C12',      // arancione — var(--accent-orange)
+  inattivo:     '#6E7681',      // grigio   — var(--text-muted)
+};
+
+// Mappa assetId → stato asset (popolata da caricaAssets)
+let _assetStati = {};
+
 // Mappa assetId → livello efficienza (aggiornata da caricaHUD)
 let _assetEfficienze = {};
 
 /**
  * Crea un'icona Leaflet personalizzata per un marker asset.
- * Il colore riflette il livello di efficienza energetica.
+ * Priorità colore: selected > stato (manutenzione/inattivo) > efficienza energetica.
+ * Replica la stessa logica cromatica di assets.html (.stato-attivo/manutenzione/inattivo).
  */
 function creaIcona(tipo, selected, assetId) {
   const fa = ICONE_TIPO[tipo] || 'fa-map-pin';
@@ -47,17 +58,30 @@ function creaIcona(tipo, selected, assetId) {
   if (selected) {
     c = COLORE_SELECTED;
   } else {
-    const eff = assetId !== undefined ? _assetEfficienze[assetId] : null;
-    c = eff ? (COLORI_EFFICIENZA[eff] || COLORI_EFFICIENZA.nd) : COLORE_MARKER;
+    const stato = assetId !== undefined ? _assetStati[assetId] : null;
+    const coloreStato = stato ? COLORI_STATO[stato] : null;
+    if (coloreStato) {
+      // Asset in manutenzione o inattivo: usa colore stato, ignora efficienza
+      c = coloreStato;
+    } else {
+      // Asset attivo: usa colore efficienza energetica
+      const eff = assetId !== undefined ? _assetEfficienze[assetId] : null;
+      c = eff ? (COLORI_EFFICIENZA[eff] || COLORI_EFFICIENZA.nd) : COLORE_MARKER;
+    }
   }
   const sc = selected ? ' selected' : '';
-  const size = (!selected && _assetEfficienze[assetId] === 'bassa') ? 30 : 26;
-  const pulse = (!selected && _assetEfficienze[assetId] === 'bassa')
+  // Pulse solo per asset attivi con efficienza bassa
+  const statoAsset = assetId !== undefined ? _assetStati[assetId] : null;
+  const isAttivo = !statoAsset || statoAsset === 'attivo';
+  const size = (isAttivo && !selected && _assetEfficienze[assetId] === 'bassa') ? 30 : 26;
+  const pulse = (isAttivo && !selected && _assetEfficienze[assetId] === 'bassa')
     ? ` box-shadow:0 0 0 4px rgba(231,76,60,0.3),0 0 0 8px rgba(231,76,60,0.1);animation:pulse-red 1.5s ease-in-out infinite;`
     : '';
+  // Opacità ridotta per asset inattivi
+  const opacity = (statoAsset === 'inattivo') ? 'opacity:0.5;' : '';
   return L.divIcon({
     className: '',
-    html: `<div class="custom-marker${sc}" style="color:${c};border-color:${c};width:${size}px;height:${size}px;${pulse}">
+    html: `<div class="custom-marker${sc}" style="color:${c};border-color:${c};width:${size}px;height:${size}px;${pulse}${opacity}">
              <i class="fas ${fa}" style="color:${c};"></i>
            </div>`,
     iconSize:   [size, size],
@@ -228,6 +252,8 @@ async function caricaAssets() {
     const geojson = await res.json();
     allFeatures = geojson.features;
     aggiornaLegenda(allFeatures);
+    // Popola _assetStati prima di creare i marker
+    allFeatures.forEach(f => { _assetStati[f.properties.id] = f.properties.stato || 'attivo'; });
     allFeatures.forEach(feature => {
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties;
