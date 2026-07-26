@@ -1668,9 +1668,11 @@ async function _edmCaricaEfficienza(assetId) {
     const fmt        = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
     const fmtInt     = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
 
-    // Gauge EUI SVG compatto (per card nella griglia)
-    function gaugeEuiSvg(eui, classe) {
-      const max = 400;
+    // Gauge EUI SVG compatto — colore dinamico per categoria
+    function gaugeEuiSvg(eui, classe, gaugeColor) {
+      // gaugeColor: 'green' | 'yellow' | 'red' (da backend per categoria)
+      const maxByClass = { A4:300, A3:300, A2:300, A1:300, A:300, B:300, C:300, D:400, E:500, F:600, G:700 };
+      const max = maxByClass[classe] || 400;
       const pct = Math.min(eui / max, 1);
       const angle = pct * 180;
       const r = 32, cx = 44, cy = 38;
@@ -1680,9 +1682,11 @@ async function _edmCaricaEfficienza(assetId) {
       const x2 = cx + r * Math.cos(rad(-90 + angle));
       const y2 = cy + r * Math.sin(rad(-90 + angle));
       const large = angle > 180 ? 1 : 0;
+      // Colore gauge: priorità a gaugeColor (per categoria), fallback a classe
+      const gaugeColorMap = { green: '#27AE60', yellow: '#F39C12', red: '#E74C3C' };
       const classColors = { A4:'#27AE60',A3:'#2ECC71',A2:'#52BE80',A1:'#82E0AA',A:'#A9DFBF',
                              B:'#F9E79F',C:'#F39C12',D:'#E67E22',E:'#E74C3C',F:'#C0392B',G:'#922B21' };
-      const color = classColors[classe] || '#58A6FF';
+      const color = (gaugeColor && gaugeColorMap[gaugeColor]) || classColors[classe] || '#58A6FF';
       return `<svg width="88" height="48" viewBox="0 0 88 48">
         <path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="var(--border-color,#1E3A5F)" stroke-width="7"/>
         <path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round"/>
@@ -1706,6 +1710,31 @@ async function _edmCaricaEfficienza(assetId) {
 
     // ── Sezione 2: KPI Sintesi (E-1…E-6) ─────────────────────────────────
     const offOk = kpi.pct_fuori_orario !== null && kpi.pct_fuori_orario < 15;
+
+    // Badge allarmi per severità (E-4)
+    const alCrit = kpi.allarmi_critical || 0;
+    const alMed  = kpi.allarmi_medium  || 0;
+    const alLow  = kpi.allarmi_low     || 0;
+    const alTot  = alCrit + alMed + alLow;
+    const alarmiBadge = alTot > 0 ? `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+        ${alCrit > 0 ? `<span style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;"><i class="fa fa-circle-exclamation" style="margin-right:3px;"></i>${alCrit} CRITICO</span>` : ''}
+        ${alMed  > 0 ? `<span style="background:rgba(243,156,18,0.15);color:#F39C12;border:1px solid rgba(243,156,18,0.4);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;"><i class="fa fa-triangle-exclamation" style="margin-right:3px;"></i>${alMed} MEDIO</span>` : ''}
+        ${alLow  > 0 ? `<span style="background:rgba(88,166,255,0.15);color:#58A6FF;border:1px solid rgba(88,166,255,0.4);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;"><i class="fa fa-info-circle" style="margin-right:3px;"></i>${alLow} BASSO</span>` : ''}
+      </div>` : `<span style="color:#27AE60;font-size:11px;"><i class="fa fa-circle-check" style="margin-right:3px;"></i>Nessun allarme attivo</span>`;
+
+    // Benchmark €/mq per categoria (E-2)
+    const bm = kpi.benchmark_eur_mq;
+    const bmHtml = bm ? (() => {
+      const actual = kpi.costo_mq_eur || 0;
+      const pct = bm.benchmark_medio > 0 ? ((actual - bm.benchmark_medio) / bm.benchmark_medio * 100) : null;
+      const pctColor = pct === null ? 'var(--text-secondary)' : pct > 15 ? '#E74C3C' : pct < -15 ? '#27AE60' : '#F39C12';
+      return `
+        <div style="margin-top:4px;font-size:10px;color:var(--text-secondary,#7BAFC4);">Benchmark ${bm.categoria}: <strong style="color:var(--text-primary);">€ ${(bm.benchmark_min||0).toFixed(2)}–${(bm.benchmark_max||0).toFixed(2)}/m²/mese</strong>
+          ${pct !== null ? `<span style="color:${pctColor};margin-left:4px;">(${pct > 0 ? '+' : ''}${pct.toFixed(0)}% vs media)</span>` : ''}
+        </div>`;
+    })() : '';
+
     const kpiCards = `
       <div class="ee-kpi-grid">
         <div class="ee-kpi-card">
@@ -1718,6 +1747,7 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-label">Costo per m²</div>
           <div class="ee-kpi-card-value">€ ${fmt(kpi.costo_mq_eur, 2)}</div>
           <div class="ee-kpi-card-unit">€/m² · mese corrente</div>
+          ${bmHtml}
         </div>
         <div class="ee-kpi-card accent-orange">
           <div class="ee-kpi-card-label">Consumi mese</div>
@@ -1735,15 +1765,15 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-value" style="color:${offOk ? 'var(--accent-green)' : '#E74C3C'}">${fmt(kpi.pct_fuori_orario)}%</div>
           <div class="ee-kpi-card-unit">dei consumi mensili</div>
         </div>` : ''}
-        ${kpi.allarmi_energetici_attivi > 0 ? `
-        <div class="ee-kpi-card accent-red">
+        <div class="ee-kpi-card ${alTot > 0 ? (alCrit > 0 ? 'accent-red' : 'accent-orange') : 'accent-green'}">
           <div class="ee-kpi-card-label">Allarmi energetici</div>
-          <div class="ee-kpi-card-value" style="color:#E74C3C;">${kpi.allarmi_energetici_attivi}</div>
+          <div class="ee-kpi-card-value" style="color:${alTot > 0 ? (alCrit > 0 ? '#E74C3C' : '#F39C12') : '#27AE60'};">${alTot}</div>
           <div class="ee-kpi-card-unit">attivi non risolti</div>
-        </div>` : ''}
-        <div class="ee-kpi-card accent-green">
-          <div class="ee-kpi-card-label">EUI · Cl. ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''}</div>
-          ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata)}
+          ${alarmiBadge}
+        </div>
+        <div class="ee-kpi-card" style="border-color:${kpi.eui_gauge_color === 'green' ? 'rgba(39,174,96,0.4)' : kpi.eui_gauge_color === 'red' ? 'rgba(231,76,60,0.4)' : 'rgba(243,156,18,0.4)'};">
+          <div class="ee-kpi-card-label">EUI · Cl. ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''} · ${kpi.building_category || 'OFFICE'}</div>
+          ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata, kpi.eui_gauge_color)}
           <div class="ee-kpi-card-unit">${fmt(kpi.eui_kwh_mq_anno)} kWh/m²/anno</div>
         </div>
       </div>`;
@@ -1778,7 +1808,16 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-chart-label">OCCUPANCY VS COSTO (14 GG)</div>
           <div class="ee-chart" id="ee-chart-occ-${assetId}"></div>
         </div>
-        <div></div>
+        <div>
+          <div class="ee-chart-label">HVAC VS TEMPERATURA ESTERNA (E-11)</div>
+          <div class="ee-chart" id="ee-chart-hvac-temp-${assetId}"></div>
+        </div>
+      </div>
+      <div class="ee-chart-row">
+        <div style="grid-column:1/-1;">
+          <div class="ee-chart-label">DECOMPOSIZIONE COSTO PER COMMODITY — 12 MESI (E-14)</div>
+          <div class="ee-chart ee-chart-lg" id="ee-chart-commodity14-${assetId}"></div>
+        </div>
       </div>`;
 
     // ── Sezione Trend ─────────────────────────────────────────────────────
@@ -1929,6 +1968,81 @@ async function _edmCaricaEfficienza(assetId) {
       const el2 = document.getElementById(`ee-chart-trend-cost-${assetId}`);
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-line"></i>Dati non disponibili</div>';
     }
+
+    // ── E-11: HVAC vs Temperatura esterna — Scatter + regressione ───────────────
+    try {
+      const hvacRes = await fetch(`/api/efficiency/${assetId}/hvac_vs_temp?giorni=90`, { headers: AUTH });
+      if (hvacRes.ok) {
+        const hvac = await hvacRes.json();
+        if (hvac.data && hvac.data.length > 0) {
+          const hvacTraces = [
+            { type: 'scatter', mode: 'markers', name: 'HVAC kWh/giorno',
+              x: hvac.data.map(r => r.temp_media), y: hvac.data.map(r => r.hvac_kwh),
+              marker: { color: '#58A6FF', size: 6, opacity: 0.7 },
+              hovertemplate: '<b>%{x:.1f}°C</b><br>HVAC: %{y:.1f} kWh<extra></extra>' }
+          ];
+          if (hvac.regressione) {
+            const xMin = Math.min(...hvac.data.map(r => r.temp_media));
+            const xMax = Math.max(...hvac.data.map(r => r.temp_media));
+            const { m, q } = hvac.regressione;
+            hvacTraces.push({
+              type: 'scatter', mode: 'lines', name: `Regressione (R²=${(hvac.regressione.r2||0).toFixed(2)})`,
+              x: [xMin, xMax], y: [m*xMin+q, m*xMax+q],
+              line: { color: '#F39C12', width: 2, dash: 'dash' },
+              hovertemplate: 'Regressione: %{y:.1f} kWh<extra></extra>'
+            });
+          }
+          const hvacEl = document.getElementById(`ee-chart-hvac-temp-${assetId}`);
+          if (hvacEl) Plotly.newPlot(`ee-chart-hvac-temp-${assetId}`, hvacTraces,
+            plotLayout({
+              margin: { t: 8, r: 12, b: 40, l: 50 },
+              xaxis: { title: { text: 'Temperatura (°C)', standoff: 4 }, gridcolor: 'rgba(30,58,95,0.5)' },
+              yaxis: { title: { text: 'HVAC kWh', standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
+              legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+            }), plotCfg);
+        } else {
+          const hvacEl = document.getElementById(`ee-chart-hvac-temp-${assetId}`);
+          if (hvacEl) hvacEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-thermometer-half"></i>Dati HVAC non disponibili</div>';
+        }
+      }
+    } catch(eHvac) { console.warn('[E-11 HVAC]', eHvac); }
+
+    // ── E-14: Decomposizione commodity — Stacked Bar mensile ───────────────
+    try {
+      const commRes = await fetch(`/api/efficiency/${assetId}/commodity?mesi=12`, { headers: AUTH });
+      if (commRes.ok) {
+        const comm = await commRes.json();
+        if (comm.data && comm.data.length > 0) {
+          const commodities = [...new Set(comm.data.map(r => r.commodity))];
+          const commColors = { ELECTRICITY: '#58A6FF', GAS_METHANE: '#F39C12', WATER: '#3498DB', GAS_GPL: '#E67E22', HEATING_OIL: '#8E44AD' };
+          const commLabels = { ELECTRICITY: 'Elettricità', GAS_METHANE: 'Gas Metano', WATER: 'Acqua', GAS_GPL: 'GPL', HEATING_OIL: 'Gasolio' };
+          const mesiUniq = [...new Set(comm.data.map(r => r.mese_label))];
+          const commTraces = commodities.map(c => {
+            const rows = comm.data.filter(r => r.commodity === c);
+            const byMese = {};
+            rows.forEach(r => { byMese[r.mese_label] = r.costo_eur; });
+            return {
+              type: 'bar', name: commLabels[c] || c,
+              x: mesiUniq, y: mesiUniq.map(m => byMese[m] || 0),
+              marker: { color: commColors[c] || '#888' },
+              hovertemplate: `<b>${commLabels[c] || c} — %{x}</b><br>€ %{y:,.2f}<extra></extra>`
+            };
+          });
+          const commEl = document.getElementById(`ee-chart-commodity14-${assetId}`);
+          if (commEl) Plotly.newPlot(`ee-chart-commodity14-${assetId}`, commTraces,
+            plotLayout({
+              barmode: 'stack',
+              margin: { t: 8, r: 12, b: 50, l: 55 },
+              yaxis: { title: { text: '€', standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
+              xaxis: { tickangle: -30, gridcolor: 'rgba(30,58,95,0.5)' },
+              legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+            }), plotCfg);
+        } else {
+          const commEl = document.getElementById(`ee-chart-commodity14-${assetId}`);
+          if (commEl) commEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-layer-group"></i>Dati commodity non disponibili</div>';
+        }
+      }
+    } catch(eComm) { console.warn('[E-14 Commodity]', eComm); }
 
   } catch(e) {
     if (el) el.innerHTML = `<div class="ee-no-data" style="height:200px;">
