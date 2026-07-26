@@ -1,6 +1,6 @@
 /**
  * GIS Asset Manager - Utilities
- * Versione: 2.1 | Autore: Felix / KeyBiz
+ * Versione: 2.2 | Autore: Felix / KeyBiz
  *
  * Funzioni condivise: toast, modal conferma, gestione tema, topbar, sidebar.
  */
@@ -130,6 +130,7 @@ function renderSidebar(paginaAttiva, modulo, elementId) {
         <i class="fa fa-bell"></i>
         <span class="${dotCls}" id="${dotId}"></span>
       </a>
+      ${a('/static/energy-summary.html',      'eff-energy-summary', 'fa-chart-line',       'Energy Summary')}
       ${a('/static/efficiency-invoices.html', 'eff-bollette',    'fa-file-invoice-dollar', 'Tariffe & Bollette')}
       ${a('/static/efficiency-settings.html', 'eff-impostazioni', 'fa-cog',                'Impostazioni')}
       <div class="${spacer}"></div>

@@ -166,6 +166,43 @@
             <label>Note</label>
             <textarea class="form-control" id="f-note" rows="2"></textarea>
           </div>
+          <!-- Sezione Efficienza Energetica -->
+          <div class="form-group full form-section-title">
+            <span>Efficienza Energetica</span>
+          </div>
+          <div class="form-group">
+            <label>Orario inizio attività</label>
+            <input class="form-control" type="time" id="f-wh-start" value="08:00">
+          </div>
+          <div class="form-group">
+            <label>Orario fine attività</label>
+            <input class="form-control" type="time" id="f-wh-end" value="19:00">
+          </div>
+          <div class="form-group">
+            <label>Giorni lavorativi</label>
+            <select class="form-control" id="f-working-days">
+              <option value="MON,TUE,WED,THU,FRI">Lun – Ven</option>
+              <option value="MON,TUE,WED,THU,FRI,SAT">Lun – Sab</option>
+              <option value="MON,TUE,WED,THU,FRI,SAT,SUN">Tutti i giorni</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Classe energetica</label>
+            <select class="form-control" id="f-energy-class">
+              <option value="">Non definita</option>
+              <option value="A4">A4</option>
+              <option value="A3">A3</option>
+              <option value="A2">A2</option>
+              <option value="A1">A1</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+              <option value="E">E</option>
+              <option value="F">F</option>
+              <option value="G">G</option>
+            </select>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-annulla">Annulla</button>
@@ -394,6 +431,11 @@
     document.getElementById('f-superficie').value= a.superficie_mq || '';
     document.getElementById('f-anno').value      = a.anno_costruzione || '';
     document.getElementById('f-note').value      = a.note || '';
+    // Campi efficienza energetica
+    document.getElementById('f-wh-start').value    = a.working_hours_start ? a.working_hours_start.substring(0,5) : '08:00';
+    document.getElementById('f-wh-end').value      = a.working_hours_end   ? a.working_hours_end.substring(0,5)   : '19:00';
+    document.getElementById('f-working-days').value = a.working_days || 'MON,TUE,WED,THU,FRI';
+    document.getElementById('f-energy-class').value = a.energy_class || '';
     document.getElementById('modal-asset').style.display = 'flex';
   }
 
@@ -418,6 +460,11 @@
       superficie_mq:    parseInt(document.getElementById('f-superficie').value) || null,
       anno_costruzione: parseInt(document.getElementById('f-anno').value) || null,
       note:             document.getElementById('f-note').value.trim() || null,
+      // Campi efficienza energetica
+      working_hours_start: document.getElementById('f-wh-start').value || '08:00',
+      working_hours_end:   document.getElementById('f-wh-end').value   || '19:00',
+      working_days:        document.getElementById('f-working-days').value || 'MON,TUE,WED,THU,FRI',
+      energy_class:        document.getElementById('f-energy-class').value || null,
     };
     const btn = document.getElementById('btn-salva');
     btn.disabled = true;

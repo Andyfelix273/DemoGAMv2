@@ -225,6 +225,11 @@ class AssetCreate(BaseModel):
     anno_costruzione: Optional[int] = None
     stato: Optional[str] = "attivo"
     note: Optional[str] = None
+    # Campi efficienza energetica
+    working_hours_start: Optional[str] = "08:00"
+    working_hours_end: Optional[str] = "19:00"
+    working_days: Optional[str] = "MON,TUE,WED,THU,FRI"
+    energy_class: Optional[str] = None
 
 class AssetUpdate(BaseModel):
     nome: Optional[str] = None
@@ -242,6 +247,11 @@ class AssetUpdate(BaseModel):
     anno_costruzione: Optional[int] = None
     stato: Optional[str] = None
     note: Optional[str] = None
+    # Campi efficienza energetica
+    working_hours_start: Optional[str] = None
+    working_hours_end: Optional[str] = None
+    working_days: Optional[str] = None
+    energy_class: Optional[str] = None
 
 class ThresholdUpdate(BaseModel):
     warning_value: float
@@ -719,11 +729,78 @@ def _seed_bim_data(database_url: str):
 _migrate_bim_schema(DATABASE_URL)
 _seed_bim_data(DATABASE_URL)
 
+# ── Migrazione schema Efficienza Energetica ──────────────────────────────────
+def _migrate_energy_efficiency_schema(database_url: str):
+    """Aggiunge campi working hours ed energy_class ad assets;
+    aggiunge chiave energy_budget_* in config;
+    seed energy_unit_costs per asset 6."""
+    import psycopg2 as _pg
+    conn = _pg.connect(database_url)
+    cur = conn.cursor()
+    try:
+        # ─ assets: working hours + energy class ─────────────────────────────
+        for col, typedef in [
+            ('working_hours_start', "TIME DEFAULT '08:00'"),
+            ('working_hours_end',   "TIME DEFAULT '19:00'"),
+            ('working_days',        "VARCHAR(50) DEFAULT 'MON,TUE,WED,THU,FRI'"),
+            ('energy_class',        'VARCHAR(10)'),
+        ]:
+            cur.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='assets' AND column_name=%s", (col,)
+            )
+            if not cur.fetchone():
+                cur.execute(f"ALTER TABLE assets ADD COLUMN {col} {typedef}")
+                print(f"[migrate_energy_eff] Colonna {col} aggiunta ad assets")
+
+        # ─ seed valori asset 6 (Sede Centrale Roma) ─────────────────────────
+        cur.execute(
+            "UPDATE assets SET working_hours_start='08:00', working_hours_end='19:00', "
+            "working_days='MON,TUE,WED,THU,FRI', energy_class='C' "
+            "WHERE id=6 AND (energy_class IS NULL OR energy_class='')"
+        )
+
+        # ─ seed energy_unit_costs per asset 6 ───────────────────────────────
+        # Inserisce solo se non esistono già
+        for commodity, unit_cost in [
+            ('ELECTRICITY', 0.285),
+            ('GAS_METHANE', 0.980),
+            ('WATER',       2.150),
+        ]:
+            cur.execute(
+                "SELECT asset_id FROM energy_unit_costs WHERE asset_id=6 AND commodity=%s",
+                (commodity,)
+            )
+            if not cur.fetchone():
+                cur.execute(
+                    "INSERT INTO energy_unit_costs (asset_id, commodity, unit_cost_eur) "
+                    "VALUES (6, %s, %s)",
+                    (commodity, unit_cost)
+                )
+                print(f"[migrate_energy_eff] energy_unit_costs: asset 6 {commodity} = {unit_cost}")
+
+        conn.commit()
+        print("[migrate_energy_eff] Schema Efficienza Energetica aggiornato OK")
+    except Exception as e:
+        conn.rollback()
+        print(f"[migrate_energy_eff] Errore: {e}")
+        import traceback; traceback.print_exc()
+    finally:
+        cur.close()
+        conn.close()
+
+_migrate_energy_efficiency_schema(DATABASE_URL)
+
 # ── Modulo Referenti ────────────────────────────────────────────────────────
 migrate_referenti_schema(DATABASE_URL)
 seed_referenti(DATABASE_URL)
 register_referenti_routes(app, get_db, get_utente_corrente, richiedi_permesso)
 print("[main] Referenti routes registered OK")
+
+# ── Modulo Efficienza Energetica (KPI) ────────────────────────────────
+from energy_efficiency_pg import register_efficiency_routes
+register_efficiency_routes(app, get_db, get_utente_corrente)
+print("[main] Efficiency KPI routes registered OK")
 
 
 # ── Endpoint autenticazione ──────────────────────────────────────────────────
@@ -817,12 +894,15 @@ def crea_asset(payload: AssetCreate, db=Depends(get_db), _=Depends(richiedi_perm
         cur = db.execute("""
             INSERT INTO assets
             (codice,nome,tipo,indirizzo,citta,provincia,cap,lat,lon,
-             referente,telefono,email,superficie_mq,anno_costruzione,stato,note)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+             referente,telefono,email,superficie_mq,anno_costruzione,stato,note,
+             working_hours_start,working_hours_end,working_days,energy_class)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (payload.codice, payload.nome, payload.tipo, payload.indirizzo,
               payload.citta, payload.provincia, payload.cap, payload.lat, payload.lon,
               payload.referente, payload.telefono, payload.email,
-              payload.superficie_mq, payload.anno_costruzione, payload.stato, payload.note))
+              payload.superficie_mq, payload.anno_costruzione, payload.stato, payload.note,
+              payload.working_hours_start, payload.working_hours_end,
+              payload.working_days, payload.energy_class))
         db.commit()
         return {"id": cur.fetchone()["id"], "messaggio": "Asset creato"}
     except psycopg2.errors.UniqueViolation:

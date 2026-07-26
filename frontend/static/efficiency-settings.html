@@ -306,6 +306,20 @@
         </div>
       </div>
 
+      <!-- Sezione: Budget energetico per asset -->
+      <div class="settings-section" id="section-budget">
+        <div class="settings-section-header">
+          <div class="settings-section-icon green"><i class="fa fa-euro-sign"></i></div>
+          <span class="settings-section-title">Budget energetico annuale</span>
+        </div>
+        <div class="settings-section-body">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+            Imposta il budget annuale di spesa energetica per ciascun asset. Viene utilizzato per calcolare lo scostamento rispetto ai costi effettivi nel modulo Energy Summary.
+          </p>
+          <div id="budget-list"><div class="setting-row"><span style="color:var(--text-muted);font-size:13px">Caricamento asset...</span></div></div>
+        </div>
+      </div>
+
       <!-- Sezione: Informazioni applicazione -->
       <div class="settings-section">
         <div class="settings-section-header">
@@ -338,7 +352,7 @@
 
   <script src="/static/js/i18n.js?v=6"></script>
   <script src="/static/js/api.js?v=6"></script>
-  <script src="/static/js/utils.js?v=8"></script>
+  <script src="/static/js/utils.js?v=9"></script>
   <script>
   /**
    * efficiency-settings.html — Impostazioni del dimostratore Asset Efficiency
@@ -348,35 +362,7 @@
   if (!requireAuth()) throw new Error('not authenticated');
   Tema.apply();
   renderTopbar('efficiency-impostazioni', { filtri: false, titolo: 'Asset Efficiency' });
-
-  // Sidebar autonoma del dimostratore efficiency
-  renderSidebar('efficiency-impostazioni');
-  setTimeout(() => {
-    const sb = document.getElementById('sidebar');
-    if (!sb) return;
-    sb.innerHTML = `
-      <a href="/static/efficiency-map.html" class="sidebar-link" title="Mappa efficienza">
-        <i class="fa fa-map-marker"></i>
-        <span>Mappa</span>
-      </a>
-      <a href="/static/efficiency-assets.html" class="sidebar-link" title="Anagrafica asset">
-        <i class="fa fa-database"></i>
-        <span>Anagrafica</span>
-      </a>
-      <a href="/static/efficiency-alarms.html" class="sidebar-link" title="Allarmi energetici">
-        <i class="fa fa-bell"></i>
-        <span>Allarmi</span>
-      </a>
-      <a href="/static/efficiency-settings.html" class="sidebar-link active" title="Impostazioni">
-        <i class="fa fa-cog"></i>
-        <span>Impostazioni</span>
-      </a>
-      <div style="flex:1;"></div>
-      <button class="sidebar-link" onclick="API.logout(); window.location.href='/static/login.html';" title="Esci">
-        <i class="fa fa-sign-out"></i>
-        <span>Esci</span>
-      </button>`;
-  }, 50);
+  renderSidebar('eff-impostazioni', 'efficiency');
 
   initAlarmNotifications();
   i18n.apply();
@@ -468,6 +454,14 @@
       };
       localStorage.setItem('efficiency_params', JSON.stringify(params));
 
+      // Salva budget energetici per asset in localStorage
+      const budgets = {};
+      allAssetsBudget.forEach(a => {
+        const el = document.getElementById(`budget-${a.id}`);
+        if (el && el.value) budgets[a.id] = parseFloat(el.value);
+      });
+      localStorage.setItem('efficiency_budgets', JSON.stringify(budgets));
+
       // Salva anche tema/lingua nel backend (se disponibile)
       try {
         await API.updateConfig({
@@ -484,8 +478,39 @@
     }
   });
 
+  // ── Budget energetico per asset ───────────────────────────────
+  let allAssetsBudget = [];
+
+  async function caricaBudget() {
+    try {
+      const gj = await API.getAssets();
+      allAssetsBudget = (gj.features || []).map(f => f.properties);
+      const saved = JSON.parse(localStorage.getItem('efficiency_budgets') || '{}');
+      let html = '';
+      allAssetsBudget.forEach(a => {
+        const val = saved[a.id] || a.annual_energy_budget_eur || '';
+        html += `
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">${a.codice} — ${a.nome}</div>
+              <div class="setting-desc">${a.tipo} · ${a.citta || '–'}</div>
+            </div>
+            <div class="setting-control">
+              <input class="setting-input" type="number" step="100" min="0"
+                     id="budget-${a.id}" value="${val}" placeholder="–">
+              <span class="setting-unit">€/anno</span>
+            </div>
+          </div>`;
+      });
+      document.getElementById('budget-list').innerHTML = html || '<p style="color:var(--text-muted);font-size:13px">Nessun asset trovato.</p>';
+    } catch (e) {
+      document.getElementById('budget-list').innerHTML = '<p style="color:var(--text-muted);font-size:13px">Errore caricamento asset.</p>';
+    }
+  }
+
   // ── Avvio ─────────────────────────────────────────────────────
   caricaDati();
+  caricaBudget();
   </script>
 </body>
 </html>

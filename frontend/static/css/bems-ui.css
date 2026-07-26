@@ -1182,3 +1182,246 @@ a.module-card:hover {
 .upload-zone-size  { color: var(--text-muted); margin-left: auto; }
 .upload-progress-wrap { background: var(--border-color); border-radius: 4px; height: 4px; overflow: hidden; }
 .upload-progress-fill { height: 100%; background: var(--accent-blue); width: 0%; transition: width 0.3s; }
+
+
+/* ─── FORM: SEZIONE TITOLO (separatore visivo nel form asset) ────────────────*/
+.form-section-title {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+/* ─── MODULO EFFICIENZA ENERGETICA ──────────────────────────────────────────*/
+
+/* Gauge EUI */
+.ee-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.ee-gauge-svg { display: block; }
+.ee-gauge-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.ee-gauge-unit {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.ee-gauge-label {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: rgba(88,166,255,0.12);
+  color: var(--accent-blue);
+}
+.ee-gauge-label.A4, .ee-gauge-label.A3, .ee-gauge-label.A2, .ee-gauge-label.A1, .ee-gauge-label.A {
+  background: rgba(39,174,96,0.15); color: #27AE60;
+}
+.ee-gauge-label.B { background: rgba(76,175,80,0.12); color: #4CAF50; }
+.ee-gauge-label.C { background: rgba(243,156,18,0.12); color: #F39C12; }
+.ee-gauge-label.D { background: rgba(231,76,60,0.12); color: #E74C3C; }
+.ee-gauge-label.E, .ee-gauge-label.F, .ee-gauge-label.G {
+  background: rgba(192,57,43,0.12); color: #c0392b;
+}
+
+/* KPI card energetica */
+.ee-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ee-kpi-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.ee-kpi-card-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ee-kpi-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.ee-kpi-card-unit {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.ee-kpi-card-delta {
+  font-size: 11px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+.ee-kpi-card-delta.up   { color: #E74C3C; }
+.ee-kpi-card-delta.down { color: #27AE60; }
+.ee-kpi-card-delta.flat { color: var(--text-muted); }
+
+/* Sezione titolo interna alla tab */
+.ee-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  padding: 10px 0 6px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 10px;
+}
+
+/* Contenitore grafico con altezza fissa */
+.ee-chart {
+  width: 100%;
+  height: 220px;
+  position: relative;
+}
+.ee-chart-lg {
+  width: 100%;
+  height: 280px;
+  position: relative;
+}
+
+/* Griglia 2 colonne per grafici affiancati */
+.ee-chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+@media (max-width: 900px) {
+  .ee-chart-row { grid-template-columns: 1fr; }
+}
+
+/* Badge stato fuori orario */
+.ee-badge-offhours {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(231,76,60,0.12);
+  color: #E74C3C;
+}
+.ee-badge-offhours.ok {
+  background: rgba(39,174,96,0.12);
+  color: #27AE60;
+}
+
+/* Riga info anagrafica energetica (working hours, classe) */
+.ee-info-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ee-info-row strong { color: var(--text-primary); }
+
+/* Placeholder "no data" */
+.ee-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  color: var(--text-muted);
+  font-size: 13px;
+  gap: 8px;
+}
+.ee-no-data i { font-size: 28px; opacity: 0.4; }
+
+/* ─── ENERGY SUMMARY — pagina portafoglio ────────────────────────────────────*/
+.es-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.es-kpi-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.es-kpi-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.es-kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.es-kpi-unit  { font-size: 11px; color: var(--text-muted); }
+.es-kpi-delta { font-size: 12px; font-weight: 600; }
+.es-kpi-delta.up   { color: #E74C3C; }
+.es-kpi-delta.down { color: #27AE60; }
+
+.es-chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1100px) {
+  .es-chart-grid { grid-template-columns: 1fr; }
+}
+.es-chart-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.es-chart-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.es-chart-inner {
+  width: 100%;
+  height: 240px;
+  position: relative;
+}
+.es-chart-inner-lg {
+  width: 100%;
+  height: 300px;
+  position: relative;
+}

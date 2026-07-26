@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Energy Summary</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
+  <link rel="stylesheet" href="/static/css/icons.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css">
+  <link rel="stylesheet" href="/static/css/map.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+
+    <div class="page-header">
+      <h1 class="page-title">
+        <i class="fa fa-leaf" style="margin-right:8px;color:var(--accent-blue);"></i>Energy Summary
+      </h1>
+      <div class="page-actions">
+        <select id="filter-mesi" class="btn btn-secondary btn-sm" style="padding:5px 10px;">
+          <option value="3">Ultimi 3 mesi</option>
+          <option value="6">Ultimi 6 mesi</option>
+          <option value="12" selected>Ultimi 12 mesi</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh" title="Aggiorna">
+          <i class="fa fa-sync-alt"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- KPI strip portafoglio -->
+      <div class="es-kpi-strip" id="kpi-strip">
+        <div class="es-kpi-card"><div class="es-kpi-label">Caricamento…</div></div>
+      </div>
+
+      <!-- Grafici riga 1: trend kWh + trend costi -->
+      <div class="es-chart-grid">
+        <div class="es-chart-card">
+          <div class="es-chart-card-title"><i class="fa fa-bolt" style="margin-right:5px;color:var(--accent-blue);"></i>Consumi mensili portafoglio (kWh)</div>
+          <div class="es-chart-inner" id="chart-trend-kwh"></div>
+        </div>
+        <div class="es-chart-card">
+          <div class="es-chart-card-title"><i class="fa fa-euro-sign" style="margin-right:5px;color:var(--accent-blue);"></i>Costi mensili portafoglio (€)</div>
+          <div class="es-chart-inner" id="chart-trend-cost"></div>
+        </div>
+      </div>
+
+      <!-- Grafici riga 2: ranking EUI + distribuzione classi -->
+      <div class="es-chart-grid">
+        <div class="es-chart-card">
+          <div class="es-chart-card-title"><i class="fa fa-sort-amount-down" style="margin-right:5px;color:var(--accent-blue);"></i>Ranking asset per EUI (kWh/m²/anno)</div>
+          <div class="es-chart-inner-lg" id="chart-ranking-eui"></div>
+        </div>
+        <div class="es-chart-card">
+          <div class="es-chart-card-title"><i class="fa fa-chart-pie" style="margin-right:5px;color:var(--accent-blue);"></i>Distribuzione classi energetiche</div>
+          <div class="es-chart-inner-lg" id="chart-classi"></div>
+        </div>
+      </div>
+
+      <!-- Tabella ranking dettaglio -->
+      <div class="es-chart-card" style="margin-bottom:0;">
+        <div class="es-chart-card-title"><i class="fa fa-table" style="margin-right:5px;color:var(--accent-blue);"></i>Dettaglio per asset</div>
+        <div class="table-wrap" style="margin-top:10px;">
+          <table id="ranking-table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Tipo</th>
+                <th>Superficie</th>
+                <th>kWh mese</th>
+                <th>Costo mese</th>
+                <th>EUI</th>
+                <th>Classe calc.</th>
+                <th>Classe cert.</th>
+              </tr>
+            </thead>
+            <tbody id="ranking-tbody">
+              <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">Caricamento…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /page-body -->
+  </div><!-- /page -->
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/api.js?v=3"></script>
+  <script src="/static/js/i18n.js?v=2"></script>
+  <script src="/static/js/utils.js?v=2"></script>
+  <script>
+  /* global API, renderSidebar, renderTopbar, Plotly */
+
+  const EUI_CLASS_COLOR = {
+    A4:'#27AE60', A3:'#2ECC71', A2:'#52BE80', A1:'#82E0AA', A:'#A9DFBF',
+    B:'#F9E79F', C:'#F39C12', D:'#E67E22', E:'#E74C3C', F:'#C0392B', G:'#922B21'
+  };
+
+  const plotCfg = { responsive: true, displayModeBar: false };
+  const plotLayout = (extra) => Object.assign({
+    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+    margin: { t: 10, r: 10, b: 40, l: 55 },
+    font: { family: 'Inter,sans-serif', size: 11, color: 'var(--text-secondary,#7BAFC4)' },
+    xaxis: { gridcolor: 'rgba(30,58,95,0.5)', zerolinecolor: 'rgba(30,58,95,0.5)' },
+    yaxis: { gridcolor: 'rgba(30,58,95,0.5)', zerolinecolor: 'rgba(30,58,95,0.5)' },
+    legend: { orientation: 'h', y: -0.3, font: { size: 10 } },
+  }, extra || {});
+
+  const fmt     = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtInt  = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
+  const trendCl = (v) => v === null ? 'flat' : v > 0 ? 'up' : 'down';
+  const trendIc = (v) => v === null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
+
+  async function caricaDashboard() {
+    const AUTH = { 'Authorization': 'Bearer ' + API.getToken() };
+    const mesi = parseInt(document.getElementById('filter-mesi').value);
+
+    try {
+      // Carica summary portafoglio
+      const [portRes] = await Promise.all([
+        fetch('/api/efficiency/portfolio/summary', { headers: AUTH }),
+      ]);
+      if (!portRes.ok) throw new Error('HTTP ' + portRes.status);
+      const port = await portRes.json();
+
+      // ── KPI Strip ──────────────────────────────────────────────────────────
+      const strip = document.getElementById('kpi-strip');
+      strip.innerHTML = `
+        <div class="es-kpi-card">
+          <div class="es-kpi-label">Consumi mese (portafoglio)</div>
+          <div class="es-kpi-value">${fmtInt(port.kwh_mese_totale)}</div>
+          <div class="es-kpi-unit">kWh</div>
+          ${port.trend_vs_mese_prec_pct !== null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
+        </div>
+        <div class="es-kpi-card">
+          <div class="es-kpi-label">Costo energetico mese</div>
+          <div class="es-kpi-value">€ ${fmtInt(port.costo_mese_eur)}</div>
+          <div class="es-kpi-unit">solo elettricità</div>
+        </div>
+        <div class="es-kpi-card">
+          <div class="es-kpi-label">CO₂ equivalente mese</div>
+          <div class="es-kpi-value">${fmtInt(port.co2_kg_mese)}</div>
+          <div class="es-kpi-unit">kg CO₂</div>
+        </div>
+        <div class="es-kpi-card">
+          <div class="es-kpi-label">EUI medio portafoglio</div>
+          <div class="es-kpi-value">${fmt(port.eui_medio)}</div>
+          <div class="es-kpi-unit">kWh/m²/anno</div>
+        </div>
+        <div class="es-kpi-card">
+          <div class="es-kpi-label">Asset attivi</div>
+          <div class="es-kpi-value">${port.n_asset_attivi}</div>
+          <div class="es-kpi-unit">nel portafoglio</div>
+        </div>
+        ${port.asset_migliore ? `
+        <div class="es-kpi-card" style="border-color:rgba(39,174,96,0.4);">
+          <div class="es-kpi-label">Asset più efficiente</div>
+          <div class="es-kpi-value" style="font-size:14px;color:#27AE60;">${port.asset_migliore.nome}</div>
+          <div class="es-kpi-unit">EUI ${fmt(port.asset_migliore.eui)} · Classe ${port.asset_migliore.eui_class}</div>
+        </div>` : ''}
+        ${port.asset_peggiore ? `
+        <div class="es-kpi-card" style="border-color:rgba(231,76,60,0.4);">
+          <div class="es-kpi-label">Asset meno efficiente</div>
+          <div class="es-kpi-value" style="font-size:14px;color:#E74C3C;">${port.asset_peggiore.nome}</div>
+          <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
+        </div>` : ''}`;
+
+      // ── Trend portafoglio (aggregato dai singoli asset) ────────────────────
+      // Usa il trend del primo asset con telemetria come proxy portafoglio
+      // (in futuro si può sommare i trend di tutti gli asset)
+      const trendAssetId = port.ranking_asset?.find(a => a.kwh_mese > 0)?.asset_id;
+      if (trendAssetId) {
+        const trendRes = await fetch(`/api/efficiency/${trendAssetId}/trend?mesi=${mesi}`, { headers: AUTH });
+        if (trendRes.ok) {
+          const trend = await trendRes.json();
+          if (trend && trend.length) {
+            Plotly.newPlot('chart-trend-kwh',
+              [{ type: 'bar', x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
+                 marker: { color: '#58A6FF' },
+                 hovertemplate: '<b>%{x}</b><br>%{y:.0f} kWh<extra></extra>' }],
+              plotLayout({ yaxis: { title: 'kWh' } }), plotCfg);
+
+            Plotly.newPlot('chart-trend-cost',
+              [{ type: 'scatter', mode: 'lines+markers',
+                 x: trend.map(r => r.mese), y: trend.map(r => r.costo_eur),
+                 line: { color: '#F39C12', width: 2 },
+                 marker: { color: '#F39C12', size: 5 },
+                 fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.1)',
+                 hovertemplate: '<b>%{x}</b><br>€ %{y:.2f}<extra></extra>' }],
+              plotLayout({ yaxis: { title: '€' } }), plotCfg);
+          }
+        }
+      }
+
+      // ── Ranking EUI bar chart ──────────────────────────────────────────────
+      const ranking = [...port.ranking_asset].reverse(); // migliori in cima
+      Plotly.newPlot('chart-ranking-eui',
+        [{ type: 'bar', orientation: 'h',
+           y: ranking.map(r => r.nome),
+           x: ranking.map(r => r.eui),
+           marker: { color: ranking.map(r => EUI_CLASS_COLOR[r.eui_class] || '#58A6FF') },
+           hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<extra></extra>' }],
+        plotLayout({ margin: { t: 10, r: 10, b: 40, l: 160 },
+                     xaxis: { title: 'kWh/m²/anno' } }), plotCfg);
+
+      // ── Distribuzione classi energetiche ──────────────────────────────────
+      const classiCount = {};
+      port.ranking_asset.forEach(a => {
+        const c = a.eui_class || 'N/D';
+        classiCount[c] = (classiCount[c] || 0) + 1;
+      });
+      const classiLabels = Object.keys(classiCount);
+      const classiValues = Object.values(classiCount);
+      Plotly.newPlot('chart-classi',
+        [{ type: 'pie', hole: 0.5,
+           labels: classiLabels, values: classiValues,
+           marker: { colors: classiLabels.map(c => EUI_CLASS_COLOR[c] || '#888') },
+           textinfo: 'label+percent', textfont: { size: 12 },
+           hovertemplate: 'Classe %{label}: %{value} asset<extra></extra>' }],
+        plotLayout({ margin: { t: 10, r: 10, b: 10, l: 10 },
+                     legend: { orientation: 'v', x: 1.02, y: 0.5 } }), plotCfg);
+
+      // ── Tabella ranking ────────────────────────────────────────────────────
+      const tbody = document.getElementById('ranking-tbody');
+      if (!port.ranking_asset || port.ranking_asset.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun dato disponibile</td></tr>';
+      } else {
+        tbody.innerHTML = port.ranking_asset.map((a, i) => {
+          const classColor = EUI_CLASS_COLOR[a.eui_class] || '#888';
+          const rank = i + 1;
+          const rankIcon = rank === 1 ? '<i class="fa fa-exclamation-triangle" style="color:#E74C3C;margin-right:4px;" title="Meno efficiente"></i>'
+                         : rank === port.ranking_asset.length ? '<i class="fa fa-star" style="color:#27AE60;margin-right:4px;" title="Più efficiente"></i>'
+                         : '';
+          return `<tr>
+            <td>${rankIcon}<strong>${a.nome}</strong></td>
+            <td>${a.tipo}</td>
+            <td>${fmtInt(a.superficie_mq)} m²</td>
+            <td>${fmtInt(a.kwh_mese)} kWh</td>
+            <td>€ ${fmtInt(a.costo_mese_eur)}</td>
+            <td><strong>${fmt(a.eui)}</strong></td>
+            <td><span style="background:${classColor}22;color:${classColor};border:1px solid ${classColor}44;
+              border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">${a.eui_class}</span></td>
+            <td>${a.energy_class_certificata
+              ? `<span style="background:rgba(88,166,255,0.1);color:#58A6FF;border:1px solid rgba(88,166,255,0.3);
+                  border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">${a.energy_class_certificata}</span>`
+              : '<span style="color:var(--text-muted);">–</span>'}</td>
+          </tr>`;
+        }).join('');
+      }
+
+    } catch(e) {
+      document.getElementById('kpi-strip').innerHTML =
+        `<div class="es-kpi-card" style="grid-column:1/-1;border-color:rgba(231,76,60,0.4);">
+          <div class="es-kpi-label" style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:5px;"></i>Errore caricamento</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${e.message}</div>
+        </div>`;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await API.requireAuth();
+    renderSidebar('eff-energy-summary', 'efficiency');
+    renderTopbar(i18n.t('energy_summary', 'Energy Summary'));
+    caricaDashboard();
+    document.getElementById('filter-mesi').addEventListener('change', caricaDashboard);
+    document.getElementById('btn-refresh').addEventListener('click', caricaDashboard);
+  });
+  </script>
+</body>
+</html>
