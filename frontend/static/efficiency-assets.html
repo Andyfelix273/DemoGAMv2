@@ -214,37 +214,9 @@
   if (!requireAuth()) throw new Error('not authenticated');
   Tema.apply();
 
-  // Topbar con titolo Asset Efficiency
-  renderTopbar('efficiency-anagrafica', { filtri: false, titolo: 'Asset Efficiency' });
-
-  // Sidebar con navigazione del dimostratore efficiency (override)
-  (function() {
-    const sb = document.getElementById('sidebar');
-    if (!sb) return;
-    // Aspetta che renderSidebar abbia popolato il DOM, poi sostituisce i link
-    renderSidebar('efficiency-anagrafica');
-    setTimeout(() => {
-      // Sostituisce i link della sidebar con quelli del dimostratore efficiency
-      sb.innerHTML = `
-        <a href="/static/efficiency-map.html" class="sidebar-btn" title="Mappa efficienza">
-          <i class="fa fa-map-marker"></i>
-        </a>
-        <a href="/static/efficiency-assets.html" class="sidebar-btn active" title="Anagrafica asset">
-          <i class="fa fa-database"></i>
-        </a>
-        <a href="/static/efficiency-alarms.html" class="sidebar-btn" title="Allarmi energetici" id="sb-allarmi">
-          <i class="fa fa-bell"></i>
-          <span class="sidebar-dot" id="sb-alarm-dot"></span>
-        </a>
-        <a href="/static/efficiency-settings.html" class="sidebar-btn" title="Impostazioni">
-          <i class="fa fa-cog"></i>
-        </a>
-        <div class="sidebar-spacer"></div>
-        <button class="sidebar-btn" onclick="API.logout(); window.location.href='/static/login.html';" title="Esci">
-          <i class="fa fa-sign-out"></i>
-        </button>`;
-    }, 50);
-  })();
+  // Topbar e sidebar del modulo Efficiency
+  renderTopbar('eff-anagrafica', { titolo: 'Asset Efficiency', modulo: 'efficiency' });
+  renderSidebar('eff-anagrafica', 'efficiency');
 
   initAlarmNotifications();
   i18n.apply();
