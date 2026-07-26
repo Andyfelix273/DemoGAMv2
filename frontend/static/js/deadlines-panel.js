@@ -575,7 +575,141 @@ const DeadlinesPanel = (() => {
       readonly:  opts.readonly  ?? false,
     };
     _injectModal(_opts.zIndex);
-    if (_container) _carica();
+    if (_container) _caricaConCards();
+  }
+
+  // ── Caricamento con layout card-list (identico a deadlines.html) ──────────────
+  async function _caricaConCards() {
+    if (!_container) return;
+    _container.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+    try {
+      if (_opts.assetId) {
+        _panelDati = await API.getAssetDeadlines(_opts.assetId);
+      } else {
+        const params = {};
+        _panelDati = await API.getDeadlines(params);
+      }
+      _panelAssetId   = _opts.assetId;
+      _panelAssetNome = _opts.assetNome;
+      _panelFiltrati  = [..._panelDati];
+      _renderCards();
+    } catch (e) {
+      _container.innerHTML = `<p class="error-msg"><i class="fa fa-exclamation-circle"></i> Errore: ${e.message}</p>`;
+    }
+  }
+
+  // ── Render card-list nel container (identico a deadlines.html) ────────────────
+  function _renderCards() {
+    if (!_container) return;
+    const canCreate = !_opts.readonly && API.can('deadlines.create');
+    const n = _panelDati.length;
+    _container.innerHTML = `
+      <div class="filtri-bar">
+        <input type="text" id="dlp-c-search" placeholder="Cerca scadenza, assegnatario..." style="flex:1;min-width:180px" oninput="DeadlinesPanel._cardFiltra()">
+        <select id="dlp-c-stato" onchange="DeadlinesPanel._cardFiltra()">
+          <option value="">Tutti gli stati</option>
+          <option value="aperta">Aperta</option>
+          <option value="chiusa">Chiusa</option>
+          <option value="scaduta">Scaduta</option>
+        </select>
+        <select id="dlp-c-prio" onchange="DeadlinesPanel._cardFiltra()">
+          <option value="">Tutte le priorità</option>
+          <option value="critica">Critica</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="bassa">Bassa</option>
+        </select>
+        <span class="record-count" id="dlp-c-count">${n} scadenz${n===1?'a':'e'}${_opts.assetNome ? ' — '+_opts.assetNome : ''}</span>
+        ${canCreate ? `<button class="btn btn-primary" onclick="DeadlinesPanel._apriNuovaCard()"><i class="fa fa-plus"></i> Nuova scadenza</button>` : ''}
+      </div>
+      <div id="dlp-c-list" style="overflow-y:auto;max-height:calc(100% - 60px)"></div>`;
+    _renderCardRighe();
+  }
+
+  function _renderCardRighe() {
+    const container = document.getElementById('dlp-c-list');
+    const countEl   = document.getElementById('dlp-c-count');
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    const n = _panelFiltrati.length;
+    if (countEl) countEl.textContent = `${n} scadenz${n===1?'a':'e'}${_opts.assetNome ? ' — '+_opts.assetNome : ''}`;
+    if (!container) return;
+    if (n === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:32px"><i class="fa fa-calendar-check"></i> Nessuna scadenza trovata</p>';
+      return;
+    }
+    const canEdit = !_opts.readonly && API.can('deadlines.update');
+    const canDel  = !_opts.readonly && API.can('deadlines.delete');
+    container.innerHTML = _panelFiltrati.map(d => {
+      const scad   = new Date(d.data_scadenza);
+      const diffGg = Math.ceil((scad - oggi) / 86400000);
+      const isScad = d.stato === 'scaduta' || (d.stato === 'aperta' && diffGg < 0);
+      const isUrg  = d.stato === 'aperta' && diffGg >= 0 && diffGg <= 7;
+      const rowCls = d.stato === 'chiusa' ? 'chiusa' : isScad ? 'scaduta' : isUrg ? 'urgente' : 'normale';
+      let dataLbl = '';
+      if (d.stato === 'chiusa')  dataLbl = `<span style="color:var(--accent-green)"><i class="fa fa-check"></i> Chiusa</span>`;
+      else if (isScad)           dataLbl = `<span style="color:var(--accent-red)"><i class="fa fa-exclamation-circle"></i> Scaduta il ${d.data_scadenza}</span>`;
+      else if (diffGg === 0)     dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade oggi</span>`;
+      else if (diffGg === 1)     dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade domani</span>`;
+      else if (diffGg <= 7)      dataLbl = `<span style="color:var(--accent-orange)"><i class="fa fa-clock"></i> Scade tra ${diffGg} gg</span>`;
+      else                       dataLbl = `<span style="color:var(--text-muted)"><i class="fa fa-calendar"></i> ${d.data_scadenza}</span>`;
+      const canClose = canEdit && d.stato === 'aperta';
+      return `<div class="dl-row ${rowCls}">
+        <i class="fa ${TIPO_ICON_P[d.tipo]||'fa-clock'}" style="color:${PRIO_COLOR_P[d.priorita]||''};font-size:18px;flex-shrink:0"></i>
+        <div class="dl-info">
+          <div class="dl-titolo">${d.titolo}</div>
+          ${!_opts.assetId ? `<div class="dl-asset"><i class="fa fa-map-marker"></i> ${d.asset_nome||''} &mdash; ${d.asset_citta||''}</div>` : ''}
+          <div class="dl-meta">${dataLbl} &nbsp;·&nbsp; <span style="font-weight:600;color:${PRIO_COLOR_P[d.priorita]||''}">${(d.priorita||'').toUpperCase()}</span> &nbsp;·&nbsp; ${d.tipo||''}${d.assegnatario?' &nbsp;·&nbsp; <i class="fa fa-user"></i> '+d.assegnatario:''}</div>
+        </div>
+        <div class="dl-actions">
+          ${canClose ? `<button class="btn btn-secondary btn-sm" title="Chiudi" onclick="DeadlinesPanel._chiudiScadenzaCard(${d.id})"><i class="fa fa-check"></i></button>` : ''}
+          ${canEdit  ? `<button class="btn btn-secondary btn-sm" title="Modifica" onclick="DeadlinesPanel._apriModificaCard(${d.id})"><i class="fa fa-pen"></i></button>` : ''}
+          ${canDel   ? `<button class="btn-icon danger" onclick="DeadlinesPanel._eliminaCard(${d.id})"><i class="fa fa-trash"></i></button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function _cardFiltra() {
+    const q  = (document.getElementById('dlp-c-search')?.value || '').toLowerCase();
+    const st = (document.getElementById('dlp-c-stato')?.value  || '');
+    const pr = (document.getElementById('dlp-c-prio')?.value   || '');
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    _panelFiltrati = _panelDati.filter(d => {
+      const statoEff = (d.stato === 'aperta' && new Date(d.data_scadenza) < oggi) ? 'scaduta' : d.stato;
+      if (st && statoEff !== st) return false;
+      if (pr && d.priorita !== pr) return false;
+      if (q && ![(d.titolo||''), (d.assegnatario||''), (d.asset_nome||'')].some(v => v.toLowerCase().includes(q))) return false;
+      return true;
+    });
+    _renderCardRighe();
+  }
+
+  function _apriNuovaCard() {
+    _opts = { assetId: _panelAssetId, assetNome: _panelAssetNome, zIndex: 1100, onSave: () => _caricaConCards(), readonly: false };
+    _apriNuova();
+  }
+
+  async function _apriModificaCard(id) {
+    _lista = _panelDati;
+    _opts  = { assetId: _panelAssetId, assetNome: _panelAssetNome, zIndex: 1100, onSave: () => _caricaConCards(), readonly: false };
+    await _apriModifica(id);
+  }
+
+  async function _chiudiScadenzaCard(id) {
+    if (!confirm('Segnare la scadenza come chiusa?')) return;
+    try {
+      await API.updateDeadline(id, { stato: 'chiusa' });
+      await _caricaConCards();
+    } catch (e) { alert('Errore: ' + e.message); }
+  }
+
+  async function _eliminaCard(id) {
+    const d = _panelDati.find(x => x.id === id);
+    if (!d || !confirm(`Eliminare la scadenza "${d.titolo}"?`)) return;
+    try {
+      await API.deleteDeadline(id);
+      await _caricaConCards();
+    } catch (e) { alert('Errore: ' + e.message); }
   }
 
   function refresh() { return _carica(); }
@@ -586,16 +720,21 @@ const DeadlinesPanel = (() => {
     apri,
     _filtra,
     _panelFiltra,
+    _cardFiltra,
     _apriNuova,
     _apriNuovaPanel,
+    _apriNuovaCard,
     _apriModifica,
     _apriModificaPanel,
+    _apriModificaCard,
     _chiudi,
     _chiudiPanel,
     _salva,
     _chiudiScadenza,
     _chiudiScadenzaPanel,
+    _chiudiScadenzaCard,
     _elimina,
     _eliminaPanel,
+    _eliminaCard,
   };
 })();
