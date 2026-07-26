@@ -272,7 +272,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
-    await API.requireAuth();
+    if (!requireAuth()) return;
     renderSidebar('eff-energy-summary', 'efficiency');
     renderTopbar(i18n.t('energy_summary', 'Energy Summary'));
     caricaDashboard();
