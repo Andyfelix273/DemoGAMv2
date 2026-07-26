@@ -622,40 +622,33 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             use_telemetry = _telemetry_available(cur, asset_id)
 
             if use_telemetry:
+                # Formula corretta: integrazione trapezoidale Σ(power_kw × 0.25h)
+                # Ogni riga telemetria rappresenta 15 minuti = 0.25 ore
                 cur.execute("""
-                    SELECT COALESCE(AVG(t.power_kw) * %s * 24, 0) AS kwh_mese
+                    SELECT COALESCE(SUM(t.power_kw) * 0.25, 0) AS kwh_mese
                     FROM telemetry t
                     JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
                     WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
                       AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
-                """, (
-                    (now - mese_start).days or 1,
-                    asset_id, mese_start, now
-                ))
+                """, (asset_id, mese_start, now))
                 kwh_mese = float(cur.fetchone()["kwh_mese"] or 0)
 
                 cur.execute("""
-                    SELECT COALESCE(AVG(t.power_kw) * %s * 24, 0) AS kwh
+                    SELECT COALESCE(SUM(t.power_kw) * 0.25, 0) AS kwh
                     FROM telemetry t
                     JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
                     WHERE t.asset_id = %s AND t.ts >= %s AND t.ts < %s
                       AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
-                """, (
-                    (mese_start - mese_prec_start).days or 1,
-                    asset_id, mese_prec_start, mese_start
-                ))
+                """, (asset_id, mese_prec_start, mese_start))
                 kwh_mese_prec = float(cur.fetchone()["kwh"] or 0)
 
                 cur.execute("""
-                    SELECT COALESCE(AVG(t.power_kw) * %s * 24, 0) AS kwh
+                    SELECT COALESCE(SUM(t.power_kw) * 0.25, 0) AS kwh
                     FROM telemetry t
                     JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
                     WHERE t.asset_id = %s AND t.ts >= %s AND t.ts <= %s
                       AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
-                """, (
-                    (now - anno_start).days or 1,
-                    asset_id, anno_start, now
-                ))
+                """, (asset_id, anno_start, now))
                 kwh_anno = float(cur.fetchone()["kwh"] or 0)
             else:
                 cur.execute("""
