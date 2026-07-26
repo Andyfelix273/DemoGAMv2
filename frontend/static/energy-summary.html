@@ -50,6 +50,61 @@
     .es-ranking-chart { width: 100%; height: 220px; }
     .es-classi-chart  { width: 100%; height: 220px; }
 
+    /* Liste Top/Best compatte */
+    .es-top-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .es-top-cat-header {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted, #4A6FA5);
+      padding: 6px 0 2px;
+      border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.4));
+      margin-bottom: 2px;
+    }
+    .es-top-cat-header:first-child { padding-top: 0; }
+    .es-top-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(30,58,95,0.2);
+      font-size: 11px;
+    }
+    .es-top-item:last-child { border-bottom: none; }
+    .es-top-rank {
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 14px;
+      text-align: center;
+    }
+    .es-top-name {
+      flex: 1;
+      color: var(--text-primary, #E8F4FD);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .es-top-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .es-top-eui {
+      font-size: 10px;
+      color: var(--text-muted, #4A6FA5);
+      white-space: nowrap;
+    }
+
     /* KPI strip */
     .es-kpi-strip {
       display: flex;
@@ -101,6 +156,18 @@
       <!-- KPI strip portafoglio -->
       <div class="es-kpi-strip" id="kpi-strip">
         <div class="es-kpi-card"><div class="es-kpi-label">Caricamento…</div></div>
+      </div>
+
+      <!-- P-4/P-5: Top efficienti / Da migliorare — liste compatte affiancate -->
+      <div class="es-row-2" style="margin-bottom:14px;">
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-star" style="color:#27AE60;"></i>Top efficienti per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-4</span></div>
+          <ul class="es-top-list" id="es-top-efficienti"></ul>
+        </div>
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-exclamation-triangle" style="color:#E74C3C;"></i>Da migliorare per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-5</span></div>
+          <ul class="es-top-list" id="es-top-inefficienti"></ul>
+        </div>
       </div>
 
       <!-- Grafico trend consumi — full width, multi-linea per impianto -->
@@ -254,58 +321,35 @@
           <div class="es-kpi-value">${port.n_asset_attivi}</div>
           <div class="es-kpi-unit">${port.n_asset_telemetria || 0} con telemetria IoT</div>
         </div>
-        ${(() => {
-          // P-4: Top 3 efficienti per categoria
-          const top3eff = port.top3_efficienti_per_categoria || {};
-          const catLabels = { OFFICE: 'Uffici', WAREHOUSE: 'Magazzini', STORAGE: 'Depositi', OTHER: 'Altro' };
-          const catList = Object.entries(top3eff);
-          if (catList.length === 0 && port.asset_migliore) {
-            return `<div class="es-kpi-card" style="border-color:rgba(39,174,96,0.4);">
-              <div class="es-kpi-label">Asset più efficiente</div>
-              <div class="es-kpi-value" style="font-size:14px;color:#27AE60;">${port.asset_migliore.nome}</div>
-              <div class="es-kpi-unit">EUI ${fmt(port.asset_migliore.eui)} · Classe ${port.asset_migliore.eui_class}</div>
-            </div>`;
-          }
-          return catList.map(([cat, assets]) => {
-            if (!assets || assets.length === 0) return '';
-            const best = assets[0];
-            const rest = assets.slice(1);
-            return `<div class="es-kpi-card" style="border-color:rgba(39,174,96,0.3);min-width:160px;">
-              <div class="es-kpi-label" style="color:#27AE60;"><i class="fa fa-star" style="margin-right:3px;"></i>Top efficienti — ${catLabels[cat] || cat}</div>
-              <div style="margin-top:4px;">
-                <div style="font-size:12px;font-weight:700;color:#27AE60;">${best.nome}</div>
-                <div style="font-size:10px;color:var(--text-muted);">EUI ${fmt(best.eui)} · Classe ${best.eui_class}</div>
-                ${rest.map(a => `<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">${a.nome} <span style="color:var(--text-muted);">EUI ${fmt(a.eui)}</span></div>`).join('')}
-              </div>
-            </div>`;
-          }).join('');
-        })()}
-        ${(() => {
-          // P-5: Top 3 inefficienti per categoria
-          const top3ineff = port.top3_inefficienti_per_categoria || {};
-          const catLabels = { OFFICE: 'Uffici', WAREHOUSE: 'Magazzini', STORAGE: 'Depositi', OTHER: 'Altro' };
-          const catList = Object.entries(top3ineff);
-          if (catList.length === 0 && port.asset_peggiore) {
-            return `<div class="es-kpi-card" style="border-color:rgba(231,76,60,0.4);">
-              <div class="es-kpi-label">Asset meno efficiente</div>
-              <div class="es-kpi-value" style="font-size:14px;color:#E74C3C;">${port.asset_peggiore.nome}</div>
-              <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
-            </div>`;
-          }
-          return catList.map(([cat, assets]) => {
-            if (!assets || assets.length === 0) return '';
-            const worst = assets[0];
-            const rest = assets.slice(1);
-            return `<div class="es-kpi-card" style="border-color:rgba(231,76,60,0.3);min-width:160px;">
-              <div class="es-kpi-label" style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:3px;"></i>Da migliorare — ${catLabels[cat] || cat}</div>
-              <div style="margin-top:4px;">
-                <div style="font-size:12px;font-weight:700;color:#E74C3C;">${worst.nome}</div>
-                <div style="font-size:10px;color:var(--text-muted);">EUI ${fmt(worst.eui)} · Classe ${worst.eui_class}</div>
-                ${rest.map(a => `<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">${a.nome} <span style="color:var(--text-muted);">EUI ${fmt(a.eui)}</span></div>`).join('')}
-              </div>
-            </div>`;
-          }).join('');
-        })()}`;
+      `;
+
+      // ── P-4/P-5: Top efficienti / Da migliorare per categoria — liste compatte ──
+      const catLabels = { OFFICE: 'Uffici', WAREHOUSE: 'Magazzini', STORAGE: 'Depositi', OTHER: 'Altro' };
+      const _renderTopList = (dataPerCat, fallbackAsset, color, icon, label) => {
+        const catList = Object.entries(dataPerCat || {}).filter(([,arr]) => arr && arr.length > 0);
+        if (catList.length === 0) {
+          if (!fallbackAsset) return '';
+          return `<li class="es-top-item">
+            <span class="es-top-name">${fallbackAsset.nome}</span>
+            <span class="es-top-badge" style="background:${color}22;color:${color};border:1px solid ${color}44;">${fallbackAsset.eui_class}</span>
+            <span class="es-top-eui">${fmt(fallbackAsset.eui)} kWh/m²</span>
+          </li>`;
+        }
+        return catList.map(([cat, assets]) => `
+          <li class="es-top-cat-header">${catLabels[cat] || cat}</li>
+          ${assets.map((a, i) => `<li class="es-top-item">
+            <span class="es-top-rank" style="color:${color};opacity:${1 - i*0.25}">${i+1}</span>
+            <span class="es-top-name">${a.nome}</span>
+            <span class="es-top-badge" style="background:${color}22;color:${color};border:1px solid ${color}44;">${a.eui_class}</span>
+            <span class="es-top-eui">${fmt(a.eui)}</span>
+          </li>`).join('')}
+        `).join('');
+      };
+
+      const topListEl = document.getElementById('es-top-efficienti');
+      const worstListEl = document.getElementById('es-top-inefficienti');
+      if (topListEl) topListEl.innerHTML = _renderTopList(port.top3_efficienti_per_categoria, port.asset_migliore, '#27AE60', 'star', 'Top efficienti');
+      if (worstListEl) worstListEl.innerHTML = _renderTopList(port.top3_inefficienti_per_categoria, port.asset_peggiore, '#E74C3C', 'exclamation-triangle', 'Da migliorare');
 
       // ── Trend consumi: multi-linea — solo asset con telemetria reale ────────────
       const assetsConDati = (port.ranking_asset || []).filter(a => a.has_telemetry && a.kwh_mese > 0);

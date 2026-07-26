@@ -8,7 +8,8 @@
 
 /* ─── LAYOUT PAGINA ─────────────────────────────────────────────────────────── */
 body {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: row;
 }
@@ -21,6 +22,8 @@ body.body-dashboard {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .page { flex: 1; }
 
@@ -1286,6 +1289,22 @@ a.module-card:hover {
 .ee-kpi-card-delta.up   { color: #E74C3C; }
 .ee-kpi-card-delta.down { color: #27AE60; }
 .ee-kpi-card-delta.flat { color: var(--text-muted); }
+
+/* Separatore categoria KPI nella griglia */
+.ee-kpi-section-sep {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent-blue, #58A6FF);
+  padding: 6px 0 2px;
+  border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.4));
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ee-kpi-section-sep:first-child { padding-top: 0; }
 
 /* Sezione titolo interna alla tab */
 .ee-section-title {
