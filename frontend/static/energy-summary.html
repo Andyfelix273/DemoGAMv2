@@ -112,23 +112,21 @@
       flex-wrap: wrap;
       margin-bottom: 14px;
     }
-    /* Separatore categoria nella KPI strip */
-    .es-kpi-sep {
-      flex: 0 0 100%;
-      width: 100%;
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--accent-blue, #58A6FF);
-      padding: 4px 0 2px;
-      border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.4));
-      margin-bottom: 2px;
+    /* Separatore di sezione pagina (SINTESI / ANALISI / TREND) */
+    .es-page-section-sep {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-blue, #58A6FF);
+      margin: 18px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.5));
     }
-    .es-kpi-sep:first-child { padding-top: 0; }
+    .es-page-section-sep i { font-size: 11px; }
     .es-kpi-card {
       flex: 1 1 130px;
       min-width: 120px;
@@ -195,7 +193,10 @@
 
     <div class="page-body">
 
-      <!-- KPI strip portafoglio -->
+      <!-- SEZIONE SINTESI (P-1 – P-5) -->
+      <div class="es-page-section-sep"><i class="fa fa-tachometer-alt"></i>Sintesi</div>
+
+      <!-- KPI strip portafoglio: P-1, P-2, P-3 -->
       <div class="es-kpi-strip" id="kpi-strip">
         <div class="es-kpi-card"><div class="es-kpi-label">Caricamento…</div></div>
       </div>
@@ -211,6 +212,9 @@
           <ul class="es-top-list" id="es-top-inefficienti"></ul>
         </div>
       </div>
+
+      <!-- SEZIONE TREND E CONFRONTO (P-8, P-9, P-10) -->
+      <div class="es-page-section-sep"><i class="fa fa-chart-line"></i>Trend e Confronto</div>
 
       <!-- Riga grafici trend: Consumi mensili + YoY + Commodity su una riga -->
       <div class="es-row-3">
@@ -232,27 +236,30 @@
         </div>
       </div>
 
-      <!-- Riga 1c: Consumi per giorno settimana (P-7) + Costo vs Budget (P-10) -->
+      <!-- SEZIONE ANALISI (P-6, P-7) -->
+      <div class="es-page-section-sep"><i class="fa fa-microscope"></i>Analisi</div>
+
+      <!-- Riga: ranking EUI P-6 (sinistra) + profilo gg settimana P-7 (destra) -->
       <div class="es-row-2" style="margin-bottom:14px;">
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-calendar-week"></i>Profilo consumi per giorno settimana (kWh/m²) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-7</span></div>
+          <div class="es-section-title"><i class="fa fa-sort-amount-down"></i>Benchmark interno: EUI per asset (P-6)</div>
+          <div class="es-ranking-chart" id="chart-ranking-eui"></div>
+        </div>
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-calendar-week"></i>Consumi per giorno settimana (kWh/m²) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-7</span></div>
           <div class="es-trend-chart" id="chart-weekday" style="height:220px;"></div>
+        </div>
+      </div>
+
+      <!-- Distribuzione classi energetiche (complemento P-6) -->
+      <div class="es-row-2" style="margin-bottom:14px;">
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-chart-pie"></i>Distribuzione classi energetiche</div>
+          <div class="es-classi-chart" id="chart-classi"></div>
         </div>
         <div class="es-section" style="margin-bottom:0;">
           <div class="es-section-title"><i class="fa fa-bullseye"></i>Costo cumulato YTD vs Budget <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-10</span></div>
           <div class="es-trend-chart" id="chart-budget" style="height:220px;"></div>
-        </div>
-      </div>
-
-      <!-- Riga 2: ranking EUI (sinistra) + distribuzione classi (destra) -->
-      <div class="es-row-2">
-        <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-sort-amount-down"></i>Ranking asset per EUI (kWh/m²/anno)</div>
-          <div class="es-ranking-chart" id="chart-ranking-eui"></div>
-        </div>
-        <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-chart-pie"></i>Distribuzione classi energetiche</div>
-          <div class="es-classi-chart" id="chart-classi"></div>
         </div>
       </div>
 
@@ -333,46 +340,40 @@
       if (!portRes.ok) throw new Error('HTTP ' + portRes.status);
       const port = await portRes.json();
 
-      // ── KPI Strip con separatori categoria ─────────────────────────────────
+      // ── KPI Strip — Sezione SINTESI (P-1, P-2, P-3) ────────────────────────
       const strip = document.getElementById('kpi-strip');
-      // Separatore visivo: elemento full-width nella grid che occupa tutta la riga
-      const _sep = (label, icon) => `<div class="es-kpi-sep"><i class="fa ${icon}"></i>${label}</div>`;
       strip.innerHTML = `
-        ${_sep('Consumi & Costi', 'fa-bolt')}
         <div class="es-kpi-card">
-          <div class="es-kpi-label">Consumi mese (portafoglio)</div>
-          <div class="es-kpi-value">${fmtInt(port.kwh_mese_totale)}</div>
-          <div class="es-kpi-unit">kWh</div>
+          <div class="es-kpi-label">Costo energetico mese (P-1)</div>
+          <div class="es-kpi-value">€ ${fmtInt(port.costo_mese_eur)}</div>
+          <div class="es-kpi-unit">portafoglio</div>
           ${port.trend_vs_mese_prec_pct != null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
         <div class="es-kpi-card">
-          <div class="es-kpi-label">Costo energetico mese</div>
-          <div class="es-kpi-value">€ ${fmtInt(port.costo_mese_eur)}</div>
-          <div class="es-kpi-unit">solo elettricità</div>
+          <div class="es-kpi-label">EUI medio portafoglio (P-2)</div>
+          <div class="es-kpi-value">${fmt(port.eui_medio)}</div>
+          <div class="es-kpi-unit">kWh/m²/anno</div>
+        </div>
+        <div class="es-kpi-card">
+          <div class="es-kpi-label">Consumi mese</div>
+          <div class="es-kpi-value">${fmtInt(port.kwh_mese_totale)}</div>
+          <div class="es-kpi-unit">kWh</div>
         </div>
         <div class="es-kpi-card">
           <div class="es-kpi-label">CO₂ equivalente mese</div>
           <div class="es-kpi-value">${fmtInt(port.co2_kg_mese)}</div>
           <div class="es-kpi-unit">kg CO₂</div>
         </div>
-        ${_sep('Efficienza Energetica', 'fa-leaf')}
         <div class="es-kpi-card">
-          <div class="es-kpi-label">EUI medio portafoglio</div>
-          <div class="es-kpi-value">${fmt(port.eui_medio)}</div>
-          <div class="es-kpi-unit">kWh/m²/anno</div>
+          <div class="es-kpi-label">Anomalie attive (P-3)</div>
+          <div class="es-kpi-value" style="color:${(port.allarmi_critical||0)>0?'#E74C3C':'var(--text-primary)'}">${port.allarmi_critical || 0}</div>
+          <div class="es-kpi-unit">${port.allarmi_medium||0} medi · ${port.allarmi_low||0} bassi</div>
         </div>
         <div class="es-kpi-card">
           <div class="es-kpi-label">Asset attivi</div>
           <div class="es-kpi-value">${port.n_asset_attivi}</div>
           <div class="es-kpi-unit">${port.n_asset_telemetria || 0} con telemetria IoT</div>
         </div>
-        ${port.allarmi_critical > 0 || port.allarmi_medium > 0 ? `
-        ${_sep('Anomalie', 'fa-exclamation-triangle')}
-        <div class="es-kpi-card" style="border-color:rgba(231,76,60,0.35)">
-          <div class="es-kpi-label">Allarmi critici</div>
-          <div class="es-kpi-value" style="color:#E74C3C">${port.allarmi_critical || 0}</div>
-          <div class="es-kpi-unit">${port.allarmi_medium || 0} medi · ${port.allarmi_low || 0} bassi</div>
-        </div>` : ''}
       `;
 
       // ── P-4/P-5: Top efficienti / Da migliorare per categoria — liste compatte ──
