@@ -9,9 +9,70 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
   <link rel="stylesheet" href="/static/css/icons.css">
-  <link rel="stylesheet" href="/static/css/bems-ui.css?v=2">
+  <link rel="stylesheet" href="/static/css/bems-ui.css?v=3">
   <link rel="stylesheet" href="/static/css/map.css">
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    /* ── Energy Summary — layout specifico ─────────────────────────────────── */
+    .es-section {
+      background: var(--card-bg, #0d1b2a);
+      border: 1px solid var(--border-color, rgba(30,58,95,0.6));
+      border-radius: 8px;
+      padding: 14px 16px 10px;
+      margin-bottom: 14px;
+    }
+    .es-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-secondary, #7BAFC4);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .es-section-title i { color: var(--accent-blue, #58A6FF); }
+
+    /* Grafico trend: full-width, altezza fissa */
+    .es-trend-chart {
+      width: 100%;
+      height: 280px;
+    }
+
+    /* Riga ranking + classi: 60% + 40% */
+    .es-row-2 {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .es-ranking-chart { width: 100%; height: 220px; }
+    .es-classi-chart  { width: 100%; height: 220px; }
+
+    /* KPI strip */
+    .es-kpi-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .es-kpi-card {
+      flex: 1 1 130px;
+      min-width: 120px;
+      background: var(--card-bg, #0d1b2a);
+      border: 1px solid var(--border-color, rgba(30,58,95,0.6));
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .es-kpi-label { font-size: 10px; color: var(--text-secondary,#7BAFC4); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+    .es-kpi-value { font-size: 22px; font-weight: 700; color: var(--text-primary,#E8F4FD); line-height: 1.1; }
+    .es-kpi-unit  { font-size: 10px; color: var(--text-muted,#4A6FA5); margin-top: 2px; }
+    .es-kpi-delta { font-size: 10px; margin-top: 4px; }
+    .es-kpi-delta.up   { color: #E74C3C; }
+    .es-kpi-delta.down { color: #27AE60; }
+    .es-kpi-delta.flat { color: var(--text-muted,#4A6FA5); }
+  </style>
 </head>
 <body class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
@@ -42,45 +103,37 @@
         <div class="es-kpi-card"><div class="es-kpi-label">Caricamento…</div></div>
       </div>
 
-      <!-- Grafici riga 1: trend kWh + trend costi -->
-      <div class="es-chart-grid">
-        <div class="es-chart-card">
-          <div class="es-chart-card-title"><i class="fa fa-bolt" style="margin-right:5px;color:var(--accent-blue);"></i>Consumi mensili portafoglio (kWh)</div>
-          <div class="es-chart-inner" id="chart-trend-kwh"></div>
+      <!-- Grafico trend consumi — full width, multi-linea per impianto -->
+      <div class="es-section">
+        <div class="es-section-title">
+          <i class="fa fa-bolt"></i>Trend consumi mensili per impianto (kWh)
+          <span id="trend-letture" style="font-weight:400;color:var(--text-muted);margin-left:8px;font-size:10px;"></span>
         </div>
-        <div class="es-chart-card">
-          <div class="es-chart-card-title"><i class="fa fa-euro-sign" style="margin-right:5px;color:var(--accent-blue);"></i>Costi mensili portafoglio (€)</div>
-          <div class="es-chart-inner" id="chart-trend-cost"></div>
+        <div class="es-trend-chart" id="chart-trend-kwh"></div>
+      </div>
+
+      <!-- Riga 2: ranking EUI (sinistra) + distribuzione classi (destra) -->
+      <div class="es-row-2">
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-sort-amount-down"></i>Ranking asset per EUI (kWh/m²/anno)</div>
+          <div class="es-ranking-chart" id="chart-ranking-eui"></div>
+        </div>
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title"><i class="fa fa-chart-pie"></i>Distribuzione classi energetiche</div>
+          <div class="es-classi-chart" id="chart-classi"></div>
         </div>
       </div>
 
-      <!-- Grafici riga 2: ranking EUI + distribuzione classi -->
-      <div class="es-chart-grid">
-        <div class="es-chart-card">
-          <div class="es-chart-card-title"><i class="fa fa-sort-amount-down" style="margin-right:5px;color:var(--accent-blue);"></i>Ranking asset per EUI (kWh/m²/anno)</div>
-          <div class="es-chart-inner-lg" id="chart-ranking-eui"></div>
-        </div>
-        <div class="es-chart-card">
-          <div class="es-chart-card-title"><i class="fa fa-chart-pie" style="margin-right:5px;color:var(--accent-blue);"></i>Distribuzione classi energetiche</div>
-          <div class="es-chart-inner-lg" id="chart-classi"></div>
-        </div>
-      </div>
-
-      <!-- Tabella ranking dettaglio -->
-      <div class="es-chart-card" style="margin-bottom:0;">
-        <div class="es-chart-card-title"><i class="fa fa-table" style="margin-right:5px;color:var(--accent-blue);"></i>Dettaglio per asset</div>
-        <div class="table-wrap" style="margin-top:10px;">
+      <!-- Tabella dettaglio asset -->
+      <div class="es-section" style="margin-bottom:0;">
+        <div class="es-section-title"><i class="fa fa-table"></i>Dettaglio per asset</div>
+        <div class="table-wrap" style="margin-top:6px;">
           <table id="ranking-table">
             <thead>
               <tr>
-                <th>Asset</th>
-                <th>Tipo</th>
-                <th>Superficie</th>
-                <th>kWh mese</th>
-                <th>Costo mese</th>
-                <th>EUI</th>
-                <th>Classe calc.</th>
-                <th>Classe cert.</th>
+                <th>Asset</th><th>Tipo</th><th>Superficie</th>
+                <th>kWh mese</th><th>Costo mese</th><th>EUI</th>
+                <th>Classe calc.</th><th>Classe cert.</th>
               </tr>
             </thead>
             <tbody id="ranking-tbody">
@@ -105,41 +158,57 @@
     B:'#F9E79F', C:'#F39C12', D:'#E67E22', E:'#E74C3C', F:'#C0392B', G:'#922B21'
   };
 
-  const plotCfg = { responsive: true, displayModeBar: false };
-  const plotLayout = (extra) => Object.assign({
-    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-    margin: { t: 10, r: 10, b: 40, l: 55 },
-    font: { family: 'Inter,sans-serif', size: 11, color: 'var(--text-secondary,#7BAFC4)' },
-    xaxis: { gridcolor: 'rgba(30,58,95,0.5)', zerolinecolor: 'rgba(30,58,95,0.5)' },
-    yaxis: { gridcolor: 'rgba(30,58,95,0.5)', zerolinecolor: 'rgba(30,58,95,0.5)' },
-    legend: { orientation: 'h', y: -0.3, font: { size: 10 } },
-  }, extra || {});
+  /* Palette multi-linea impianti (stile screenshot: blu, verde, arancione, viola, giallo…) */
+  const PLANT_COLORS = ['#58A6FF','#27AE60','#F39C12','#DDA0DD','#F0E68C','#FF8C00','#8FBC8F'];
 
-  const fmt     = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const fmtInt  = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
-  const trendCl = (v) => v === null ? 'flat' : v > 0 ? 'up' : 'down';
-  const trendIc = (v) => v === null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
+  const plotCfg = { responsive: true, displayModeBar: false };
+
+  /* Layout base identico allo screenshot: sfondo trasparente, griglia sottile, font Inter */
+  const baseLayout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font: { family: 'Inter,sans-serif', size: 11, color: '#7BAFC4' },
+    xaxis: {
+      gridcolor: 'rgba(30,58,95,0.4)',
+      zerolinecolor: 'rgba(30,58,95,0.4)',
+      tickfont: { size: 10 }
+    },
+    yaxis: {
+      gridcolor: 'rgba(30,58,95,0.4)',
+      zerolinecolor: 'rgba(30,58,95,0.4)',
+      tickfont: { size: 10 }
+    },
+    legend: {
+      orientation: 'h',
+      y: -0.22,
+      x: 0,
+      font: { size: 10 },
+      bgcolor: 'transparent'
+    },
+  };
+
+  const fmt    = (v, d=1) => v == null ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtInt = (v)      => v == null ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
+  const trendCl = (v) => v == null ? 'flat' : v > 0 ? 'up' : 'down';
+  const trendIc = (v) => v == null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
 
   async function caricaDashboard() {
     const AUTH = { 'Authorization': 'Bearer ' + API.getToken() };
     const mesi = parseInt(document.getElementById('filter-mesi').value);
 
     try {
-      // Carica summary portafoglio
-      const [portRes] = await Promise.all([
-        fetch('/api/efficiency/portfolio/summary', { headers: AUTH }),
-      ]);
+      const portRes = await fetch('/api/efficiency/portfolio/summary', { headers: AUTH });
       if (!portRes.ok) throw new Error('HTTP ' + portRes.status);
       const port = await portRes.json();
 
-      // ── KPI Strip ──────────────────────────────────────────────────────────
+      // ── KPI Strip ────────────────────────────────────────────────────────────
       const strip = document.getElementById('kpi-strip');
       strip.innerHTML = `
         <div class="es-kpi-card">
           <div class="es-kpi-label">Consumi mese (portafoglio)</div>
           <div class="es-kpi-value">${fmtInt(port.kwh_mese_totale)}</div>
           <div class="es-kpi-unit">kWh</div>
-          ${port.trend_vs_mese_prec_pct !== null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
+          ${port.trend_vs_mese_prec_pct != null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
         <div class="es-kpi-card">
           <div class="es-kpi-label">Costo energetico mese</div>
@@ -174,94 +243,110 @@
           <div class="es-kpi-unit">EUI ${fmt(port.asset_peggiore.eui)} · Classe ${port.asset_peggiore.eui_class}</div>
         </div>` : ''}`;
 
-      // ── Trend portafoglio ─────────────────────────────────────────────────
-      const trendAssetId = port.ranking_asset?.find(a => a.kwh_mese > 0)?.asset_id;
-      if (trendAssetId) {
-        const trendRes = await fetch(`/api/efficiency/${trendAssetId}/trend?mesi=${mesi}`, { headers: AUTH });
-        if (trendRes.ok) {
-          const trend = await trendRes.json();
-          if (trend && trend.length) {
-            // Grafico kWh: linea + area fill
-            Plotly.newPlot('chart-trend-kwh',
-              [{ type: 'scatter', mode: 'lines',
-                 x: trend.map(r => r.mese), y: trend.map(r => r.kwh),
-                 name: 'kWh', line: { color: '#58A6FF', width: 2.5, shape: 'spline' },
-                 fill: 'tozeroy', fillcolor: 'rgba(88,166,255,0.12)',
-                 hovertemplate: '<b>%{x}</b><br>%{y:,.0f} kWh<extra></extra>' }],
-              plotLayout({
-                margin: { t: 10, r: 15, b: 45, l: 60 },
-                yaxis: { title: { text: 'kWh', standoff: 8 }, tickformat: ',.0f' },
-                xaxis: { tickangle: -30 },
-                showlegend: false
-              }), plotCfg);
+      // ── Trend consumi: multi-linea per asset (come screenshot) ───────────────
+      // Recupera trend per tutti gli asset con dati
+      const assetsConDati = (port.ranking_asset || []).filter(a => a.kwh_mese > 0);
+      if (assetsConDati.length > 0) {
+        const trendPromises = assetsConDati.map(a =>
+          fetch(`/api/efficiency/${a.asset_id}/trend?mesi=${mesi}`, { headers: AUTH })
+            .then(r => r.ok ? r.json() : [])
+            .then(data => ({ nome: a.nome, data }))
+        );
+        const trendResults = await Promise.all(trendPromises);
 
-            // Grafico costi: linea + area fill
-            Plotly.newPlot('chart-trend-cost',
-              [{ type: 'scatter', mode: 'lines',
-                 x: trend.map(r => r.mese), y: trend.map(r => r.costo_eur),
-                 name: '€', line: { color: '#F39C12', width: 2.5, shape: 'spline' },
-                 fill: 'tozeroy', fillcolor: 'rgba(243,156,18,0.12)',
-                 hovertemplate: '<b>%{x}</b><br>€ %{y:,.2f}<extra></extra>' }],
-              plotLayout({
-                margin: { t: 10, r: 15, b: 45, l: 65 },
-                yaxis: { title: { text: '€', standoff: 8 }, tickformat: ',.0f' },
-                xaxis: { tickangle: -30 },
-                showlegend: false
-              }), plotCfg);
-          }
-        }
+        const traces = trendResults
+          .filter(t => t.data && t.data.length > 0)
+          .map((t, i) => ({
+            type: 'scatter',
+            mode: 'lines',
+            name: t.nome,
+            x: t.data.map(r => r.mese),
+            y: t.data.map(r => r.kwh),
+            line: { color: PLANT_COLORS[i % PLANT_COLORS.length], width: 2, shape: 'spline' },
+            hovertemplate: `<b>${t.nome}</b><br>%{x}<br>%{y:,.0f} kWh<extra></extra>`
+          }));
+
+        const totLetture = trendResults.reduce((s, t) => s + (t.data ? t.data.length : 0), 0);
+        const letEl = document.getElementById('trend-letture');
+        if (letEl) letEl.textContent = totLetture + ' punti';
+
+        Plotly.newPlot('chart-trend-kwh', traces,
+          Object.assign({}, baseLayout, {
+            margin: { t: 8, r: 16, b: 60, l: 58 },
+            yaxis: Object.assign({}, baseLayout.yaxis, {
+              title: { text: 'kWh', font: { size: 10 }, standoff: 6 },
+              tickformat: ',.0f'
+            }),
+            xaxis: Object.assign({}, baseLayout.xaxis, { tickangle: -30 }),
+          }), plotCfg);
+      } else {
+        document.getElementById('chart-trend-kwh').innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Dati non disponibili</div>';
       }
 
-      // ── Ranking EUI — scatter orizzontale con colore per classe ──────────────
-      const ranking = [...port.ranking_asset].sort((a,b) => b.eui - a.eui); // peggiori in cima
-      const rankH = Math.max(260, ranking.length * 28 + 60);
-      document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
-      Plotly.newPlot('chart-ranking-eui',
-        [{ type: 'scatter', mode: 'markers',
-           y: ranking.map(r => r.nome),
-           x: ranking.map(r => r.eui),
-           marker: {
-             color: ranking.map(r => EUI_CLASS_COLOR[r.eui_class] || '#58A6FF'),
-             size: 12, symbol: 'circle',
-             line: { color: 'rgba(255,255,255,0.3)', width: 1 }
-           },
-           text: ranking.map(r => `Classe ${r.eui_class}`),
-           hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<br>%{text}<extra></extra>' }],
-        plotLayout({
-          margin: { t: 10, r: 20, b: 40, l: 160 },
-          xaxis: { title: { text: 'kWh/m²/anno', standoff: 8 }, gridcolor: 'rgba(30,58,95,0.5)' },
-          yaxis: { automargin: true, tickfont: { size: 11 } },
-          showlegend: false
-        }), plotCfg);
+      // ── Ranking EUI — lollipop orizzontale ───────────────────────────────────
+      const ranking = [...(port.ranking_asset || [])].sort((a, b) => b.eui - a.eui);
+      if (ranking.length > 0) {
+        // Adatta altezza al numero di asset
+        const rankH = Math.max(180, ranking.length * 32 + 50);
+        document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
 
-      // ── Distribuzione classi energetiche ──────────────────────────────────
+        Plotly.newPlot('chart-ranking-eui',
+          [{ type: 'scatter', mode: 'markers',
+             y: ranking.map(r => r.nome),
+             x: ranking.map(r => r.eui),
+             marker: {
+               color: ranking.map(r => EUI_CLASS_COLOR[r.eui_class] || '#58A6FF'),
+               size: 10, symbol: 'circle',
+               line: { color: 'rgba(255,255,255,0.25)', width: 1 }
+             },
+             text: ranking.map(r => `Classe ${r.eui_class}`),
+             hovertemplate: '<b>%{y}</b><br>EUI: %{x:.1f} kWh/m²/anno<br>%{text}<extra></extra>' }],
+          Object.assign({}, baseLayout, {
+            margin: { t: 8, r: 16, b: 30, l: 150 },
+            xaxis: Object.assign({}, baseLayout.xaxis, {
+              title: { text: 'kWh/m²/anno', font: { size: 10 }, standoff: 4 }
+            }),
+            yaxis: Object.assign({}, baseLayout.yaxis, { automargin: true }),
+            showlegend: false
+          }), plotCfg);
+      }
+
+      // ── Distribuzione classi energetiche — donut ─────────────────────────────
       const classiCount = {};
-      port.ranking_asset.forEach(a => {
+      (port.ranking_asset || []).forEach(a => {
         const c = a.eui_class || 'N/D';
         classiCount[c] = (classiCount[c] || 0) + 1;
       });
       const classiLabels = Object.keys(classiCount);
-      const classiValues = Object.values(classiCount);
-      Plotly.newPlot('chart-classi',
-        [{ type: 'pie', hole: 0.5,
-           labels: classiLabels, values: classiValues,
-           marker: { colors: classiLabels.map(c => EUI_CLASS_COLOR[c] || '#888') },
-           textinfo: 'label+percent', textfont: { size: 12 },
-           hovertemplate: 'Classe %{label}: %{value} asset<extra></extra>' }],
-        plotLayout({ margin: { t: 10, r: 10, b: 10, l: 10 },
-                     legend: { orientation: 'v', x: 1.02, y: 0.5 } }), plotCfg);
+      if (classiLabels.length > 0) {
+        Plotly.newPlot('chart-classi',
+          [{ type: 'pie', hole: 0.48,
+             labels: classiLabels,
+             values: Object.values(classiCount),
+             marker: { colors: classiLabels.map(c => EUI_CLASS_COLOR[c] || '#888') },
+             textinfo: 'label+percent',
+             textfont: { size: 11 },
+             hovertemplate: 'Classe %{label}: %{value} asset<extra></extra>' }],
+          Object.assign({}, baseLayout, {
+            margin: { t: 8, r: 10, b: 8, l: 10 },
+            legend: { orientation: 'v', x: 1.02, y: 0.5, font: { size: 10 } }
+          }), plotCfg);
+      }
 
-      // ── Tabella ranking ────────────────────────────────────────────────────
+      // ── Tabella ranking ───────────────────────────────────────────────────────
       const tbody = document.getElementById('ranking-tbody');
       if (!port.ranking_asset || port.ranking_asset.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun dato disponibile</td></tr>';
       } else {
         tbody.innerHTML = port.ranking_asset.map((a, i) => {
           const classColor = EUI_CLASS_COLOR[a.eui_class] || '#888';
-          const rank = i + 1;
-          const rankIcon = rank === 1 ? '<i class="fa fa-exclamation-triangle" style="color:#E74C3C;margin-right:4px;" title="Meno efficiente"></i>'
-                         : rank === port.ranking_asset.length ? '<i class="fa fa-star" style="color:#27AE60;margin-right:4px;" title="Più efficiente"></i>'
-                         : '';
+          const n = port.ranking_asset.length;
+          const rankIcon = i === 0
+            ? '<i class="fa fa-exclamation-triangle" style="color:#E74C3C;margin-right:4px;" title="Meno efficiente"></i>'
+            : i === n - 1
+            ? '<i class="fa fa-star" style="color:#27AE60;margin-right:4px;" title="Più efficiente"></i>'
+            : '';
           return `<tr>
             <td>${rankIcon}<strong>${a.nome}</strong></td>
             <td>${a.tipo}</td>
@@ -269,11 +354,9 @@
             <td>${fmtInt(a.kwh_mese)} kWh</td>
             <td>€ ${fmtInt(a.costo_mese_eur)}</td>
             <td><strong>${fmt(a.eui)}</strong></td>
-            <td><span style="background:${classColor}22;color:${classColor};border:1px solid ${classColor}44;
-              border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">${a.eui_class}</span></td>
+            <td><span style="background:${classColor}22;color:${classColor};border:1px solid ${classColor}44;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">${a.eui_class}</span></td>
             <td>${a.energy_class_certificata
-              ? `<span style="background:rgba(88,166,255,0.1);color:#58A6FF;border:1px solid rgba(88,166,255,0.3);
-                  border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">${a.energy_class_certificata}</span>`
+              ? `<span style="background:rgba(88,166,255,0.1);color:#58A6FF;border:1px solid rgba(88,166,255,0.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">${a.energy_class_certificata}</span>`
               : '<span style="color:var(--text-muted);">–</span>'}</td>
           </tr>`;
         }).join('');
@@ -281,14 +364,14 @@
 
     } catch(e) {
       console.error('[EnergySummary] Errore:', e);
-      const errHtml = `<div class="es-kpi-card" style="grid-column:1/-1;border-color:rgba(231,76,60,0.4);">
+      document.getElementById('kpi-strip').innerHTML = `
+        <div class="es-kpi-card" style="grid-column:1/-1;border-color:rgba(231,76,60,0.4);">
           <div class="es-kpi-label" style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:5px;"></i>Errore caricamento</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${e.message}</div>
         </div>`;
-      document.getElementById('kpi-strip').innerHTML = errHtml;
-      ['chart-trend-kwh','chart-trend-cost','chart-ranking-eui','chart-classi'].forEach(id => {
+      ['chart-trend-kwh','chart-ranking-eui','chart-classi'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Dati non disponibili</div>`;
+        if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Dati non disponibili</div>';
       });
     }
   }

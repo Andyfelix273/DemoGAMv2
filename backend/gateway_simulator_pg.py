@@ -72,15 +72,19 @@ PLANTS = [
 ]
 
 # Baseline potenza per tipo impianto (kW)
+# Asset 6: Sede Centrale Roma — 2 piani (P4: 650 mq, P5: 695 mq) = 1345 mq totali
+# Target: ~9.500 kWh/mese = EUI ~85 kWh/mq/anno → classe C
+# Ripartizione: HVAC 45%, Illuminazione 21%, Altri 21%, CED 8%, ServEM 5%
+# Picco in orario lavorativo ~28 kW, media h24 ~13 kW
 BASELINE_KW = {
-    "contatore":     45.0,
-    "hvac":          18.0,
-    "illuminazione":  8.0,
-    "ups":            5.0,
+    "contatore":     14.0,   # Contatore principale: media h24 ~13 kW
+    "hvac":           6.0,   # HVAC per piano: picco 6 kW, media ~3 kW (spento di notte)
+    "illuminazione":  3.0,   # Illuminazione per piano: picco 3 kW, quasi zero di notte
+    "ups":            1.5,
     "generatore":     0.0,
-    "ced":            8.5,   # Piccolo CED: 4-5 server (1.2kW cad) + storage (1kW) + switch (0.3kW) + condizionatore (2kW)
-    "servizi_em":    12.0,   # Servizi Elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
-    "altri_carichi":  7.0,   # Altri carichi: prese, stampanti, caricatori, piccoli elettrodomestici
+    "ced":            1.8,   # CED: 4 server × 0.3 kW + storage 0.3 kW + switch 0.1 kW + condiz. 0.5 kW
+    "servizi_em":     2.5,   # Servizi EM: pompe, ascensori — picco in orario
+    "altri_carichi":  3.0,   # Altri carichi: prese, stampanti — picco in orario, stand-by di notte
 }
 
 # ── Funzioni di simulazione ─────────────────────────────────────────────────
