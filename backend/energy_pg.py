@@ -524,11 +524,14 @@ def register_energy_routes(app, get_db, get_utente_corrente):
                     score = 100
                 item["efficiency_score"] = round(score, 1)
                 if score >= 70:
-                    item["color"] = "green"
+                    item["efficiency_level"] = "alta"
+                    item["color"] = "green"   # retrocompatibilità
                 elif score >= 40:
-                    item["color"] = "orange"
+                    item["efficiency_level"] = "media"
+                    item["color"] = "orange"  # retrocompatibilità
                 else:
-                    item["color"] = "red"
+                    item["efficiency_level"] = "bassa"
+                    item["color"] = "red"     # retrocompatibilità
 
         return result
 

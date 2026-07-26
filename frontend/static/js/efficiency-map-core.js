@@ -95,7 +95,7 @@ function creaIcona(tipo, selected, assetId) {
 // =============================================
 /**
  * Carica i KPI energetici dal backend e aggiorna i colori dei marker.
- * Chiama /api/energy/heatmap per ottenere efficiency_score e colore per asset.
+ * Chiama /api/energy/heatmap per ottenere efficiency_level ('alta'/'media'/'bassa') per asset.
  */
 async function caricaHUD() {
   try {
@@ -106,20 +106,10 @@ async function caricaHUD() {
     const items = await res.json();
 
     // Aggiorna _assetEfficienze e ricolora i marker
+    // Usa direttamente efficiency_level ('alta'/'media'/'bassa') restituito dal backend
     _assetEfficienze = {};
     items.forEach(item => {
-      // color dall'API: 'green'=alta, 'orange'=media, 'red'=bassa
-      const colorMap = {
-        'green':   'alta',
-        'orange':  'media',
-        'red':     'bassa',
-        // fallback per valori hex legacy
-        '#27AE60': 'alta',
-        '#F39C12': 'media',
-        '#E74C3C': 'bassa',
-      };
-      const eff = colorMap[item.color] || 'nd';
-      _assetEfficienze[item.asset_id] = eff;
+      _assetEfficienze[item.asset_id] = item.efficiency_level || 'nd';
     });
 
     // Ricolora tutti i marker (eccetto quello selezionato)
@@ -132,22 +122,22 @@ async function caricaHUD() {
     // Aggiorna KPI nel pannello laterale se presenti
     const kpiEl = document.getElementById('eff-kpi-summary');
     if (kpiEl) {
-      const alta  = items.filter(i => i.color === 'green'  || i.color === '#27AE60').length;
-      const media = items.filter(i => i.color === 'orange' || i.color === '#F39C12').length;
-      const bassa = items.filter(i => i.color === 'red'    || i.color === '#E74C3C').length;
+      const alta  = items.filter(i => i.efficiency_level === 'alta').length;
+      const media = items.filter(i => i.efficiency_level === 'media').length;
+      const bassa = items.filter(i => i.efficiency_level === 'bassa').length;
       kpiEl.innerHTML = `
         <div class="op-kpi-card" style="text-decoration:none;">
-          <div class="op-kpi-val" style="color:#27AE60;">${alta}</div>
+          <div class="op-kpi-val" style="color:${COLORI_EFFICIENZA.alta};">${alta}</div>
           <div class="op-kpi-label">Alta efficienza</div>
           <div class="op-kpi-desc">kWh/m² nella norma</div>
         </div>
         <div class="op-kpi-card" style="text-decoration:none;">
-          <div class="op-kpi-val" style="color:#F39C12;">${media}</div>
+          <div class="op-kpi-val" style="color:${COLORI_EFFICIENZA.media};">${media}</div>
           <div class="op-kpi-label">Media efficienza</div>
           <div class="op-kpi-desc">Sopra la media</div>
         </div>
         <div class="op-kpi-card" style="text-decoration:none;">
-          <div class="op-kpi-val" style="color:#E74C3C;">${bassa}</div>
+          <div class="op-kpi-val" style="color:${COLORI_EFFICIENZA.bassa};">${bassa}</div>
           <div class="op-kpi-label">Bassa efficienza</div>
           <div class="op-kpi-desc">Anomalie rilevate</div>
         </div>`;
