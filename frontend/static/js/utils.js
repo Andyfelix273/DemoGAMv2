@@ -173,13 +173,14 @@ function renderTopbar(paginaAttiva, opzioni) {
   const isAdmin    = API.isAdmin();
   const nome       = API.getNome() || '';
   const mostraFiltri = opzioni.filtri !== false; // default true
+  const titoloApp  = opzioni.titolo || 'GIS Asset Manager';
 
   const html = `
     <img id="topbar-logo" class="topbar-logo"
          src="/static/img/${Tema.get() === 'dark' ? 'logodark' : 'logolight'}.png"
          alt="Logo">
     <div class="topbar-divider"></div>
-    <span class="topbar-title">GIS Asset Manager</span>
+    <span class="topbar-title">${titoloApp}</span>
 
     ${mostraFiltri ? `
     <div class="topbar-divider"></div>
