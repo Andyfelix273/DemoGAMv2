@@ -686,13 +686,15 @@ def popola_bems(conn):
 
     # Impianti
     impianti = [
-        (asset_id, "P4", None, "IMP-P4-HVAC",  "HVAC Piano 4",        "hvac",         "Carrier",  "30XA-P4",  2018, "operativo", 45.0),
-        (asset_id, "P5", None, "IMP-P5-HVAC",  "HVAC Piano 5",        "hvac",         "Carrier",  "30XA-P5",  2020, "operativo", 38.0),
-        (asset_id, "P4", None, "IMP-P4-LUX",   "Illuminazione P4",    "illuminazione","Philips",  "HUE-PRO",  2021, "operativo", 12.0),
-        (asset_id, "P5", None, "IMP-P5-LUX",   "Illuminazione P5",    "illuminazione","Philips",  "HUE-PRO",  2021, "operativo", 10.0),
-        (asset_id, None, None, "IMP-MAIN-MTR", "Contatore Principale", "contatore",    "ABB",      "B23-312",  2019, "operativo", None),
-        (asset_id, "P4", None, "IMP-P4-SUB",   "Sub-meter Piano 4",   "contatore",    "ABB",      "B21-213",  2019, "operativo", None),
-        (asset_id, "P5", None, "IMP-P5-SUB",   "Sub-meter Piano 5",   "contatore",    "ABB",      "B21-213",  2020, "operativo", None),
+        (asset_id, "P4", None, "IMP-P4-HVAC",  "HVAC Piano 4",              "hvac",          "Carrier",  "30XA-P4",  2018, "operativo", 45.0),
+        (asset_id, "P5", None, "IMP-P5-HVAC",  "HVAC Piano 5",              "hvac",          "Carrier",  "30XA-P5",  2020, "operativo", 38.0),
+        (asset_id, "P4", None, "IMP-P4-LUX",   "Illuminazione P4",          "illuminazione", "Philips",  "HUE-PRO",  2021, "operativo", 12.0),
+        (asset_id, "P5", None, "IMP-P5-LUX",   "Illuminazione P5",          "illuminazione", "Philips",  "HUE-PRO",  2021, "operativo", 10.0),
+        (asset_id, None, None, "IMP-MAIN-MTR", "Contatore Principale",       "contatore",     "ABB",      "B23-312",  2019, "operativo", None),
+        (asset_id, "P4", None, "IMP-P4-SUB",   "Sub-meter Piano 4",         "contatore",     "ABB",      "B21-213",  2019, "operativo", None),
+        (asset_id, "P5", None, "IMP-P5-SUB",   "Sub-meter Piano 5",         "contatore",     "ABB",      "B21-213",  2020, "operativo", None),
+        (asset_id, None, None, "IMP-CED",      "CED (Data Center)",          "ced",           "Dell",     "PowerEdge",2022, "operativo", 22.0),
+        (asset_id, None, None, "IMP-SERV-EM",  "Servizi Elettromeccanici",   "servizi_em",    "Schneider","EcoStruxure",2021,"operativo",12.0),
     ]
     for imp in impianti:
         cur.execute("""

@@ -67,15 +67,19 @@ PLANTS = [
     ("IMP-P5-HVAC",  "P5",   None,       "hvac"),
     ("IMP-P5-LUX",   "P5",   None,       "illuminazione"),
     ("IMP-P5-SUB",   "P5",   None,       "contatore"),
+    ("IMP-CED",      None,   None,       "ced"),
+    ("IMP-SERV-EM",  None,   None,       "servizi_em"),
 ]
 
 # Baseline potenza per tipo impianto (kW)
 BASELINE_KW = {
-    "contatore":    45.0,
-    "hvac":         18.0,
-    "illuminazione": 8.0,
-    "ups":           5.0,
-    "generatore":    0.0,
+    "contatore":     45.0,
+    "hvac":          18.0,
+    "illuminazione":  8.0,
+    "ups":            5.0,
+    "generatore":     0.0,
+    "ced":           22.0,   # CED: server, storage, networking — quasi costante h24
+    "servizi_em":    12.0,   # Servizi Elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
 }
 
 # ── Funzioni di simulazione ─────────────────────────────────────────────────
@@ -157,6 +161,22 @@ def simula_impianto(plant_id: str, floor_id: str, tipo: str, ts: datetime) -> di
         power = baseline * factor
     elif tipo == "illuminazione":
         factor = (0.8 + random.uniform(0, 0.15)) if is_working else 0.05
+        power = baseline * factor
+    elif tipo == "ced":
+        # CED: carico quasi costante h24 con picchi durante orario lavorativo
+        # (batch notturni, backup, aggiornamenti)
+        if is_working:
+            factor = 0.80 + random.uniform(0, 0.15)  # 80-95% in orario
+        else:
+            factor = 0.70 + random.uniform(0, 0.10)  # 70-80% fuori orario (batch/backup)
+        power = baseline * factor
+    elif tipo == "servizi_em":
+        # Servizi elettromeccanici: pompe, ascensori, UPS, gruppi elettrogeni
+        # Picco in orario lavorativo (ascensori, pompe circolazione), minimo notturno
+        if is_working:
+            factor = 0.65 + random.uniform(0, 0.25)  # 65-90% in orario
+        else:
+            factor = 0.20 + random.uniform(0, 0.10)  # 20-30% fuori orario (solo UPS/pompe)
         power = baseline * factor
     else:
         power = baseline * (0.5 + random.uniform(0, 0.3))
