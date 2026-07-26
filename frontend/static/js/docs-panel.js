@@ -20,9 +20,13 @@ const DocsPanel = (() => {
   const MODAL_PDF_ID    = 'docp-modal-pdf';
 
   // ── Stato interno ─────────────────────────────────────────────────────────────
-  let _container   = null;
-  let _opts        = {};
-  let _lista       = [];
+  let _container     = null;
+  let _opts          = {};
+  let _lista         = [];
+  let _listaFiltrata = [];
+  let _fileScelto    = null;
+  let _assetsCache   = [];
+  const _uid = 'docp_' + Math.random().toString(36).slice(2, 7);
 
   // ── Utility ───────────────────────────────────────────────────────────────────
   function fmtDim(bytes) {
@@ -35,32 +39,32 @@ const DocsPanel = (() => {
     if (!s) return '–';
     return new Date(s).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
-  function mimeBadge(mime, nomeFile) {
+  function _tipoDoc(mime, nomeFile) {
     const nm = (nomeFile || '').toLowerCase();
     const m  = (mime || '').toLowerCase();
-    if (m.includes('pdf') || nm.endsWith('.pdf'))
-      return '<span class="mime-badge mime-pdf"><i class="fa fa-file-pdf"></i> PDF</span>';
-    if (m.includes('word') || nm.endsWith('.docx') || nm.endsWith('.doc'))
-      return '<span class="mime-badge mime-word"><i class="fa fa-file-word"></i> Word</span>';
-    if (m.includes('excel') || m.includes('spreadsheet') || nm.endsWith('.xlsx') || nm.endsWith('.xls'))
-      return '<span class="mime-badge mime-xls"><i class="fa fa-file-excel"></i> Excel</span>';
-    if (m.includes('image') || nm.endsWith('.png') || nm.endsWith('.jpg') || nm.endsWith('.jpeg'))
-      return '<span class="mime-badge mime-img"><i class="fa fa-file-image"></i> Immagine</span>';
-    return '<span class="mime-badge mime-other"><i class="fa fa-file"></i> File</span>';
+    if (m.includes('pdf') || nm.endsWith('.pdf'))   return 'pdf';
+    if (m.includes('word') || nm.endsWith('.docx') || nm.endsWith('.doc')) return 'word';
+    if (m.includes('excel') || m.includes('spreadsheet') || nm.endsWith('.xlsx') || nm.endsWith('.xls')) return 'excel';
+    if (m.includes('image') || nm.endsWith('.png') || nm.endsWith('.jpg') || nm.endsWith('.jpeg')) return 'immagine';
+    return 'altro';
+  }
+  function mimeBadge(mime, nomeFile) {
+    const t = _tipoDoc(mime, nomeFile);
+    const map = {
+      pdf:      '<span class="mime-badge mime-pdf"><i class="fa fa-file-pdf"></i> PDF</span>',
+      word:     '<span class="mime-badge mime-word"><i class="fa fa-file-word"></i> Word</span>',
+      excel:    '<span class="mime-badge mime-xls"><i class="fa fa-file-excel"></i> Excel</span>',
+      immagine: '<span class="mime-badge mime-img"><i class="fa fa-file-image"></i> Immagine</span>',
+    };
+    return map[t] || '<span class="mime-badge mime-other"><i class="fa fa-file"></i> File</span>';
   }
   function isPdf(mime, nomeFile) {
     return (mime || '').toLowerCase().includes('pdf') || (nomeFile || '').toLowerCase().endsWith('.pdf');
   }
 
   // ── Gestione modali ───────────────────────────────────────────────────────────
-  function _apriModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('open');
-  }
-  function _chiudiModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('open');
-  }
+  function _apriModal(id) { const el = document.getElementById(id); if (el) el.classList.add('open'); }
+  function _chiudiModal(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); }
 
   // ── Iniezione modali nel DOM ──────────────────────────────────────────────────
   function _injectModals(zIndex) {
@@ -100,7 +104,7 @@ const DocsPanel = (() => {
             <input type="file" id="docp-file-input" style="display:none"
                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
                    onchange="DocsPanel._onFileSelected(this.files[0])">
-            <div id="docp-file-preview" style="display:none;margin-top:10px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px">
+            <div id="docp-file-preview" style="display:none;margin-top:10px;padding:10px;background:var(--bg-secondary);border-radius:6px;font-size:13px;align-items:center;gap:8px">
               <i class="fa fa-file" style="color:var(--accent-blue)"></i>
               <span id="docp-file-name"></span>
               <span id="docp-file-size" style="color:var(--text-muted);margin-left:auto"></span>
@@ -151,10 +155,7 @@ const DocsPanel = (() => {
     });
   }
 
-  // ── Stato upload ──────────────────────────────────────────────────────────────
-  let _fileScelto  = null;
-  let _assetsCache = [];
-
+  // ── Caricamento asset per il select ──────────────────────────────────────────
   async function _caricaAssets() {
     if (_assetsCache.length === 0) {
       const geo = await API.getAssets();
@@ -167,7 +168,7 @@ const DocsPanel = (() => {
     ).join('');
   }
 
-  // ── Caricamento e render ──────────────────────────────────────────────────────
+  // ── Caricamento dati ──────────────────────────────────────────────────────────
   async function _carica() {
     if (!_container) return;
     _container.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
@@ -177,28 +178,39 @@ const DocsPanel = (() => {
       } else {
         _lista = await API.getDocuments();
       }
+      _listaFiltrata = [..._lista];
       _render();
     } catch (e) {
       _container.innerHTML = `<p style="color:var(--accent-red);font-size:13px"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
     }
   }
 
-  function _render() {
-    if (!_container) return;
-    const canUpload = !_opts.readonly && API.can('documents.create');
-    const canDelete = !_opts.readonly && API.can('documents.delete');
+  // ── Filtro client-side ────────────────────────────────────────────────────────
+  function _filtra() {
+    const q    = (document.getElementById(_uid + '_q')?.value   || '').toLowerCase();
+    const tipo = (document.getElementById(_uid + '_tipo')?.value || '');
+    _listaFiltrata = _lista.filter(doc => {
+      if (tipo && _tipoDoc(doc.mime_type, doc.nome_file) !== tipo) return false;
+      if (q && ![doc.nome_file, doc.caricato_da, doc.asset_nome]
+        .some(v => (v || '').toLowerCase().includes(q))) return false;
+      return true;
+    });
+    _renderRighe();
+  }
 
-    if (_lista.length === 0) {
-      _container.innerHTML = `
-        <div style="text-align:center;padding:24px;color:var(--text-muted)">
-          <i class="fa fa-folder-open" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px"></i>
-          <div style="font-size:13px">Nessun documento${_opts.assetNome ? ' per questo asset' : ''}</div>
-          ${canUpload ? `<button class="btn btn-primary" style="margin-top:12px" onclick="DocsPanel._apriUpload()"><i class="fa fa-upload"></i> Carica documento</button>` : ''}
-        </div>`;
+  // ── Render righe tbody ────────────────────────────────────────────────────────
+  function _renderRighe() {
+    const canDelete = !_opts.readonly && API.can('documents.delete');
+    const tbody = document.getElementById(_uid + '_tbody');
+    const count = document.getElementById(_uid + '_count');
+    if (!tbody) return;
+    const n = _listaFiltrata.length;
+    if (count) count.textContent = `${n} document${n === 1 ? 'o' : 'i'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}`;
+    if (n === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun documento trovato</td></tr>`;
       return;
     }
-
-    const righe = _lista.map(doc => {
+    tbody.innerHTML = _listaFiltrata.map(doc => {
       const pdfPreview = isPdf(doc.mime_type, doc.nome_file)
         ? `<button class="btn-icon" title="Anteprima PDF" onclick="DocsPanel._apriPdf(${doc.id}, '${(doc.nome_file || '').replace(/'/g, "\\'")}')"><i class="fa fa-eye"></i></button>`
         : '';
@@ -223,10 +235,36 @@ const DocsPanel = (() => {
           </td>
         </tr>`;
     }).join('');
+  }
 
+  // ── Render struttura completa ─────────────────────────────────────────────────
+  function _render() {
+    if (!_container) return;
+    const canUpload = !_opts.readonly && API.can('documents.create');
+
+    if (_lista.length === 0) {
+      _container.innerHTML = `
+        <div style="text-align:center;padding:24px;color:var(--text-muted)">
+          <i class="fa fa-folder-open" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px"></i>
+          <div style="font-size:13px">Nessun documento${_opts.assetNome ? ' per questo asset' : ''}</div>
+          ${canUpload ? `<button class="btn btn-primary" style="margin-top:12px" onclick="DocsPanel._apriUpload()"><i class="fa fa-upload"></i> Carica documento</button>` : ''}
+        </div>`;
+      return;
+    }
+
+    const n = _lista.length;
     _container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--text-muted)">${_lista.length} document${_lista.length === 1 ? 'o' : 'i'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
+      <div class="filtri-bar">
+        <input type="text" id="${_uid}_q" placeholder="Cerca nome file, caricato da..." oninput="DocsPanel._filtra()" style="flex:1;min-width:160px">
+        <select id="${_uid}_tipo" onchange="DocsPanel._filtra()">
+          <option value="">Tutti i tipi</option>
+          <option value="pdf">PDF</option>
+          <option value="word">Word</option>
+          <option value="excel">Excel</option>
+          <option value="immagine">Immagine</option>
+          <option value="altro">Altro</option>
+        </select>
+        <span class="record-count" id="${_uid}_count">${n} document${n === 1 ? 'o' : 'i'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
         ${canUpload ? `<button class="btn btn-primary" onclick="DocsPanel._apriUpload()"><i class="fa fa-upload"></i> Carica documento</button>` : ''}
       </div>
       <div style="overflow-x:auto">
@@ -238,9 +276,11 @@ const DocsPanel = (() => {
               <th>Dimensione</th><th>Caricato il</th><th>Caricato da</th><th></th>
             </tr>
           </thead>
-          <tbody>${righe}</tbody>
+          <tbody id="${_uid}_tbody"></tbody>
         </table>
       </div>`;
+
+    _renderRighe();
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────────
@@ -354,7 +394,7 @@ const DocsPanel = (() => {
       readonly:  opts.readonly  ?? false,
     };
     _injectModals(_opts.zIndex);
-    _carica();
+    if (_container) _carica();
   }
 
   function refresh() { return _carica(); }
@@ -362,6 +402,7 @@ const DocsPanel = (() => {
   return {
     mount,
     refresh,
+    _filtra,
     _apriUpload,
     _onFileSelected,
     _onDrop,

@@ -22,20 +22,17 @@ const DeadlinesPanel = (() => {
   const MODAL_FORM_ID = 'dlp-modal-form';
 
   // ── Stato interno ─────────────────────────────────────────────────────────────
-  let _container   = null;
-  let _opts        = {};
-  let _lista       = [];
-  let _assetsCache = [];
+  let _container     = null;
+  let _opts          = {};
+  let _lista         = [];
+  let _listaFiltrata = [];
+  let _assetsCache   = [];
+  const _uid = 'dlp_' + Math.random().toString(36).slice(2, 7);
 
   // ── Utility ───────────────────────────────────────────────────────────────────
   function fmtData(s) {
     if (!s) return '—';
     return new Date(s).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  }
-  function diffGiorni(dataStr) {
-    const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
-    const scad = new Date(dataStr);
-    return Math.ceil((scad - oggi) / 86400000);
   }
   function badgeStato(stato) {
     const col = STATO_COLOR[stato] || 'var(--text-muted)';
@@ -49,14 +46,8 @@ const DeadlinesPanel = (() => {
 
   // ── Gestione modale ───────────────────────────────────────────────────────────
   function _getModal() { return document.getElementById(MODAL_FORM_ID); }
-  function _apriModal() {
-    const el = _getModal();
-    if (el) el.classList.add('open');
-  }
-  function _chiudiModal() {
-    const el = _getModal();
-    if (el) el.classList.remove('open');
-  }
+  function _apriModal() { const el = _getModal(); if (el) el.classList.add('open'); }
+  function _chiudiModal() { const el = _getModal(); if (el) el.classList.remove('open'); }
 
   // ── Iniezione modale nel DOM ──────────────────────────────────────────────────
   function _injectModal(zIndex) {
@@ -155,7 +146,7 @@ const DeadlinesPanel = (() => {
     ).join('');
   }
 
-  // ── Caricamento e render ──────────────────────────────────────────────────────
+  // ── Caricamento dati ──────────────────────────────────────────────────────────
   async function _carica() {
     if (!_container) return;
     _container.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
@@ -165,38 +156,51 @@ const DeadlinesPanel = (() => {
       } else {
         _lista = await API.getDeadlines();
       }
+      _listaFiltrata = [..._lista];
       _render();
     } catch (e) {
       _container.innerHTML = `<p style="color:var(--accent-red);font-size:13px"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
     }
   }
 
-  function _render() {
-    if (!_container) return;
-    const canCreate = !_opts.readonly && API.can('deadlines.create');
+  // ── Filtro client-side ────────────────────────────────────────────────────────
+  function _filtra() {
+    const q     = (document.getElementById(_uid + '_q')?.value    || '').toLowerCase();
+    const stato = (document.getElementById(_uid + '_stato')?.value || '');
+    const prio  = (document.getElementById(_uid + '_prio')?.value  || '');
+    const oggi  = new Date(); oggi.setHours(0, 0, 0, 0);
+    _listaFiltrata = _lista.filter(d => {
+      const statoEffettivo = (d.stato === 'aperta' && new Date(d.data_scadenza) < oggi) ? 'scaduta' : d.stato;
+      if (stato && statoEffettivo !== stato) return false;
+      if (prio  && d.priorita !== prio)      return false;
+      if (q && ![d.titolo, d.assegnatario, d.asset_nome]
+        .some(v => (v || '').toLowerCase().includes(q))) return false;
+      return true;
+    });
+    _renderRighe();
+  }
+
+  // ── Render righe tbody ────────────────────────────────────────────────────────
+  function _renderRighe() {
     const canEdit   = !_opts.readonly && API.can('deadlines.update');
     const canDelete = !_opts.readonly && API.can('deadlines.delete');
-
-    if (_lista.length === 0) {
-      _container.innerHTML = `
-        <div style="text-align:center;padding:24px;color:var(--text-muted)">
-          <i class="fa fa-calendar-check" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px"></i>
-          <div style="font-size:13px">Nessuna scadenza${_opts.assetNome ? ' per questo asset' : ''}</div>
-          ${canCreate ? `<button class="btn btn-primary" style="margin-top:12px" onclick="DeadlinesPanel._apriNuova()"><i class="fa fa-plus"></i> Nuova scadenza</button>` : ''}
-        </div>`;
+    const tbody = document.getElementById(_uid + '_tbody');
+    const count = document.getElementById(_uid + '_count');
+    if (!tbody) return;
+    const n = _listaFiltrata.length;
+    if (count) count.textContent = `${n} scadenz${n === 1 ? 'a' : 'e'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}`;
+    if (n === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Nessuna scadenza trovata</td></tr>`;
       return;
     }
-
     const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
-
-    const righe = _lista.map(d => {
+    tbody.innerHTML = _listaFiltrata.map(d => {
       const scad = new Date(d.data_scadenza);
       const giorni = Math.ceil((scad - oggi) / 86400000);
       const isScaduta = d.stato === 'scaduta' || (d.stato === 'aperta' && giorni < 0);
       const isUrgente = d.stato === 'aperta' && giorni >= 0 && giorni <= 7;
       const tipoIcon  = TIPO_ICON[d.tipo] || 'fa-clock';
       const prioCol   = PRIO_COLOR[d.priorita] || 'var(--text-muted)';
-
       let giorniLabel = '';
       if (d.stato !== 'chiusa') {
         giorniLabel = giorni < 0
@@ -205,9 +209,7 @@ const DeadlinesPanel = (() => {
             ? `<span style="color:var(--accent-orange);font-size:11px;font-weight:600">${giorni}gg</span>`
             : `<span style="color:var(--text-muted);font-size:11px">${giorni}gg</span>`;
       }
-
       const rowBg = isScaduta ? 'rgba(248,81,73,0.04)' : isUrgente ? 'rgba(210,153,34,0.04)' : '';
-
       return `
         <tr style="background:${rowBg}">
           <td><i class="fa ${tipoIcon}" style="color:${prioCol};font-size:14px" title="${d.tipo || ''}"></i></td>
@@ -229,25 +231,59 @@ const DeadlinesPanel = (() => {
           </td>
         </tr>`;
     }).join('');
+  }
 
-    const colAsset = !_opts.assetId ? '<th>Asset</th>' : '';
+  // ── Render struttura completa ─────────────────────────────────────────────────
+  function _render() {
+    if (!_container) return;
+    const canCreate = !_opts.readonly && API.can('deadlines.create');
+    const colAsset  = !_opts.assetId ? '<th>Asset</th>' : '';
+
+    if (_lista.length === 0) {
+      _container.innerHTML = `
+        <div style="text-align:center;padding:24px;color:var(--text-muted)">
+          <i class="fa fa-calendar-check" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px"></i>
+          <div style="font-size:13px">Nessuna scadenza${_opts.assetNome ? ' per questo asset' : ''}</div>
+          ${canCreate ? `<button class="btn btn-primary" style="margin-top:12px" onclick="DeadlinesPanel._apriNuova()"><i class="fa fa-plus"></i> Nuova scadenza</button>` : ''}
+        </div>`;
+      return;
+    }
+
+    const n = _lista.length;
     _container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--text-muted)">${_lista.length} scadenz${_lista.length === 1 ? 'a' : 'e'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
+      <div class="filtri-bar">
+        <input type="text" id="${_uid}_q" placeholder="Cerca titolo, assegnatario..." oninput="DeadlinesPanel._filtra()" style="flex:1;min-width:160px">
+        <select id="${_uid}_stato" onchange="DeadlinesPanel._filtra()">
+          <option value="">Tutti gli stati</option>
+          <option value="aperta">Aperta</option>
+          <option value="scaduta">Scaduta</option>
+          <option value="chiusa">Chiusa</option>
+        </select>
+        <select id="${_uid}_prio" onchange="DeadlinesPanel._filtra()">
+          <option value="">Tutte le priorità</option>
+          <option value="critica">Critica</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="bassa">Bassa</option>
+        </select>
+        <span class="record-count" id="${_uid}_count">${n} scadenz${n === 1 ? 'a' : 'e'}${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
         ${canCreate ? `<button class="btn btn-primary" onclick="DeadlinesPanel._apriNuova()"><i class="fa fa-plus"></i> Nuova scadenza</button>` : ''}
       </div>
       <div style="overflow-x:auto">
         <table class="data-table" style="width:100%">
           <thead>
             <tr>
-              <th style="width:32px"></th><th>Titolo${!_opts.assetId ? ' / Asset' : ''}</th>
+              <th style="width:32px"></th>
+              <th>Titolo${!_opts.assetId ? ' / Asset' : ''}</th>
               <th>Priorità</th><th>Stato</th><th>Scadenza</th><th>Giorni</th>
               <th>Assegnatario</th><th></th>
             </tr>
           </thead>
-          <tbody>${righe}</tbody>
+          <tbody id="${_uid}_tbody"></tbody>
         </table>
       </div>`;
+
+    _renderRighe();
   }
 
   // ── Form nuovo ────────────────────────────────────────────────────────────────
@@ -370,11 +406,6 @@ const DeadlinesPanel = (() => {
   }
 
   // ── API pubblica ──────────────────────────────────────────────────────────────
-  /**
-   * mount(containerEl, opts)
-   * Se containerEl è null, inietta solo la modale CRUD senza renderizzare la lista.
-   * Utile nelle pagine standalone che hanno già la propria tabella.
-   */
   function mount(containerEl, opts = {}) {
     _container = containerEl;
     _opts = {
@@ -393,6 +424,7 @@ const DeadlinesPanel = (() => {
   return {
     mount,
     refresh,
+    _filtra,
     _apriNuova,
     _apriModifica,
     _chiudi,

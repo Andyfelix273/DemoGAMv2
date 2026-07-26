@@ -14,7 +14,7 @@
  *   readonly  {boolean}      — se true, nasconde i controlli di creazione/modifica
  *
  * Uso in pagina standalone (workorders.html):
- *   WoPanel.mount(document.getElementById('wo-panel-root'), { zIndex: 1000 });
+ *   WoPanel.mount(null, { zIndex: 1000 });  // inietta solo le modali
  *
  * Uso nella modale dettaglio asset (map-modal.js):
  *   WoPanel.mount(document.getElementById('mm-panel-workorders'), {
@@ -32,13 +32,16 @@ const WoPanel = (() => {
   const MODAL_STATO_ID  = 'wop-modal-stato';
 
   // ── Stato interno ─────────────────────────────────────────────────────────────
-  let _container   = null;
-  let _opts        = {};
-  let _lista       = [];
-  let _corrente    = null;
-  let _assetsCache = [];
+  let _container      = null;
+  let _opts           = {};
+  let _lista          = [];
+  let _listaFiltrata  = [];
+  let _corrente       = null;
+  let _assetsCache    = [];
   let _cambioStatoId     = null;
   let _cambioStatoScelto = null;
+  // ID univoco per i filtri (evita conflitti se montato più volte nella stessa pagina)
+  const _uid = 'wop_' + Math.random().toString(36).slice(2, 7);
 
   // ── Utility ───────────────────────────────────────────────────────────────────
   function fmtData(d) {
@@ -71,7 +74,6 @@ const WoPanel = (() => {
 
   // ── Gestione modali ───────────────────────────────────────────────────────────
   function _getModal(id) { return document.getElementById(id); }
-
   function _apriModal(id) {
     const el = _getModal(id);
     if (el) el.classList.add('open');
@@ -84,7 +86,6 @@ const WoPanel = (() => {
   // ── Iniezione modali nel DOM (una sola volta per sessione) ────────────────────
   function _injectModals(zIndex) {
     if (_getModal(MODAL_FORM_ID)) {
-      // Aggiorna solo il z-index se le modali esistono già
       [MODAL_FORM_ID, MODAL_DET_ID, MODAL_STATO_ID].forEach(id => {
         const el = _getModal(id);
         if (el) el.style.zIndex = zIndex;
@@ -233,7 +234,6 @@ const WoPanel = (() => {
     div.innerHTML = html;
     document.body.appendChild(div);
 
-    // Chiudi con Escape
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         _chiudiModal(MODAL_STATO_ID);
@@ -256,7 +256,7 @@ const WoPanel = (() => {
     ).join('');
   }
 
-  // ── Render lista nel container ────────────────────────────────────────────────
+  // ── Caricamento dati ──────────────────────────────────────────────────────────
   async function _carica() {
     if (!_container) return;
     _container.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
@@ -266,30 +266,44 @@ const WoPanel = (() => {
       } else {
         _lista = await API.getWorkOrders();
       }
+      _listaFiltrata = [..._lista];
       _render();
     } catch (e) {
       _container.innerHTML = `<p style="color:var(--accent-red);font-size:13px"><i class="fa fa-exclamation-circle"></i> Errore caricamento: ${e.message}</p>`;
     }
   }
 
-  function _render() {
-    if (!_container) return;
-    const canCreate = !_opts.readonly && API.can('work_orders.create');
+  // ── Filtro client-side ────────────────────────────────────────────────────────
+  function _filtra() {
+    const q     = (document.getElementById(_uid + '_q')?.value     || '').toLowerCase();
+    const stato = (document.getElementById(_uid + '_stato')?.value  || '');
+    const tipo  = (document.getElementById(_uid + '_tipo')?.value   || '');
+    const prio  = (document.getElementById(_uid + '_prio')?.value   || '');
+    _listaFiltrata = _lista.filter(wo => {
+      if (stato && wo.stato    !== stato) return false;
+      if (tipo  && wo.tipo     !== tipo)  return false;
+      if (prio  && wo.priorita !== prio)  return false;
+      if (q && ![wo.codice, wo.titolo, wo.assegnatario, wo.asset_nome]
+        .some(v => (v || '').toLowerCase().includes(q))) return false;
+      return true;
+    });
+    _renderRighe();
+  }
+
+  // ── Render righe tbody (aggiornamento parziale) ───────────────────────────────
+  function _renderRighe() {
     const canEdit   = !_opts.readonly && API.can('work_orders.update');
     const canDelete = !_opts.readonly && API.can('work_orders.delete');
     const oggi_str  = oggi();
-
-    if (_lista.length === 0) {
-      _container.innerHTML = `
-        <div style="text-align:center;padding:24px;color:var(--text-muted)">
-          <i class="fa fa-wrench" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px"></i>
-          <div style="font-size:13px">Nessun work order${_opts.assetNome ? ' per questo asset' : ''}</div>
-          ${canCreate ? `<button class="btn btn-primary" style="margin-top:12px" onclick="WoPanel._apriNuovo()"><i class="fa fa-plus"></i> Nuovo WO</button>` : ''}
-        </div>`;
+    const tbody = document.getElementById(_uid + '_tbody');
+    const count = document.getElementById(_uid + '_count');
+    if (!tbody) return;
+    if (count) count.textContent = `${_listaFiltrata.length} work order${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}`;
+    if (_listaFiltrata.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-muted)">Nessun work order trovato</td></tr>`;
       return;
     }
-
-    const righe = _lista.map(wo => {
+    tbody.innerHTML = _listaFiltrata.map(wo => {
       const scaduto = wo.data_pianificata && wo.data_pianificata < oggi_str &&
                       !['completato', 'annullato'].includes(wo.stato);
       const rowStyle = scaduto ? 'background:rgba(248,81,73,0.04)' : '';
@@ -320,11 +334,49 @@ const WoPanel = (() => {
           </td>
         </tr>`;
     }).join('');
+  }
 
-    const colAsset = !_opts.assetId ? '<th>Asset</th>' : '';
+  // ── Render struttura completa ─────────────────────────────────────────────────
+  function _render() {
+    if (!_container) return;
+    const canCreate = !_opts.readonly && API.can('work_orders.create');
+    const colAsset  = !_opts.assetId ? '<th>Asset</th>' : '';
+
+    if (_lista.length === 0) {
+      _container.innerHTML = `
+        <div style="text-align:center;padding:24px;color:var(--text-muted)">
+          <i class="fa fa-wrench" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px"></i>
+          <div style="font-size:13px">Nessun work order${_opts.assetNome ? ' per questo asset' : ''}</div>
+          ${canCreate ? `<button class="btn btn-primary" style="margin-top:12px" onclick="WoPanel._apriNuovo()"><i class="fa fa-plus"></i> Nuovo WO</button>` : ''}
+        </div>`;
+      return;
+    }
+
     _container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--text-muted)">${_lista.length} work order${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
+      <div class="filtri-bar">
+        <input type="text" id="${_uid}_q" placeholder="Cerca codice, titolo, assegnatario..." oninput="WoPanel._filtra()" style="flex:1;min-width:160px">
+        <select id="${_uid}_stato" onchange="WoPanel._filtra()">
+          <option value="">Tutti gli stati</option>
+          <option value="aperto">Aperto</option>
+          <option value="in_corso">In corso</option>
+          <option value="completato">Completato</option>
+          <option value="annullato">Annullato</option>
+        </select>
+        <select id="${_uid}_tipo" onchange="WoPanel._filtra()">
+          <option value="">Tutti i tipi</option>
+          <option value="correttivo">Correttivo</option>
+          <option value="preventivo">Preventivo</option>
+          <option value="ispezione">Ispezione</option>
+          <option value="manutenzione">Manutenzione</option>
+        </select>
+        <select id="${_uid}_prio" onchange="WoPanel._filtra()">
+          <option value="">Tutte le priorità</option>
+          <option value="critica">Critica</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="bassa">Bassa</option>
+        </select>
+        <span class="record-count" id="${_uid}_count">${_lista.length} work order${_opts.assetNome ? ` — ${_opts.assetNome}` : ''}</span>
         ${canCreate ? `<button class="btn btn-primary" onclick="WoPanel._apriNuovo()"><i class="fa fa-plus"></i> Nuovo WO</button>` : ''}
       </div>
       <div style="overflow-x:auto">
@@ -335,9 +387,11 @@ const WoPanel = (() => {
               <th>Assegnatario</th><th>Data pianif.</th><th>Apertura</th><th></th>
             </tr>
           </thead>
-          <tbody>${righe}</tbody>
+          <tbody id="${_uid}_tbody"></tbody>
         </table>
       </div>`;
+
+    _renderRighe();
   }
 
   // ── Apertura form nuovo ───────────────────────────────────────────────────────
@@ -353,11 +407,9 @@ const WoPanel = (() => {
     document.getElementById('wop-f-descrizione').value = prefill.descrizione || '';
     document.getElementById('wop-form-error').textContent = '';
 
-    // Se il pannello è contestuale a un asset, nascondi il select asset e preimpostalo
     const assetWrap = document.getElementById('wop-asset-wrap');
     if (_opts.assetId) {
       assetWrap.style.display = 'none';
-      // Assicura che il select esista e abbia il valore corretto
       await _caricaAssets();
       document.getElementById('wop-f-asset').value = _opts.assetId;
     } else {
@@ -550,17 +602,6 @@ const WoPanel = (() => {
 
   // ── API pubblica ──────────────────────────────────────────────────────────────
   /**
-   * Monta il pannello WO nel container specificato.
-   *
-   * @param {HTMLElement} containerEl - Elemento DOM che conterrà la lista WO
-   * @param {object} opts
-   * @param {number|null}   opts.assetId   - Filtra per asset (null = tutti)
-   * @param {string|null}   opts.assetNome - Nome asset per il titolo contestuale
-   * @param {number}        opts.zIndex    - z-index base per le modali (default 1000)
-   * @param {function|null} opts.onSave    - Callback dopo ogni salvataggio/eliminazione
-   * @param {boolean}       opts.readonly  - Se true, nasconde i controlli di scrittura
-   */
-  /**
    * mount(containerEl, opts)
    * Se containerEl è null, inietta solo le modali CRUD senza renderizzare la lista.
    * Utile nelle pagine standalone che hanno già la propria tabella.
@@ -578,13 +619,12 @@ const WoPanel = (() => {
     if (_container) _carica();
   }
 
-  /** Ricarica la lista (utile dopo operazioni esterne) */
   function refresh() { return _carica(); }
 
   return {
     mount,
     refresh,
-    // Esposti per i handler inline negli onclick
+    _filtra,
     _apriNuovo,
     _apriModifica,
     _apriModificaDaDettaglio,
