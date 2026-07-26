@@ -37,16 +37,32 @@ LLM_INVOICE_MODEL       = os.environ.get("LLM_INVOICE_MODEL", "gpt-5-mini")
 UNIT_COST_ROLLING_N     = int(os.environ.get("UNIT_COST_ROLLING_INVOICES", "3"))
 LLM_EXTRACTION_TIMEOUT  = int(os.environ.get("LLM_EXTRACTION_TIMEOUT_SEC", "30"))
 
-COMMODITIES = ("ELECTRICITY", "GAS", "WATER")
+COMMODITIES = (
+    "ELECTRICITY",
+    "GAS_METHANE",
+    "GAS_GPL",
+    "WATER",
+    "HEATING_OIL",
+    "DIESEL",
+    "PETROL",
+)
 COMMODITY_LABELS = {
-    "ELECTRICITY": "Elettricità",
-    "GAS":         "Gas",
-    "WATER":       "Acqua",
+    "ELECTRICITY":  "Elettricità",
+    "GAS_METHANE":  "Gas Metano",
+    "GAS_GPL":      "GPL",
+    "WATER":        "Acqua",
+    "HEATING_OIL":  "Gasolio riscaldamento",
+    "DIESEL":       "Gasolio autotrazione",
+    "PETROL":       "Benzina",
 }
 COMMODITY_UNITS = {
-    "ELECTRICITY": "kWh",
-    "GAS":         "Smc",
-    "WATER":       "m³",
+    "ELECTRICITY":  "kWh",
+    "GAS_METHANE":  "Smc",
+    "GAS_GPL":      "kg",
+    "WATER":        "m³",
+    "HEATING_OIL":  "litri",
+    "DIESEL":       "litri",
+    "PETROL":       "litri",
 }
 
 # ── Migrazione schema ────────────────────────────────────────────────────────
@@ -80,7 +96,7 @@ def migrate_invoices_schema(database_url: str = None):
                 supply_point_id UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
                 asset_id        INTEGER     NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
                 supplier_id     UUID        NOT NULL REFERENCES suppliers(supplier_id) ON DELETE RESTRICT,
-                commodity       VARCHAR(20) NOT NULL CHECK (commodity IN ('ELECTRICITY','GAS','WATER')),
+                commodity       VARCHAR(20) NOT NULL CHECK (commodity IN ('ELECTRICITY','GAS_METHANE','GAS_GPL','WATER','HEATING_OIL','DIESEL','PETROL')),
                 point_code      VARCHAR(50),
                 description     VARCHAR(255),
                 is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -110,7 +126,7 @@ def migrate_invoices_schema(database_url: str = None):
                 invoice_id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
                 supply_point_id         UUID          REFERENCES supply_points(supply_point_id) ON DELETE SET NULL,
                 asset_id                INTEGER       NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-                commodity               VARCHAR(20)   NOT NULL CHECK (commodity IN ('ELECTRICITY','GAS','WATER')),
+                commodity               VARCHAR(20)   NOT NULL CHECK (commodity IN ('ELECTRICITY','GAS_METHANE','GAS_GPL','WATER','HEATING_OIL','DIESEL','PETROL')),
                 invoice_number          VARCHAR(100),
                 issue_date              DATE,
                 period_from             DATE,
@@ -140,7 +156,7 @@ def migrate_invoices_schema(database_url: str = None):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS energy_unit_costs (
                 asset_id                INTEGER     NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-                commodity               VARCHAR(20) NOT NULL CHECK (commodity IN ('ELECTRICITY','GAS','WATER')),
+                commodity               VARCHAR(20) NOT NULL CHECK (commodity IN ('ELECTRICITY','GAS_METHANE','GAS_GPL','WATER','HEATING_OIL','DIESEL','PETROL')),
                 unit_cost_eur           NUMERIC(10,6) NOT NULL DEFAULT 0,
                 last_updated            TIMESTAMP   NOT NULL DEFAULT NOW(),
                 active_supply_points    INTEGER     NOT NULL DEFAULT 0,
@@ -166,6 +182,28 @@ def migrate_invoices_schema(database_url: str = None):
             """)
         except Exception:
             pass
+        # Migrazione commodity: GAS -> GAS_METHANE + nuovi valori
+        # 1. Aggiorna i dati esistenti
+        for tbl in ['supply_points', 'invoices', 'energy_unit_costs']:
+            try:
+                cur.execute(f"UPDATE {tbl} SET commodity='GAS_METHANE' WHERE commodity='GAS'")
+            except Exception:
+                pass
+        # 2. Ricrea i CHECK constraint con il set esteso
+        commodity_check = "('ELECTRICITY','GAS_METHANE','GAS_GPL','WATER','HEATING_OIL','DIESEL','PETROL')"
+        for tbl, cname in [
+            ('supply_points',    'supply_points_commodity_check'),
+            ('invoices',         'invoices_commodity_check'),
+            ('energy_unit_costs','energy_unit_costs_commodity_check'),
+        ]:
+            try:
+                cur.execute(f"""
+                    ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {cname};
+                    ALTER TABLE {tbl} ADD CONSTRAINT {cname}
+                        CHECK (commodity IN {commodity_check});
+                """)
+            except Exception:
+                pass
 
         cur.close()
         conn.close()
@@ -209,7 +247,7 @@ def seed_invoices_demo(database_url: str = None):
                 "supplier_name": "Eni Plenitude S.p.A.",
                 "vat": "01741720150",
                 "supply_points": [
-                    {"commodity": "GAS", "point_code": "IT-PDR-0012345",
+                    {"commodity": "GAS_METHANE", "point_code": "IT-PDR-0012345",
                      "description": "Centrale termica",
                      "unit_cost": 0.9800, "consumption": 420.0, "amount": 411.6},
                 ]
@@ -383,7 +421,8 @@ async def _estrai_dati_bolletta(testo_pdf: str, asset_id: int, invoice_id: str, 
             "- unit_cost_eur: costo TOTALE per unità consumata, ottenuto dividendo "
             "total_amount_eur per la quantità consumata. Deve includere TUTTE le voci. "
             "NON usare solo il prezzo della materia energia.\n"
-            "- point_code: codice POD (elettricità), PDR (gas) o matricola contatore (acqua).\n"
+            "- commodity: uno tra ELECTRICITY, GAS_METHANE, GAS_GPL, WATER, HEATING_OIL, DIESEL, PETROL.\n"
+            "- point_code: codice POD (elettricità), PDR (gas metano/GPL) o matricola contatore (acqua/gasolio/benzina).\n"
             "- Se il documento contiene più commodity (es. elettricità E gas nella stessa fattura), "
             "restituisci un oggetto separato nell'array items per ciascuna commodity.\n"
             "- Se non riesci a determinare un valore con certezza, imposta confidence < 0.60 "

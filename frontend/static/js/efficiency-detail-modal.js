@@ -135,9 +135,13 @@
   background:var(--bg-secondary,#0A1628);border:1px solid var(--border,#1E3A5F);
   border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;
 }
-.edm-inv-commodity-card.electricity { border-left:3px solid var(--accent-blue,#00A3E0); }
-.edm-inv-commodity-card.gas         { border-left:3px solid var(--accent-orange,#F39C12); }
+.edm-inv-commodity-card.electricity  { border-left:3px solid var(--accent-blue,#00A3E0); }
+.edm-inv-commodity-card.gas-methane { border-left:3px solid var(--accent-orange,#F39C12); }
+.edm-inv-commodity-card.gas-gpl     { border-left:3px solid #E67E22; }
 .edm-inv-commodity-card.water       { border-left:3px solid #3498DB; }
+.edm-inv-commodity-card.heating-oil { border-left:3px solid #8E44AD; }
+.edm-inv-commodity-card.diesel      { border-left:3px solid #7F8C8D; }
+.edm-inv-commodity-card.petrol      { border-left:3px solid #27AE60; }
 .edm-inv-commodity-label { font-size:10px;color:var(--text-secondary,#7BAFC4);text-transform:uppercase;letter-spacing:0.5px; }
 .edm-inv-commodity-cost  { font-size:20px;font-weight:700;color:var(--text-primary,#E0F0FF); }
 .edm-inv-commodity-unit  { font-size:10px;color:var(--text-muted,#4A7A9B); }
@@ -950,9 +954,13 @@ async function _edmCaricaBollette(assetId) {
 
   // ── Costanti commodity ──────────────────────────────────────────────
   const COMMODITY_META = {
-    ELECTRICITY: { label: 'Elettricità', unit: 'kWh', icon: 'fa-bolt',       cls: 'electricity', color: 'var(--accent-blue,#00A3E0)' },
-    GAS:         { label: 'Gas',          unit: 'Smc', icon: 'fa-fire',       cls: 'gas',         color: 'var(--accent-orange,#F39C12)' },
-    WATER:       { label: 'Acqua',        unit: 'm³',  icon: 'fa-tint',       cls: 'water',       color: '#3498DB' },
+    ELECTRICITY:  { label: 'Elettricità',          unit: 'kWh',   icon: 'fa-bolt',        cls: 'electricity',  color: 'var(--accent-blue,#00A3E0)' },
+    GAS_METHANE:  { label: 'Gas Metano',            unit: 'Smc',   icon: 'fa-fire',        cls: 'gas-methane',  color: 'var(--accent-orange,#F39C12)' },
+    GAS_GPL:      { label: 'GPL',                   unit: 'kg',    icon: 'fa-fire-flame-curved', cls: 'gas-gpl', color: '#E67E22' },
+    WATER:        { label: 'Acqua',                 unit: 'm³',    icon: 'fa-droplet',     cls: 'water',        color: '#3498DB' },
+    HEATING_OIL:  { label: 'Gasolio riscaldamento', unit: 'litri', icon: 'fa-oil-can',     cls: 'heating-oil',  color: '#8E44AD' },
+    DIESEL:       { label: 'Gasolio autotrazione',  unit: 'litri', icon: 'fa-gas-pump',    cls: 'diesel',       color: '#7F8C8D' },
+    PETROL:       { label: 'Benzina',               unit: 'litri', icon: 'fa-gas-pump',    cls: 'petrol',       color: '#27AE60' },
   };
 
   // ── Utility ─────────────────────────────────────────────────────────
@@ -1358,8 +1366,12 @@ function _edmApriFormManualeBolletta(assetId) {
               <label>Commodity *</label>
               <select id="edm-inv-m-commodity">
                 <option value="ELECTRICITY">Elettricità</option>
-                <option value="GAS">Gas</option>
+                <option value="GAS_METHANE">Gas Metano</option>
+                <option value="GAS_GPL">GPL</option>
                 <option value="WATER">Acqua</option>
+                <option value="HEATING_OIL">Gasolio riscaldamento</option>
+                <option value="DIESEL">Gasolio autotrazione</option>
+                <option value="PETROL">Benzina</option>
               </select>
             </div>
             <div class="form-group">
@@ -1399,7 +1411,9 @@ function _edmApriFormManualeBolletta(assetId) {
               <select id="edm-inv-m-unit">
                 <option value="kWh">kWh</option>
                 <option value="Smc">Smc</option>
+                <option value="kg">kg</option>
                 <option value="m³">m³</option>
+                <option value="litri">litri</option>
               </select>
             </div>
           </div>
@@ -1513,8 +1527,12 @@ async function _edmApriModaleNuovaFornitura(assetId) {
             <label>Commodity *</label>
             <select id="edm-sp-commodity">
               <option value="ELECTRICITY">Elettricità</option>
-              <option value="GAS">Gas</option>
+              <option value="GAS_METHANE">Gas Metano</option>
+              <option value="GAS_GPL">GPL</option>
               <option value="WATER">Acqua</option>
+              <option value="HEATING_OIL">Gasolio riscaldamento</option>
+              <option value="DIESEL">Gasolio autotrazione</option>
+              <option value="PETROL">Benzina</option>
             </select>
           </div>
           <div class="form-group">
