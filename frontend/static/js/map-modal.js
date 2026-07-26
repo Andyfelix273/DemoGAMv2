@@ -228,25 +228,15 @@ async function apriModaleAsset(id) {
     }
     document.getElementById('mm-panel-allarmi').innerHTML = allHtml;
 
-    // ── Tab WO / Documenti / Scadenze: aprono modale grande con Panel.apri() ─────────
-    // Il codice di render è unico nel panel module; qui si inietta solo il pulsante di accesso.
-    const _assetNomeSafe = (a.nome || '').replace(/'/g, "\\'");
-
-    function _renderTabAccesso(panelId, label, icon, panelObj) {
-      const el = document.getElementById(panelId);
-      if (!el) return;
-      el.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;height:140px">
-          <button class="btn btn-primary" style="font-size:14px;padding:10px 24px"
-            onclick="${panelObj}.apri(${id}, '${_assetNomeSafe}')">
-            <i class="fa ${icon}" style="margin-right:8px"></i>Apri ${label}
-          </button>
-        </div>`;
-    }
-
-    _renderTabAccesso('mm-panel-workorders', 'Work Order', 'fa-wrench',   'WoPanel');
-    _renderTabAccesso('mm-panel-documenti',  'Documenti',  'fa-file',     'DocsPanel');
-    _renderTabAccesso('mm-panel-scadenze',   'Scadenze',   'fa-calendar', 'DeadlinesPanel');
+    // ── Tab WO / Documenti / Scadenze: mount() diretto nel container della tab ─────
+    // Approccio parametrico: il codice di render è unico nel panel module.
+    const _panelOpts = { assetId: id, assetNome: a.nome, zIndex: 1100 };
+    const _elWO  = document.getElementById('mm-panel-workorders');
+    const _elDoc = document.getElementById('mm-panel-documenti');
+    const _elDl  = document.getElementById('mm-panel-scadenze');
+    if (_elWO  && typeof WoPanel  !== 'undefined') WoPanel.mount(_elWO,  _panelOpts);
+    if (_elDoc && typeof DocsPanel !== 'undefined') DocsPanel.mount(_elDoc, _panelOpts);
+    if (_elDl  && typeof DeadlinesPanel !== 'undefined') DeadlinesPanel.mount(_elDl, _panelOpts);
 
     // Badge: conteggi in background per aggiornare i tab
     API.getAssetWorkOrders(id).then(list => {
