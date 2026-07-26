@@ -9,43 +9,38 @@ Le versioni seguono [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased] — branch `bems-v2`
 
+---
+
+## [1.4.0] — 2026-07-26
+
 ### Aggiunto
 - **Modulo Tariffe & Bollette** (`invoices_pg.py`): gestione forniture energetiche (elettricità, gas, acqua) con upload PDF, estrazione dati tramite LLM (GPT-4o-mini + pdfplumber), calcolo costo unitario automatico e storico bollette per asset
 - **Tab "Tariffe & Bollette"** nella modale di dettaglio asset (modulo Efficiency): KPI costi unitari per commodity, tabella forniture, upload drag-and-drop con progress bar, inserimento manuale, storico bollette con colonna **Quota oneri**
-- **Pagina sidebar `efficiency-invoices.html`**: dashboard aggregata costi unitari su tutti gli asset con filtri commodity/tipo e apertura diretta modale dettaglio
+- **Pagina `efficiency-invoices.html`** (Tariffe & Bollette): redesign completo con logica bollette-centrica — una riga per bolletta (non per asset); colonne: codice bolletta, fornitura, fornitore, importo, periodo da/a, data fattura, asset, categoria, città, stato, azioni; filtri: ricerca libera (prima posizione), periodo (ultimo mese/bimestre/3 mesi/6 mesi), tipo fornitura, categoria, stato
 - **Voce di menu "Tariffe & Bollette"** nella sidebar del modulo Asset Efficiency
+- **Set commodity esteso**: aggiunti `GAS_GPL` (GPL, kg), `HEATING_OIL` (Gasolio riscaldamento, litri), `DIESEL` (Gasolio autotrazione, litri), `PETROL` (Benzina, litri) — totale 7 commodity
+- **Impianti asset 6 — CED e Servizi Elettromeccanici**: aggiunti `IMP-CED` (CED Data Center, 8.5 kW baseline, profilo quasi piatto h24 con picco notturno per backup) e `IMP-SERV-EM` (Servizi Elettromeccanici, 12 kW baseline, picco in orario lavorativo)
+- **Sub-meter P4/P5 → "Altri carichi"**: `IMP-P4-SUB` e `IMP-P5-SUB` rinominati in "Altri carichi P4/P5" (tipo `altri_carichi`, 8/6 kW baseline, profilo molto variabile in orario, stand-by notturno)
+- **Gateway simulator** (`gateway_simulator_pg.py`): avviato con backfill 72h + loop real-time ogni 5 minuti; ora gestisce tutti e 9 gli impianti dell'asset 6
 
 ### Modificato
 - **Flusso bollette**: eliminato prerequisito fornitura obbligatoria — le forniture vengono create automaticamente dal POD/PDR estratto dalla bolletta
 - **Validazione cross-asset**: se il POD estratto appartiene già a un altro asset, la bolletta viene marcata `wrong_asset` con avviso visivo (bordo rosso) invece di essere abbinata silenziosamente
-- **Prompt LLM**: aggiunte descrizioni esplicite per `total_amount_eur` (totale bolletta IVA inclusa), `quota_oneri_eur` (costi diversi dalla materia prima) e `point_code` (POD/PDR/matricola)
-- **Tab "Zone & Occupancy"**: le tab "Occupancy" e "Zone" della modale dettaglio asset (modulo Efficiency) sono state unificate in un'unica tab con KPI aggregati in cima e card zone dettagliate
-- **Colorazione marker mappa Efficiency**: rimosso doppio mapping hardcoded `color→efficiency_level` nel JS; il backend ora restituisce direttamente `efficiency_level: "alta"/"media"/"bassa"` nell'endpoint `/api/energy/heatmap`
+- **Prompt LLM**: aggiunte descrizioni esplicite per `total_amount_eur`, `quota_oneri_eur` e `point_code`
+- **Tab "Zone & Occupancy"**: le tab "Occupancy" e "Zone" della modale dettaglio asset unificate in un'unica tab con KPI aggregati in cima e card zone dettagliate
+- **Colorazione marker mappa Efficiency**: rimosso doppio mapping hardcoded `color→efficiency_level`; il backend restituisce direttamente `efficiency_level`
 - **Terminologia**: sostituito "flotta" con "asset" in tutti i file del modulo Efficiency
+- **`COMMODITY_META`**: unica fonte di verità per label, unità, icone e colori in tutto il modulo bollette
+- **CED baseline**: ridimensionato da 22 kW a 8.5 kW per riflettere una piccola sala server (4-5 server + storage + switch + condizionatore dedicato)
 
 ### Corretto
 - Badge `wrong_asset` aggiunto a `statusBadge()` con classe `badge-scaduta` (rosso)
-- Classe CSS `edm-inv-wrong-asset` aggiunta con bordo rosso e sfondo semi-trasparente
 - **Endpoint bollette**: tutti gli endpoint usavano `db=None, utente=None` invece di `Depends(get_db)` — aggiunto `from fastapi import Depends` mancante
 - **Topbar titolo**: `renderTopbar` ora legge `opzioni.titolo` invece di restituire sempre "GIS Asset Manager"
-- **`efficiency-invoices.html`**: aggiunto `requireAuth()` mancante che causava blocco su "Caricamento..." e `.catch()` su `caricaDashboard()` per errori visibili
-- **Migrazione `GAS→GAS_METHANE`**: corretta sequenza operazioni (prima `DROP CONSTRAINT`, poi `UPDATE`, poi `ADD CONSTRAINT`) — il vecchio ordine causava il fallimento silenzioso dell'`UPDATE` per violazione del CHECK constraint esistente
-- **Modello LLM**: corretto typo `gpt-5-mini` → `gpt-4o-mini` nella costante `LLM_INVOICE_MODEL`
-
----
-
-## [Unreleased — commodity] — 2026-07-26
-
-### Aggiunto
-- **Set commodity esteso**: aggiunti `GAS_GPL` (GPL, kg), `HEATING_OIL` (Gasolio riscaldamento, litri), `DIESEL` (Gasolio autotrazione, litri), `PETROL` (Benzina, litri)
-- Classi CSS `edm-inv-commodity-card.*` per tutte le 7 commodity con colori distinti
-
-### Modificato
-- Rinominato `GAS` → `GAS_METHANE` con migrazione automatica dati esistenti (`ALTER TABLE` + `UPDATE`)
-- `COMMODITY_META` è ora l'unica fonte di verità per label, unità, icone e colori in tutto il modulo
-- Dashboard aggregata `efficiency-invoices.html` genera KPI strip e colonne tabella **dinamicamente** in base alle commodity presenti nei dati (nessun hardcoding)
-- Select commodity/unità aggiornati in tutti i form (inserimento manuale e nuova fornitura)
-- Prompt LLM aggiornato con tutti i 7 codici commodity
+- **`efficiency-invoices.html`**: aggiunto `i18n.js` mancante che causava `ReferenceError: i18n is not defined` in `renderTopbar` e blocco su "Caricamento..."
+- **`efficiency-assets.html` e `efficiency-invoices.html`**: aggiunto `map.css` mancante che causava il collasso del layout nella sezione Referenti della modale (classi `.mm-ref-*` definite in `map.css`)
+- **Migrazione `GAS→GAS_METHANE`**: corretta sequenza operazioni (prima `DROP CONSTRAINT`, poi `UPDATE`, poi `ADD CONSTRAINT`) — il vecchio ordine causava fallimento silenzioso per violazione del CHECK constraint
+- **Modello LLM**: corretto typo `gpt-5-mini` → `gpt-4o-mini`
 
 ---
 
@@ -130,3 +125,8 @@ Le versioni seguono [Semantic Versioning](https://semver.org/lang/it/).
 - **`api.js`**: client API centralizzato con gestione token JWT e permessi
 
 [Unreleased]: https://github.com/Andyfelix273/DemoGAMv2/compare/bems-v2...HEAD
+[1.4.0]: https://github.com/Andyfelix273/DemoGAMv2/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/Andyfelix273/DemoGAMv2/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Andyfelix273/DemoGAMv2/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Andyfelix273/DemoGAMv2/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Andyfelix273/DemoGAMv2/releases/tag/v1.0.0
