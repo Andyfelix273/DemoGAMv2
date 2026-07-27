@@ -1828,7 +1828,7 @@ async function _edmCaricaEfficienza(assetId) {
           <div class="ee-kpi-card-unit">attivi non risolti</div>
           ${alarmiBadge}
         </div>
-        <div class="ee-kpi-card" style="border-color:${kpi.eui_gauge_color === 'green' ? 'rgba(39,174,96,0.4)' : kpi.eui_gauge_color === 'red' ? 'rgba(231,76,60,0.4)' : 'rgba(243,156,18,0.4)'};" data-kpi-tip="E-3 — Intensità d’uso energetico: consumo totale degli ultimi 12 mesi diviso la superficie lorda. Indica l’efficienza strutturale dell’edificio.">
+        <div class="ee-kpi-card" style="border-color:${kpi.eui_gauge_color === 'green' ? 'rgba(39,174,96,0.4)' : kpi.eui_gauge_color === 'red' ? 'rgba(231,76,60,0.4)' : 'rgba(243,156,18,0.4)'};" data-kpi-tip="E-3 — EUI (Energy Use Intensity): consumo energetico degli ultimi 12 mesi diviso la superficie lorda (kWh/m²/anno). Indica quanto energia consuma ogni metro quadro in un anno. Valore più basso = edificio più efficiente. La classe energetica è calcolata su questo valore secondo la normativa UNI/TS 11300.">
           <div class="ee-kpi-card-label">EUI · Cl. ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''} · ${kpi.building_category || 'OFFICE'}</div>
           ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata, kpi.eui_gauge_color)}
           <div class="ee-kpi-card-unit">${fmt(kpi.eui_kwh_mq_anno)} kWh/m²/anno</div>

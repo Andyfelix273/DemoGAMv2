@@ -390,7 +390,7 @@
           <div class="es-kpi-unit">portafoglio</div>
           ${port.trend_vs_mese_prec_pct != null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
-        <div class="es-kpi-card" data-kpi-tip="P-2 — Media ponderata per superficie dell’EUI di tutti gli asset. Calcolata globalmente e per categoria se disponibile.">
+        <div class="es-kpi-card" data-kpi-tip="P-2 — EUI (Energy Use Intensity): consumo energetico annuo diviso la superficie lorda dell’edificio (kWh/m²/anno). Indica quanto energia consuma ogni metro quadro in un anno. Valore più basso = edificio più efficiente. Qui è la media ponderata per superficie di tutti gli asset attivi del portafoglio.">
           <div class="es-kpi-label">EUI medio portafoglio (P-2)</div>
           <div class="es-kpi-value">${fmtKpi(port.eui_medio, 1)}</div>
           <div class="es-kpi-unit">kWh/m²/anno</div>
