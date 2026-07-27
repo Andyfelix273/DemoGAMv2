@@ -1,0 +1,776 @@
+/*
+ * GAM Platform — Global Design Tokens
+ * Design: Midnight Blueprint (dark navy + accent ciano KeyBiz)
+ * Preserva fedelmente il design system del frontend vanilla (theme.css)
+ *
+ * Palette:
+ *   --bg-primary:    #0D1B2A  (base)
+ *   --bg-secondary:  #132338  (card/panel)
+ *   --bg-tertiary:   #1A2E45  (input/hover)
+ *   --accent:        #00A3E0  (ciano KeyBiz)
+ *   --text-primary:  #E8F4FD
+ *   --text-secondary:#7BAFC4
+ *   --text-muted:    #4A7A9B
+ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Tailwind theme mapping → CSS vars GAM ─────────────────────────── */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --color-card:                 var(--card);
+  --color-card-foreground:      var(--card-foreground);
+  --color-popover:              var(--popover);
+  --color-popover-foreground:   var(--popover-foreground);
+  --color-primary:              var(--primary);
+  --color-primary-foreground:   var(--primary-foreground);
+  --color-secondary:            var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:                var(--muted);
+  --color-muted-foreground:     var(--muted-foreground);
+  --color-accent:               var(--accent);
+  --color-accent-foreground:    var(--accent-foreground);
+  --color-destructive:          var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border:               var(--border);
+  --color-input:                var(--input);
+  --color-ring:                 var(--ring);
+  --color-sidebar:              var(--sidebar);
+  --color-sidebar-foreground:   var(--sidebar-foreground);
+  --color-sidebar-primary:      var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:       var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:       var(--sidebar-border);
+  --color-sidebar-ring:         var(--sidebar-ring);
+
+  /* Semantic accent colors (usabili come text-success, bg-warning, ecc.) */
+  --color-success:   var(--success);
+  --color-warning:   var(--warning);
+  --color-danger:    var(--danger);
+  --color-info:      var(--info);
+
+  /* Chart palette GAM */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Font families */
+  --font-sans:    'Inter', system-ui, sans-serif;
+  --font-display: 'Montserrat', 'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Dark theme (default) — identico a theme.css ───────────────────── */
+:root {
+  color-scheme: dark;
+  --radius: 0.375rem;
+
+  /* Backgrounds */
+  --background:  oklch(0.13 0.03 230);   /* #0D1B2A */
+  --card:        oklch(0.17 0.035 230);  /* #132338 */
+  --popover:     oklch(0.17 0.035 230);
+  --input:       oklch(0.21 0.04 230);   /* #1A2E45 */
+  --border:      oklch(0.25 0.05 230);   /* #1E3A5F */
+  --ring:        oklch(0.62 0.18 210);   /* #00A3E0 */
+
+  /* Foregrounds */
+  --foreground:           oklch(0.94 0.02 210);  /* #E8F4FD */
+  --card-foreground:      oklch(0.94 0.02 210);
+  --popover-foreground:   oklch(0.94 0.02 210);
+  --muted-foreground:     oklch(0.62 0.06 220);  /* #7BAFC4 */
+
+  /* Primary = accent ciano KeyBiz */
+  --primary:              oklch(0.62 0.18 210);  /* #00A3E0 */
+  --primary-foreground:   oklch(0.13 0.03 230);
+
+  /* Secondary = surface hover */
+  --secondary:            oklch(0.21 0.04 230);  /* #1A2E45 */
+  --secondary-foreground: oklch(0.94 0.02 210);
+
+  /* Muted = bg-tertiary */
+  --muted:                oklch(0.21 0.04 230);
+  --accent:               oklch(0.25 0.05 230);  /* #1E3A5F — hover subtile */
+  --accent-foreground:    oklch(0.94 0.02 210);
+
+  /* Destructive */
+  --destructive:          oklch(0.55 0.22 25);   /* #E74C3C */
+  --destructive-foreground: oklch(0.98 0 0);
+
+  /* Semantic */
+  --success: oklch(0.55 0.17 145);   /* #27AE60 */
+  --warning: oklch(0.72 0.17 70);    /* #F39C12 */
+  --danger:  oklch(0.55 0.22 25);    /* #E74C3C */
+  --info:    oklch(0.85 0.14 95);    /* #F1C40F */
+
+  /* Sidebar */
+  --sidebar:                    oklch(0.17 0.035 230);
+  --sidebar-foreground:         oklch(0.94 0.02 210);
+  --sidebar-primary:            oklch(0.62 0.18 210);
+  --sidebar-primary-foreground: oklch(0.13 0.03 230);
+  --sidebar-accent:             oklch(0.21 0.04 230);
+  --sidebar-accent-foreground:  oklch(0.94 0.02 210);
+  --sidebar-border:             oklch(0.25 0.05 230);
+  --sidebar-ring:               oklch(0.62 0.18 210);
+
+  /* Chart colors GAM */
+  --chart-1: oklch(0.62 0.18 210);   /* accent-blue  #00A3E0 */
+  --chart-2: oklch(0.55 0.17 145);   /* accent-green #27AE60 */
+  --chart-3: oklch(0.72 0.17 70);    /* accent-orange #F39C12 */
+  --chart-4: oklch(0.55 0.22 25);    /* accent-red   #E74C3C */
+  --chart-5: oklch(0.85 0.14 95);    /* accent-yellow #F1C40F */
+
+  /* Custom GAM vars (per compatibilità con componenti che li usano direttamente) */
+  --gam-bg-primary:    #0D1B2A;
+  --gam-bg-secondary:  #132338;
+  --gam-bg-tertiary:   #1A2E45;
+  --gam-border:        #1E3A5F;
+  --gam-text-primary:  #E8F4FD;
+  --gam-text-secondary:#7BAFC4;
+  --gam-text-muted:    #4A7A9B;
+  --gam-accent:        #00A3E0;
+  --gam-accent-hover:  #0090C8;
+  --gam-success:       #27AE60;
+  --gam-warning:       #F39C12;
+  --gam-danger:        #E74C3C;
+  --gam-info:          #F1C40F;
+  --gam-shadow:        0 4px 16px rgba(0,0,0,0.5);
+
+  /* Easing curves */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* ── Light theme (opzionale, non default) ───────────────────────────── */
+.light {
+  color-scheme: light;
+  --background:  oklch(0.97 0.005 230);
+  --card:        oklch(1 0 0);
+  --popover:     oklch(1 0 0);
+  --input:       oklch(0.95 0.005 230);
+  --border:      oklch(0.85 0.01 230);
+  --ring:        oklch(0.45 0.18 210);
+  --foreground:           oklch(0.15 0.02 230);
+  --card-foreground:      oklch(0.15 0.02 230);
+  --popover-foreground:   oklch(0.15 0.02 230);
+  --muted-foreground:     oklch(0.45 0.04 230);
+  --primary:              oklch(0.45 0.18 210);
+  --primary-foreground:   oklch(0.98 0 0);
+  --secondary:            oklch(0.95 0.005 230);
+  --secondary-foreground: oklch(0.15 0.02 230);
+  --muted:                oklch(0.95 0.005 230);
+  --accent:               oklch(0.93 0.01 230);
+  --accent-foreground:    oklch(0.15 0.02 230);
+  --destructive:          oklch(0.5 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.45 0.17 145);
+  --warning: oklch(0.6 0.17 70);
+  --danger:  oklch(0.5 0.22 25);
+  --info:    oklch(0.65 0.14 95);
+  --sidebar:                    oklch(0.98 0.002 230);
+  --sidebar-foreground:         oklch(0.15 0.02 230);
+  --sidebar-primary:            oklch(0.45 0.18 210);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent:             oklch(0.93 0.01 230);
+  --sidebar-accent-foreground:  oklch(0.15 0.02 230);
+  --sidebar-border:             oklch(0.85 0.01 230);
+  --sidebar-ring:               oklch(0.45 0.18 210);
+  --gam-bg-primary:    #f6f8fa;
+  --gam-bg-secondary:  #ffffff;
+  --gam-bg-tertiary:   #f0f2f5;
+  --gam-border:        #d0d7de;
+  --gam-text-primary:  #1f2328;
+  --gam-text-secondary:#57606a;
+  --gam-text-muted:    #8c959f;
+  --gam-accent:        #0969da;
+  --gam-accent-hover:  #0550ae;
+  --gam-success:       #1a7f37;
+  --gam-warning:       #e36209;
+  --gam-danger:        #cf222e;
+  --gam-info:          #9a6700;
+  --gam-shadow:        0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* ── Base layer ─────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+  #root {
+    height: 100%;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+  /* Cursori interattivi */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+  /* Scrollbar sottile stile GAM */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--gam-bg-primary); }
+  ::-webkit-scrollbar-thumb { background: var(--gam-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gam-text-muted); }
+}
+
+/* ── Component layer ────────────────────────────────────────────────── */
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .flex { min-height: 0; min-width: 0; }
+
+  @media (min-width: 640px) {
+    .container { padding-left: 1.5rem; padding-right: 1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .container { padding-left: 2rem; padding-right: 2rem; max-width: 1440px; }
+  }
+
+  /* ── GAM-specific utilities ── */
+  .gam-card {
+    background: var(--gam-bg-secondary);
+    border: 1px solid var(--gam-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--gam-shadow);
+  }
+  .gam-card-hover {
+    transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
+  }
+  .gam-card-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+  }
+  .gam-section-title {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gam-accent);
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gam-border);
+    margin-bottom: 0.75rem;
+  }
+  .gam-kpi-value {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .gam-label {
+    font-size: 0.6875rem;
+    color: var(--gam-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .gam-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .gam-input {
+    background: var(--gam-bg-tertiary);
+    border: 1px solid var(--gam-border);
+    color: var(--gam-text-primary);
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+    transition: border-color 150ms var(--ease-out);
+  }
+  .gam-input:focus {
+    outline: none;
+    border-color: var(--gam-accent);
+  }
+  .gam-btn-primary {
+    background: var(--gam-accent);
+    color: var(--gam-bg-primary);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--radius-sm);
+    transition: background 150ms var(--ease-out), transform 160ms var(--ease-out);
+  }
+  .gam-btn-primary:hover { background: var(--gam-accent-hover); }
+  .gam-btn-primary:active { transform: scale(0.97); }
+
+  /* Animazioni modal */
+  @keyframes gam-modal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .gam-modal-enter {
+    animation: gam-modal-in 220ms var(--ease-out) forwards;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   APP LAYOUT — Sidebar + Topbar + Content
+   Replica fedele del layout map.css vanilla
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Variabili layout */
+:root {
+  --topbar-h: 48px;
+  --sidebar-w: 52px;
+}
+
+/* Layout radice */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  bottom: 0;
+  background: var(--gam-bg-secondary);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  z-index: 1000;
+  gap: 2px;
+}
+
+.sidebar-logo {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.sidebar-logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+.sidebar-nav::-webkit-scrollbar { display: none; }
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+/* Pulsanti sidebar */
+.sb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  color: rgba(255,255,255,0.55);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+  flex-shrink: 0;
+}
+.sb-btn:hover {
+  background: rgba(0,163,224,0.18);
+  color: rgba(255,255,255,0.95);
+}
+.sb-btn.active {
+  background: rgba(0,163,224,0.22);
+  color: var(--gam-accent);
+}
+.sb-btn:active { transform: scale(0.95); }
+
+/* Dot allarmi */
+.sb-dot {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gam-danger);
+}
+.sb-dot.visible { display: block; }
+
+/* Divisore sidebar */
+.sb-divider {
+  width: 28px;
+  height: 1px;
+  background: rgba(0,163,224,0.25);
+  margin: 4px 0;
+}
+
+/* Avatar utente */
+.sb-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gam-accent);
+  color: var(--gam-bg-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+/* ── Topbar ───────────────────────────────────────────────────────── */
+.app-main {
+  margin-left: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  height: var(--topbar-h);
+  background: var(--gam-bg-secondary);
+  border-bottom: 1px solid var(--gam-border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 900;
+  flex-shrink: 0;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.topbar-logo {
+  height: 24px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--gam-text-primary);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbar-alarm-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--gam-text-secondary);
+  text-decoration: none;
+  transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.topbar-alarm-btn:hover {
+  background: rgba(0,163,224,0.15);
+  color: var(--gam-text-primary);
+}
+
+.topbar-alarm-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--gam-danger);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topbar-nome {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--gam-text-primary);
+}
+
+.topbar-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.topbar-badge.admin {
+  background: rgba(0,163,224,0.2);
+  color: var(--gam-accent);
+}
+.topbar-badge.user {
+  background: rgba(123,175,196,0.15);
+  color: var(--gam-text-secondary);
+}
+
+/* ── Area contenuto ───────────────────────────────────────────────── */
+.app-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOGIN PAGE — replica fedele del vanilla login.html
+   ═══════════════════════════════════════════════════════════════════ */
+.login-page {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+}
+
+/* Overlay scuro semi-trasparente sopra il bg */
+.login-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 0;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  background: rgba(19, 35, 56, 0.88);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 2.25rem 2rem 1.75rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  backdrop-filter: blur(6px);
+}
+
+/* Logo Metamorphosis (grande, in cima) */
+.login-meta-logo {
+  height: 72px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 6px;
+}
+
+/* Logo KeyBiz (più piccolo, sotto) */
+.login-keybiz-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 1.25rem;
+}
+
+.login-subtitle {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--gam-text-primary);
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.login-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Label login: normale, non uppercase */
+.login-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gam-text-secondary);
+}
+
+.login-input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--gam-text-primary);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  width: 100%;
+  transition: border-color 150ms var(--ease-out);
+}
+.login-input:focus {
+  outline: none;
+  border-color: var(--gam-accent);
+  background: rgba(255,255,255,0.09);
+}
+.login-input::placeholder { color: rgba(255,255,255,0.25); }
+
+.login-error {
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 4px;
+  color: var(--gam-danger);
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+}
+
+.login-btn {
+  background: var(--gam-accent);
+  color: var(--gam-bg-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  padding: 0.625rem 1rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), transform 160ms var(--ease-out);
+  width: 100%;
+  margin-top: 0.375rem;
+}
+.login-btn:hover { background: var(--gam-accent-hover); }
+.login-btn:active { transform: scale(0.97); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.login-hint {
+  font-size: 0.75rem;
+  color: var(--gam-text-muted);
+  text-align: center;
+  margin-top: 1.25rem;
+}
+
+/* Utility generica btn-primary (usata altrove) */
+.btn-primary {
+  background: var(--gam-accent);
+  color: var(--gam-bg-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), transform 160ms var(--ease-out);
+}
+.btn-primary:hover { background: var(--gam-accent-hover); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Input generico GAM (usato in altri form) */
+.gam-input {
+  background: var(--gam-bg-tertiary);
+  border: 1px solid var(--gam-border);
+  color: var(--gam-text-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.625rem;
+  font-size: 0.8125rem;
+  transition: border-color 150ms var(--ease-out);
+}
+.gam-input:focus { outline: none; border-color: var(--gam-accent); }
+.gam-input::placeholder { color: var(--gam-text-muted); }
