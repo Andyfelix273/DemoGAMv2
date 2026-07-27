@@ -179,10 +179,14 @@
     const AUTH    = { 'Authorization': 'Bearer ' + API.getToken() };
     const giorni  = parseInt(document.getElementById('filter-giorni').value);
 
-    // ── P-O1 / P-O3: KPI strip ───────────────────────────────────────────────
+    // ── P-O1 / P-O3 / P-O4: KPI strip (caricati in parallelo) ───────────────
     try {
-      const res = await fetch(`/api/occupancy/portfolio/summary?giorni=${giorni}`, { headers: AUTH });
-      const d   = res.ok ? await res.json() : null;
+      const [summaryRes, iaqRes] = await Promise.all([
+        fetch(`/api/occupancy/portfolio/summary?giorni=${giorni}`, { headers: AUTH }),
+        fetch(`/api/occupancy/portfolio/iaq_summary?giorni=${giorni}`, { headers: AUTH }).catch(() => null)
+      ]);
+      const d   = summaryRes.ok ? await summaryRes.json() : null;
+      const iaq = iaqRes && iaqRes.ok ? await iaqRes.json() : null;
       const strip = document.getElementById('occ-kpi-strip');
 
       if (d && d.avg_pct_portfolio !== null) {
@@ -191,6 +195,40 @@
         const deltaHtml = delta !== null && delta !== undefined
           ? `<div class="es-kpi-delta ${trendCl(delta)}">${trendIc(delta)} ${fmt(Math.abs(delta))}% vs periodo prec.</div>` : '';
 
+        // Card P-O3 e P-O4 con dati IAQ reali o placeholder
+        let po3Html, po4Html;
+        if (iaq && iaq.n_asset_iaq > 0) {
+          const co2Color  = iaq.asset_critici > 0 ? '#E74C3C' : iaq.avg_co2_portfolio > 800 ? '#F39C12' : '#27AE60';
+          const tempColor = iaq.avg_temp_portfolio > 26 || iaq.avg_temp_portfolio < 19 ? '#F39C12' : '#27AE60';
+          po3Html = `
+            <div class="es-kpi-card" data-kpi-tip="p-o3 — co2 media portafoglio: ${iaq.avg_co2_portfolio} ppm su ${iaq.n_asset_iaq} asset monitorati. asset critici (co2 > 1000 ppm per oltre 20% delle ore): ${iaq.asset_critici}.">
+              <div class="es-kpi-label"><i class="fa fa-wind" style="margin-right:4px;"></i>CO₂ media portafoglio (P-O3)</div>
+              <div class="es-kpi-value" style="color:${co2Color};">${fmtInt(iaq.avg_co2_portfolio)} <span style="font-size:14px;font-weight:400;">ppm</span></div>
+              <div class="es-kpi-unit">${iaq.asset_critici > 0
+                ? `<span style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:3px;"></i>${iaq.asset_critici} asset critici</span>`
+                : '<span style="color:#27AE60;"><i class="fa fa-check" style="margin-right:3px;"></i>qualità buona</span>'}</div>
+            </div>`;
+          po4Html = `
+            <div class="es-kpi-card" data-kpi-tip="p-o4 — comfort termico medio portafoglio: temperatura media ${iaq.avg_temp_portfolio}°C. zona di comfort 19–26°C.">
+              <div class="es-kpi-label"><i class="fa fa-thermometer-half" style="margin-right:4px;"></i>Comfort termico medio (P-O4)</div>
+              <div class="es-kpi-value" style="color:${tempColor};">${fmt(iaq.avg_temp_portfolio, 1)} <span style="font-size:14px;font-weight:400;">°C</span></div>
+              <div class="es-kpi-unit">${iaq.avg_temp_portfolio > 26 ? 'Troppo caldo' : iaq.avg_temp_portfolio < 19 ? 'Troppo freddo' : 'Nella norma'} · ${iaq.n_asset_iaq} asset</div>
+            </div>`;
+        } else {
+          po3Html = `
+            <div class="es-kpi-card" style="opacity:0.55;" data-kpi-tip="p-o3 — qualità aria portafoglio. non disponibile: sensori co2 non configurati.">
+              <div class="es-kpi-label"><i class="fa fa-wind" style="margin-right:4px;"></i>Asset qualità aria critica (P-O3)</div>
+              <div class="es-kpi-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+              <div class="es-kpi-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
+            </div>`;
+          po4Html = `
+            <div class="es-kpi-card" style="opacity:0.55;" data-kpi-tip="p-o4 — comfort termico. non disponibile: sensori T/RH non configurati.">
+              <div class="es-kpi-label"><i class="fa fa-thermometer-half" style="margin-right:4px;"></i>Comfort termico medio (P-O4)</div>
+              <div class="es-kpi-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+              <div class="es-kpi-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori T/RH non configurati</div>
+            </div>`;
+        }
+
         strip.innerHTML = `
           <div class="es-kpi-card" data-kpi-tip="p-o1 — tasso di utilizzo medio del portafoglio: media dei tassi di occupazione di tutti gli asset con sensori di presenza configurati nel periodo selezionato.">
             <div class="es-kpi-label"><i class="fa fa-users" style="margin-right:4px;"></i>Utilizzo medio portafoglio (P-O1)</div>
@@ -198,17 +236,8 @@
             <div class="es-kpi-unit">${d.n_asset_con_sensori} asset monitorati · ${giorni} giorni</div>
             ${deltaHtml}
           </div>
-          <div class="es-kpi-card" data-kpi-tip="p-o3 — numero di asset in cui la qualità dell'aria è risultata critica (co2 > soglia per più del 20% delle ore occupate). non disponibile: sensori co2 non configurati." style="opacity:0.55;">
-            <div class="es-kpi-label"><i class="fa fa-wind" style="margin-right:4px;"></i>Asset qualità aria critica (P-O3)</div>
-            <div class="es-kpi-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
-            <div class="es-kpi-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
-          </div>
-          <div class="es-kpi-card" data-kpi-tip="p-o4 — indice di comfort termico medio (pmv) del portafoglio. non disponibile: sensori temperatura/umidità non configurati." style="opacity:0.55;">
-            <div class="es-kpi-label"><i class="fa fa-thermometer-half" style="margin-right:4px;"></i>Comfort termico medio (P-O4)</div>
-            <div class="es-kpi-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
-            <div class="es-kpi-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori T/RH non configurati</div>
-          </div>`;
-
+          ${po3Html}
+          ${po4Html}`;
         // Tabella dettaglio asset
         const tbody = document.getElementById('occ-tbody');
         if (d.asset && d.asset.length) {
@@ -243,7 +272,8 @@
         document.getElementById('occ-tbody').innerHTML =
           '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun dato disponibile</td></tr>';
       }
-    } catch(e) { console.warn('[Occ P-O1]', e); }
+
+    } catch(e) { console.warn('[Occ P-O1/IAQ]', e); }
 
     // ── P-O2: Pattern settimanale ─────────────────────────────────────────────
     try {
@@ -339,38 +369,7 @@
       }
     } catch(e) { console.warn('[Occ P-O5]', e); }
 
-    // ── P-O3 / P-O4: IAQ portafoglio ──────────────────────────────────────────
-    try {
-      const res = await fetch(`/api/occupancy/portfolio/iaq_summary?giorni=${giorni}`, { headers: AUTH });
-      const d   = res.ok ? await res.json() : null;
-      if (d && d.n_asset_iaq > 0) {
-        // Aggiorna le card P-O3 e P-O4 nella strip già renderizzata
-        const strip = document.getElementById('occ-kpi-strip');
-        if (strip) {
-          // Rimuovi placeholder P-O3 e P-O4 e sostituisci con dati reali
-          const co2Color  = d.asset_critici > 0 ? '#E74C3C' : d.avg_co2_portfolio > 800 ? '#F39C12' : '#27AE60';
-          const tempColor = d.avg_temp_portfolio > 26 || d.avg_temp_portfolio < 19 ? '#F39C12' : '#27AE60';
-          // Crea o aggiorna le card IAQ
-          const po3Card = strip.querySelector('[data-iaq-po3]');
-          const po4Card = strip.querySelector('[data-iaq-po4]');
-          const iaqHtml = `
-            <div class="es-kpi-card" data-iaq-po3 data-kpi-tip="p-o3 — qualità aria portafoglio: co2 media ${d.avg_co2_portfolio} ppm su ${d.n_asset_iaq} asset monitorati. asset critici (co2 > 1000 ppm per oltre 20% delle ore): ${d.asset_critici}.">
-              <div class="es-kpi-label"><i class="fa fa-wind" style="margin-right:4px;"></i>CO₂ media portafoglio (P-O3)</div>
-              <div class="es-kpi-value" style="color:${co2Color};">${fmtInt(d.avg_co2_portfolio)} <span style="font-size:14px;font-weight:400;">ppm</span></div>
-              <div class="es-kpi-unit">${d.asset_critici > 0 ? `<span style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:3px;"></i>${d.asset_critici} asset critici</span>` : '<span style="color:#27AE60;"><i class="fa fa-check" style="margin-right:3px;"></i>qualità buona</span>'}</div>
-            </div>
-            <div class="es-kpi-card" data-iaq-po4 data-kpi-tip="p-o4 — comfort termico medio portafoglio: temperatura media ${d.avg_temp_portfolio}°C. zona di comfort 19–26°C.">
-              <div class="es-kpi-label"><i class="fa fa-thermometer-half" style="margin-right:4px;"></i>Comfort termico medio (P-O4)</div>
-              <div class="es-kpi-value" style="color:${tempColor};">${fmt(d.avg_temp_portfolio, 1)} <span style="font-size:14px;font-weight:400;">°C</span></div>
-              <div class="es-kpi-unit">${d.avg_temp_portfolio > 26 ? 'Troppo caldo' : d.avg_temp_portfolio < 19 ? 'Troppo freddo' : 'Nella norma'} · ${d.n_asset_iaq} asset</div>
-            </div>`;
-          // Rimuovi card placeholder P-O3/P-O4 (opacity:0.55) e aggiungi quelle reali
-          const placeholders = strip.querySelectorAll('[style*="opacity:0.55"]');
-          placeholders.forEach(p => p.remove());
-          strip.insertAdjacentHTML('beforeend', iaqHtml);
-        }
-      }
-    } catch(e) { console.warn('[Occ P-O3/P-O4]', e); }
+
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
