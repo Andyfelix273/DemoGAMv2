@@ -446,7 +446,9 @@
       // ── P-6: Ranking EUI — Bar Chart orizzontale raggruppato per categoria ────
       const ranking = [...(port.ranking_asset || [])].sort((a, b) => b.eui - a.eui);
       if (ranking.length > 0) {
-        // Altezza fissa 160px come P-7, barre alte proporzionate al numero di asset
+        // Altezza fissa 160px, barre con width esplicito uguale a P-7
+        // P-7: 7 barre in 160px con bargap default (0.2) => barre alte ~18px
+        // Forziamo width=18px su tutte le barre indipendentemente dal numero di asset
         const rankH = 160;
         document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
 
@@ -462,6 +464,7 @@
             name: catLabels[cat] || cat,
             y: rows.map(r => r.nome),
             x: rows.map(r => r.eui),
+            width: rows.map(() => 0.6), // larghezza fissa categoria: 0.6 in unità asse Y
             marker: { color: rows.map(r => EUI_CLASS_COLOR[r.eui_class] || catColors[cat] || '#58A6FF'), opacity: 0.85 },
             text: rows.map(r => fmt(r.eui)),
             textposition: 'outside',
