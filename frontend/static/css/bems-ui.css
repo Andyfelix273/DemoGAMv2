@@ -1406,6 +1406,27 @@ a.module-card:hover {
 }
 .ee-no-data i { font-size: 28px; opacity: 0.4; }
 
+/* ─── ES-SECTION: card generica condivisa tra summary e modale ───────────────*/
+.es-section {
+  background: var(--card-bg, #0d1b2a);
+  border: 1px solid var(--border-color, rgba(30,58,95,0.6));
+  border-radius: 8px;
+  padding: 14px 16px 10px;
+  margin-bottom: 14px;
+}
+.es-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #7BAFC4);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.es-section-title i { color: var(--accent-blue, #58A6FF); }
+
 /* ─── ENERGY SUMMARY — pagina portafoglio ────────────────────────────────────*/
 .es-kpi-strip {
   display: grid;

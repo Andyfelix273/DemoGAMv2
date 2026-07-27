@@ -564,6 +564,65 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             })
         return result
 
+    # ── E-6: Costo energetico per persona-ora ────────────────────────────────
+    @app.get("/api/efficiency/{asset_id}/kpi_e6", tags=["efficiency"])
+    def get_kpi_e6(asset_id: int,
+                   giorni: int = 30,
+                   _=Depends(get_utente_corrente),
+                   db=Depends(get_db)):
+        """Costo energetico per persona-ora nel periodo.
+        Formula: costo_totale_eur / Σ(presenti × ore_slot).
+        Restituisce {costo_persona_ora, costo_totale_eur, persona_ore_totali, giorni, trend_pct}."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+        ts_prev  = ts_from - timedelta(days=giorni)
+        unit_cost = _get_unit_cost(cur, asset_id, "ELECTRICITY")
+
+        def _calc(ts_start, ts_end):
+            # Costo energetico nel periodo
+            cur.execute("""
+                SELECT COALESCE(SUM(kwh),0) AS kwh_tot
+                FROM (
+                    SELECT AVG(t.power_kw) * 24.0 AS kwh
+                    FROM telemetry t
+                    JOIN plants p ON p.plant_id = t.plant_id AND p.asset_id = t.asset_id
+                    WHERE t.asset_id = %s AND t.ts >= %s AND t.ts < %s
+                      AND p.tipo NOT IN ('contatore') AND t.power_kw IS NOT NULL
+                    GROUP BY DATE(t.ts AT TIME ZONE 'Europe/Rome')
+                ) sub
+            """, (asset_id, ts_start, ts_end))
+            kwh_tot = float(cur.fetchone()["kwh_tot"] or 0)
+            costo = round(kwh_tot * unit_cost, 2)
+
+            # Persona-ore: ogni snapshot è un'istantanea (assumiamo slot di 15 min = 0.25h)
+            cur.execute("""
+                SELECT COALESCE(SUM(presenti) * 0.25, 0) AS persona_ore
+                FROM occupancy_snapshot
+                WHERE asset_id = %s AND ts >= %s AND ts < %s
+            """, (asset_id, ts_start, ts_end))
+            persona_ore = float(cur.fetchone()["persona_ore"] or 0)
+            return costo, persona_ore
+
+        costo_cur, po_cur   = _calc(ts_from, now)
+        costo_prev, po_prev = _calc(ts_prev, ts_from)
+
+        costo_ph_cur  = round(costo_cur  / po_cur,  4) if po_cur  > 0 else None
+        costo_ph_prev = round(costo_prev / po_prev, 4) if po_prev > 0 else None
+
+        trend_pct = None
+        if costo_ph_cur is not None and costo_ph_prev and costo_ph_prev > 0:
+            trend_pct = round((costo_ph_cur - costo_ph_prev) / costo_ph_prev * 100, 1)
+
+        return {
+            "costo_persona_ora": costo_ph_cur,
+            "costo_totale_eur": round(costo_cur, 2),
+            "persona_ore_totali": round(po_cur, 1),
+            "giorni": giorni,
+            "trend_pct": trend_pct,
+            "disponibile": po_cur > 0,
+        }
+
     # ── E-12: Correlazione occupancy vs costo ────────────────────────────────
     @app.get("/api/efficiency/{asset_id}/occupancy", tags=["efficiency"])
     def get_occupancy_vs_cost(asset_id: int,
