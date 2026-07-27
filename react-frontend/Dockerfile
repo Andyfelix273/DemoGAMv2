@@ -6,18 +6,19 @@ WORKDIR /app
 # Installa pnpm
 RUN npm install -g pnpm
 
-# Copia manifest e installa dipendenze
-COPY package.json pnpm-lock.yaml ./
+# Copia TUTTO il sorgente (inclusa cartella patches/ necessaria per pnpm)
+COPY . .
+
+# Installa dipendenze (patches/ è già presente)
 RUN pnpm install --frozen-lockfile
 
-# Copia sorgenti e build
-COPY . .
+# Build produzione
 RUN pnpm build
 
 # ── Stage 2: Serve con nginx ──────────────────────────────────────────
 FROM nginx:1.27-alpine
 
-# Copia build React
+# Copia build React (output in dist/public per questo progetto Vite)
 COPY --from=builder /app/dist/public /usr/share/nginx/html
 
 # Copia configurazione nginx con proxy API
