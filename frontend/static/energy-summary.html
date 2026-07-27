@@ -239,27 +239,25 @@
       <!-- SEZIONE ANALISI (P-6, P-7) -->
       <div class="es-page-section-sep"><i class="fa fa-microscope"></i>Analisi</div>
 
-      <!-- Riga: ranking EUI P-6 (sinistra) + profilo gg settimana P-7 (destra) -->
-      <div class="es-row-2" style="margin-bottom:14px;">
+      <!-- Riga: P-6 con classi inline (sinistra) + colonna P-7 + P-10 (destra) -->
+      <div class="es-row-2" style="margin-bottom:14px;align-items:start;">
+        <!-- SINISTRA: P-6 ranking EUI + distribuzione classi come testo -->
         <div class="es-section" style="margin-bottom:0;">
           <div class="es-section-title"><i class="fa fa-sort-amount-down"></i>Benchmark interno: EUI per asset (P-6)</div>
           <div class="es-ranking-chart" id="chart-ranking-eui"></div>
+          <!-- Distribuzione classi energetiche come badge testo -->
+          <div id="classi-text-wrap" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color,rgba(30,58,95,0.4));"></div>
         </div>
-        <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-calendar-week"></i>Consumi per giorno settimana (kWh/m²) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-7</span></div>
-          <div class="es-trend-chart" id="chart-weekday" style="height:220px;"></div>
-        </div>
-      </div>
-
-      <!-- Distribuzione classi energetiche (complemento P-6) -->
-      <div class="es-row-2" style="margin-bottom:14px;">
-        <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-chart-pie"></i>Distribuzione classi energetiche</div>
-          <div class="es-classi-chart" id="chart-classi"></div>
-        </div>
-        <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-bullseye"></i>Costo cumulato YTD vs Budget <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-10</span></div>
-          <div class="es-trend-chart" id="chart-budget" style="height:220px;"></div>
+        <!-- DESTRA: P-7 dimezzato + P-10 sotto -->
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title"><i class="fa fa-calendar-week"></i>Consumi per giorno settimana (kWh/m²) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-7</span></div>
+            <div class="es-trend-chart" id="chart-weekday" style="height:160px;"></div>
+          </div>
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title"><i class="fa fa-bullseye"></i>Costo cumulato YTD vs Budget <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-10</span></div>
+            <div class="es-trend-chart" id="chart-budget" style="height:160px;"></div>
+          </div>
         </div>
       </div>
 
@@ -481,26 +479,36 @@
           }), plotCfg);
       }
 
-      // ── Distribuzione classi energetiche — donut ─────────────────────────────
+      // ── Distribuzione classi energetiche — badge testo sotto P-6 ──────────────────
       const classiCount = {};
+      const totAsset = (port.ranking_asset || []).length;
       (port.ranking_asset || []).forEach(a => {
         const c = a.eui_class || 'N/D';
         classiCount[c] = (classiCount[c] || 0) + 1;
       });
-      const classiLabels = Object.keys(classiCount);
-      if (classiLabels.length > 0) {
-        Plotly.newPlot('chart-classi',
-          [{ type: 'pie', hole: 0.48,
-             labels: classiLabels,
-             values: Object.values(classiCount),
-             marker: { colors: classiLabels.map(c => EUI_CLASS_COLOR[c] || '#888') },
-             textinfo: 'label+percent',
-             textfont: { size: 11 },
-             hovertemplate: 'Classe %{label}: %{value} asset<extra></extra>' }],
-          Object.assign({}, baseLayout, {
-            margin: { t: 8, r: 10, b: 8, l: 10 },
-            legend: { orientation: 'v', x: 1.02, y: 0.5, font: { size: 10 } }
-          }), plotCfg);
+      const classiWrap = document.getElementById('classi-text-wrap');
+      if (classiWrap) {
+        const classiOrd = ['A4','A3','A2','A1','B','C','D','E','F','G','N/D'];
+        const voci = classiOrd
+          .filter(c => classiCount[c])
+          .map(c => {
+            const n = classiCount[c];
+            const pct = totAsset > 0 ? Math.round(n / totAsset * 100) : 0;
+            const col = EUI_CLASS_COLOR[c] || '#888';
+            return `<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${col};flex-shrink:0;"></span>
+              <span style="font-size:11px;font-weight:700;color:${col};">${c}</span>
+              <span style="font-size:11px;color:var(--text-primary);">${n} asset</span>
+              <span style="font-size:10px;color:var(--text-muted);">(${pct}%)</span>
+            </span>`;
+          });
+        if (voci.length > 0) {
+          classiWrap.innerHTML = `
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px;">Distribuzione classi energetiche</div>
+            <div style="display:flex;flex-wrap:wrap;gap:2px;">${voci.join('')}</div>`;
+        } else {
+          classiWrap.innerHTML = '<span style="font-size:11px;color:var(--text-muted);">Nessuna classe energetica disponibile</span>';
+        }
       }
 
       // ── P-8: Trend YoY — Grouped Bar ────────────────────────────────────────
@@ -714,7 +722,7 @@
           <div class="es-kpi-label" style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:5px;"></i>Errore caricamento</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${e.message}</div>
         </div>`;
-      ['chart-trend-kwh','chart-ranking-eui','chart-classi'].forEach(id => {
+      ['chart-trend-kwh','chart-ranking-eui'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Dati non disponibili</div>';
       });
