@@ -190,7 +190,7 @@
 [data-kpi-tip]::after {
   content:attr(data-kpi-tip);
   position:absolute;
-  top:calc(100% + 8px);
+  bottom:calc(100% + 8px);
   left:0;
   transform:none;
   background:#0a1628;
@@ -212,11 +212,11 @@
 [data-kpi-tip]::before {
   content:'';
   position:absolute;
-  top:calc(100% + 2px);
+  bottom:calc(100% + 2px);
   left:16px;
   transform:none;
   border:6px solid transparent;
-  border-bottom-color:rgba(88,166,255,0.25);
+  border-top-color:rgba(88,166,255,0.25);
   z-index:9999;
   pointer-events:none;
   opacity:0;
