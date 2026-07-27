@@ -552,9 +552,419 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
             if kwh is not None:
                 ts_val = occ["ts"].isoformat() if isinstance(occ["ts"], datetime) else occ["ts"]
                 result.append({
-                    "ts": ts_val,
+                                        "ts": ts_val,
                     "pct_occupancy": float(occ["pct_occ"]),
                     "kwh_elettrico": round(float(kwh), 4),
                 })
-
         return result
+
+    # ── KPI Occupancy — Modulo BEMS ───────────────────────────────────────────
+
+    @app.get("/api/occupancy/{asset_id}/summary", tags=["occupancy-kpi"])
+    def get_occupancy_kpi_summary(asset_id: int,
+                                   giorni: int = 30,
+                                   _=Depends(get_utente_corrente),
+                                   db=Depends(get_db)):
+        """O-1: Tasso Occupazione Medio — media pct_occupancy nelle ore lavorative."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+        ts_prev = ts_from - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT working_hours_start, working_hours_end, working_days
+            FROM assets WHERE id = %s
+        """, (asset_id,))
+        asset = cur.fetchone()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset non trovato")
+
+        wh_start = int(str(asset["working_hours_start"] or "08:00:00")[:2])
+        wh_end   = int(str(asset["working_hours_end"]   or "19:00:00")[:2])
+        wd_str   = asset["working_days"] or "MON,TUE,WED,THU,FRI"
+        wd_map   = {"MON":1,"TUE":2,"WED":3,"THU":4,"FRI":5,"SAT":6,"SUN":7}
+        wd_list  = [wd_map[d.strip()] for d in wd_str.split(",") if d.strip() in wd_map]
+
+        def _avg_occ(ts_a, ts_b):
+            cur.execute("""
+                SELECT ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct,
+                       COUNT(DISTINCT s.zone_id) AS zone_count
+                FROM occupancy_snapshot s
+                WHERE s.asset_id = %s
+                  AND s.ts >= %s AND s.ts < %s
+                  AND EXTRACT(hour FROM s.ts AT TIME ZONE 'Europe/Rome') >= %s
+                  AND EXTRACT(hour FROM s.ts AT TIME ZONE 'Europe/Rome') < %s
+                  AND EXTRACT(isodow FROM s.ts AT TIME ZONE 'Europe/Rome') = ANY(%s)
+            """, (asset_id, ts_a, ts_b, wh_start, wh_end, wd_list))
+            r = cur.fetchone()
+            return float(r["avg_pct"] or 0), int(r["zone_count"] or 0)
+
+        avg_curr, zone_count = _avg_occ(ts_from, now)
+        avg_prev, _          = _avg_occ(ts_prev, ts_from)
+
+        delta_pct = None
+        if avg_prev > 0:
+            delta_pct = round(((avg_curr - avg_prev) / avg_prev) * 100, 1)
+
+        cur.execute("""
+            SELECT COUNT(DISTINCT ts) AS n_snap
+            FROM occupancy_snapshot
+            WHERE asset_id = %s AND ts >= %s AND ts < %s
+              AND EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome') >= %s
+              AND EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome') < %s
+              AND EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome') = ANY(%s)
+        """, (asset_id, ts_from, now, wh_start, wh_end, wd_list))
+        n_snap = cur.fetchone()["n_snap"] or 0
+
+        return {
+            "asset_id": asset_id,
+            "giorni": giorni,
+            "avg_pct_occupancy": avg_curr,
+            "avg_pct_prev": avg_prev,
+            "delta_pct": delta_pct,
+            "zone_count": zone_count,
+            "n_snapshot_lavorativi": n_snap,
+            "working_hours": f"{wh_start:02d}:00\u2013{wh_end:02d}:00",
+            "working_days": wd_str,
+        }
+
+    @app.get("/api/occupancy/{asset_id}/heatmap", tags=["occupancy-kpi"])
+    def get_occupancy_heatmap(asset_id: int,
+                               giorni: int = 30,
+                               _=Depends(get_utente_corrente),
+                               db=Depends(get_db)):
+        """O-5: Heatmap Occupancy zona x ora — matrice zona_nome x ora del giorno."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT oz.nome AS zona_nome,
+                   EXTRACT(hour FROM s.ts AT TIME ZONE 'Europe/Rome')::int AS ora,
+                   ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct
+            FROM occupancy_snapshot s
+            JOIN occupancy_zones oz ON oz.id = s.zone_id
+            WHERE s.asset_id = %s AND s.ts >= %s AND s.ts < %s
+            GROUP BY oz.nome, ora
+            ORDER BY oz.nome, ora
+        """, (asset_id, ts_from, now))
+        rows = cur.fetchall()
+
+        if not rows:
+            raise HTTPException(status_code=404, detail="Nessun dato occupancy disponibile")
+
+        zones_set = sorted(set(r["zona_nome"] for r in rows))
+        matrix = {z: [None]*24 for z in zones_set}
+        for r in rows:
+            matrix[r["zona_nome"]][r["ora"]] = float(r["avg_pct"])
+
+        return {
+            "asset_id": asset_id,
+            "giorni": giorni,
+            "zones": zones_set,
+            "hours": list(range(24)),
+            "matrix": [matrix[z] for z in zones_set],
+        }
+
+    @app.get("/api/occupancy/{asset_id}/daily_profile", tags=["occupancy-kpi"])
+    def get_occupancy_daily_profile(asset_id: int,
+                                     giorni: int = 30,
+                                     _=Depends(get_utente_corrente),
+                                     db=Depends(get_db)):
+        """O-7: Profilo Giornaliero 24h — media pct_occupancy per ora del giorno."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome')::int AS ora,
+                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   ROUND(MAX(pct_occupancy)::numeric, 1) AS max_pct,
+                   ROUND(MIN(pct_occupancy)::numeric, 1) AS min_pct
+            FROM occupancy_snapshot
+            WHERE asset_id = %s AND ts >= %s AND ts < %s
+            GROUP BY ora
+            ORDER BY ora
+        """, (asset_id, ts_from, now))
+        rows = cur.fetchall()
+
+        if not rows:
+            raise HTTPException(status_code=404, detail="Nessun dato occupancy disponibile")
+
+        cur.execute("""
+            SELECT working_hours_start, working_hours_end FROM assets WHERE id = %s
+        """, (asset_id,))
+        asset = cur.fetchone()
+        wh_start = int(str(asset["working_hours_start"] or "08:00:00")[:2]) if asset else 8
+        wh_end   = int(str(asset["working_hours_end"]   or "19:00:00")[:2]) if asset else 19
+
+        ora_map = {r["ora"]: r for r in rows}
+        result = []
+        for h in range(24):
+            r = ora_map.get(h)
+            result.append({
+                "ora": h,
+                "avg_pct": float(r["avg_pct"]) if r else None,
+                "max_pct": float(r["max_pct"]) if r else None,
+                "min_pct": float(r["min_pct"]) if r else None,
+                "lavorativo": wh_start <= h < wh_end,
+            })
+
+        return {
+            "asset_id": asset_id,
+            "giorni": giorni,
+            "data": result,
+            "working_hours_start": wh_start,
+            "working_hours_end": wh_end,
+        }
+
+    @app.get("/api/occupancy/{asset_id}/weekly_pattern", tags=["occupancy-kpi"])
+    def get_occupancy_weekly_pattern(asset_id: int,
+                                      giorni: int = 90,
+                                      _=Depends(get_utente_corrente),
+                                      db=Depends(get_db)):
+        """O-6: Pattern Settimanale — media pct_occupancy per giorno della settimana."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome')::int AS dow,
+                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT DATE(ts AT TIME ZONE 'Europe/Rome')) AS n_giorni
+            FROM occupancy_snapshot
+            WHERE asset_id = %s AND ts >= %s AND ts < %s
+            GROUP BY dow
+            ORDER BY dow
+        """, (asset_id, ts_from, now))
+        rows = cur.fetchall()
+
+        cur.execute("SELECT working_days FROM assets WHERE id = %s", (asset_id,))
+        asset = cur.fetchone()
+        wd_str = asset["working_days"] if asset else "MON,TUE,WED,THU,FRI"
+        wd_map = {"MON":1,"TUE":2,"WED":3,"THU":4,"FRI":5,"SAT":6,"SUN":7}
+        wd_list = [wd_map[d.strip()] for d in wd_str.split(",") if d.strip() in wd_map]
+
+        dow_labels = {1:"Lun",2:"Mar",3:"Mer",4:"Gio",5:"Ven",6:"Sab",7:"Dom"}
+        dow_map = {r["dow"]: r for r in rows}
+        result = []
+        for dow in range(1, 8):
+            r = dow_map.get(dow)
+            result.append({
+                "dow": dow,
+                "label": dow_labels[dow],
+                "avg_pct": float(r["avg_pct"]) if r else None,
+                "n_giorni": int(r["n_giorni"]) if r else 0,
+                "lavorativo": dow in wd_list,
+            })
+
+        return {
+            "asset_id": asset_id,
+            "giorni": giorni,
+            "settimane_stimate": round(giorni / 7),
+            "dati_parziali": giorni < 84,
+            "data": result,
+        }
+
+    @app.get("/api/occupancy/{asset_id}/ovi", tags=["occupancy-kpi"])
+    def get_occupancy_ovi(asset_id: int,
+                           mesi: int = 6,
+                           _=Depends(get_utente_corrente),
+                           db=Depends(get_db)):
+        """O-11: OVI Trend — Occupancy Variability Index mensile (coefficiente di variazione)."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=mesi * 30)
+
+        cur.execute("""
+            SELECT DATE_TRUNC('month', ts AT TIME ZONE 'Europe/Rome') AS mese,
+                   ROUND(AVG(pct_occupancy)::numeric, 2) AS avg_pct,
+                   ROUND(STDDEV(pct_occupancy)::numeric, 2) AS stddev_pct,
+                   COUNT(*) AS n
+            FROM occupancy_snapshot
+            WHERE asset_id = %s AND ts >= %s AND ts < %s
+            GROUP BY mese
+            ORDER BY mese
+        """, (asset_id, ts_from, now))
+        rows = cur.fetchall()
+
+        result = []
+        for r in rows:
+            avg = float(r["avg_pct"] or 0)
+            std = float(r["stddev_pct"] or 0)
+            ovi = round(std / avg, 3) if avg > 0 else None
+            result.append({
+                "mese": str(r["mese"])[:7],
+                "avg_pct": avg,
+                "stddev_pct": std,
+                "ovi": ovi,
+                "n": int(r["n"]),
+            })
+
+        return {
+            "asset_id": asset_id,
+            "mesi": mesi,
+            "dati_parziali": mesi < 8,
+            "data": result,
+        }
+
+    # ── KPI Occupancy Portafoglio ─────────────────────────────────────────────
+
+    @app.get("/api/occupancy/portfolio/kpi_summary", tags=["occupancy-kpi"])
+    def get_occupancy_portfolio_kpi(giorni: int = 30,
+                                     _=Depends(get_utente_corrente),
+                                     db=Depends(get_db)):
+        """P-O1: Tasso Utilizzo Medio Portafoglio — per ogni asset con dati occupancy."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT s.asset_id,
+                   a.nome,
+                   a.tipo,
+                   a.superficie_mq,
+                   ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT s.zone_id) AS zone_count
+            FROM occupancy_snapshot s
+            JOIN assets a ON a.id = s.asset_id
+            WHERE s.ts >= %s AND s.ts < %s
+            GROUP BY s.asset_id, a.nome, a.tipo, a.superficie_mq
+            ORDER BY avg_pct DESC
+        """, (ts_from, now))
+        rows = cur.fetchall()
+
+        if not rows:
+            return {"giorni": giorni, "avg_portafoglio": None, "asset": []}
+
+        assets_list = []
+        for r in rows:
+            assets_list.append({
+                "asset_id": r["asset_id"],
+                "nome": r["nome"],
+                "tipo": r["tipo"],
+                "superficie_mq": float(r["superficie_mq"] or 0),
+                "avg_pct": float(r["avg_pct"] or 0),
+                "zone_count": int(r["zone_count"]),
+            })
+
+        avg_portafoglio = round(sum(a["avg_pct"] for a in assets_list) / len(assets_list), 1)
+
+        return {
+            "giorni": giorni,
+            "avg_portafoglio": avg_portafoglio,
+            "n_asset": len(assets_list),
+            "asset": assets_list,
+        }
+
+    @app.get("/api/occupancy/portfolio/weekly_pattern", tags=["occupancy-kpi"])
+    def get_occupancy_portfolio_weekly(giorni: int = 90,
+                                        _=Depends(get_utente_corrente),
+                                        db=Depends(get_db)):
+        """P-O2: Pattern Settimanale Portafoglio — media portafoglio per giorno settimana."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome')::int AS dow,
+                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT asset_id) AS n_asset
+            FROM occupancy_snapshot
+            WHERE ts >= %s AND ts < %s
+            GROUP BY dow
+            ORDER BY dow
+        """, (ts_from, now))
+        rows = cur.fetchall()
+
+        dow_labels = {1:"Lun",2:"Mar",3:"Mer",4:"Gio",5:"Ven",6:"Sab",7:"Dom"}
+        dow_map = {r["dow"]: r for r in rows}
+        result = []
+        for dow in range(1, 8):
+            r = dow_map.get(dow)
+            result.append({
+                "dow": dow,
+                "label": dow_labels[dow],
+                "avg_pct": float(r["avg_pct"]) if r else None,
+                "n_asset": int(r["n_asset"]) if r else 0,
+                "weekend": dow >= 6,
+            })
+
+        return {
+            "giorni": giorni,
+            "dati_parziali": giorni < 84,
+            "data": result,
+        }
+
+    @app.get("/api/occupancy/portfolio/scatter", tags=["occupancy-kpi"])
+    def get_occupancy_portfolio_scatter(giorni: int = 365,
+                                         _=Depends(get_utente_corrente),
+                                         db=Depends(get_db)):
+        """P-O5: Scatter Occupancy vs EUI — per ogni asset con dati occupancy."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from_occ = now - timedelta(days=30)
+        ts_from_energy = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT asset_id, ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct
+            FROM occupancy_snapshot
+            WHERE ts >= %s AND ts < %s
+            GROUP BY asset_id
+        """, (ts_from_occ, now))
+        occ_map = {r["asset_id"]: float(r["avg_pct"]) for r in cur.fetchall()}
+
+        if not occ_map:
+            return {"data": [], "median_occupancy": None, "median_eui": None}
+
+        cur.execute("""
+            SELECT r.asset_id,
+                   SUM(r.valore) AS kwh_totale,
+                   a.superficie_mq,
+                   a.nome,
+                   a.tipo,
+                   a.building_category,
+                   a.energy_class
+            FROM energy_readings r
+            JOIN energy_meters m ON m.id = r.meter_id
+            JOIN assets a ON a.id = r.asset_id
+            WHERE r.asset_id = ANY(%s) AND m.tipo = 'elettrico'
+              AND r.ts >= %s AND r.ts < %s
+            GROUP BY r.asset_id, a.superficie_mq, a.nome, a.tipo, a.building_category, a.energy_class
+        """, (list(occ_map.keys()), ts_from_energy, now))
+        energy_rows = cur.fetchall()
+
+        result = []
+        for r in energy_rows:
+            aid = r["asset_id"]
+            if aid not in occ_map:
+                continue
+            sup = float(r["superficie_mq"] or 1)
+            kwh = float(r["kwh_totale"] or 0)
+            days_ratio = giorni / 365.0
+            eui = round(kwh / sup / days_ratio, 1) if sup > 0 and days_ratio > 0 else None
+            result.append({
+                "asset_id": aid,
+                "nome": r["nome"],
+                "tipo": r["tipo"],
+                "building_category": r["building_category"],
+                "energy_class": r["energy_class"],
+                "superficie_mq": sup,
+                "avg_pct_occupancy": occ_map[aid],
+                "eui_kwh_mq_anno": eui,
+            })
+
+        if result:
+            occ_vals = sorted([x["avg_pct_occupancy"] for x in result])
+            eui_vals = sorted([x["eui_kwh_mq_anno"] for x in result if x["eui_kwh_mq_anno"]])
+            med_occ = occ_vals[len(occ_vals)//2] if occ_vals else None
+            med_eui = eui_vals[len(eui_vals)//2] if eui_vals else None
+        else:
+            med_occ = med_eui = None
+
+        return {
+            "data": result,
+            "median_occupancy": med_occ,
+            "median_eui": med_eui,
+            "giorni_energia": giorni,
+        }

@@ -567,16 +567,30 @@ async function _edmCaricaZone(assetId) {
   const el = document.getElementById('edm-panel-zone');
   if (!el) return;
   try {
-    const [zonesRes, telRes, summaryRes] = await Promise.all([
-      fetch(`/api/bems/buildings/${assetId}/zones`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }),
-      fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null),
-      fetch('/api/occupancy/summary', { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).catch(() => null)
+    const AUTH = { 'Authorization': 'Bearer ' + API.getToken() };
+    const [zonesRes, telRes, summaryRes, occKpiRes, heatmapRes, dailyRes, weeklyRes, oviRes] = await Promise.all([
+      fetch(`/api/bems/buildings/${assetId}/zones`, { headers: AUTH }),
+      fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: AUTH }).catch(() => null),
+      fetch('/api/occupancy/summary', { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/summary?giorni=30`, { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/heatmap?giorni=30`, { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/daily_profile?giorni=30`, { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/weekly_pattern?giorni=90`, { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/ovi?mesi=6`, { headers: AUTH }).catch(() => null)
     ]);
     if (!zonesRes.ok) throw new Error('HTTP ' + zonesRes.status);
     const zones      = await zonesRes.json();
     const telData    = telRes && telRes.ok ? await telRes.json() : {};
     const occItems   = summaryRes && summaryRes.ok ? await summaryRes.json() : [];
     const occ        = occItems.find(i => i.asset_id === assetId);
+    const occKpi     = occKpiRes && occKpiRes.ok ? await occKpiRes.json() : null;
+    const heatmap    = heatmapRes && heatmapRes.ok ? await heatmapRes.json() : null;
+    const daily      = dailyRes && dailyRes.ok ? await dailyRes.json() : null;
+    const weekly     = weeklyRes && weeklyRes.ok ? await weeklyRes.json() : null;
+    const ovi        = oviRes && oviRes.ok ? await oviRes.json() : null;
+
+    const fmt = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: true });
+    const fmtInt = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0, useGrouping: true });
 
     if (!zones || zones.length === 0) {
       el.innerHTML = `<p style="color:var(--text-secondary,#7BAFC4);font-size:13px;text-align:center;padding:20px;">Nessuna zona BEMS configurata per questo asset.</p>`;
@@ -594,7 +608,7 @@ async function _edmCaricaZone(assetId) {
                        bagno:'fa-male', reception:'fa-info-circle', server:'fa-server',
                        archivio:'fa-archive', altro:'fa-th-large' };
 
-    // ── KPI Occupancy aggregati ──────────────────────────────────────────
+    // ── KPI Occupancy aggregati (realtime) ───────────────────────────────
     const telValues    = Object.values(telData);
     const zoneOccupate = telValues.filter(z => z.occupancy === true).length;
     const zoneTotali   = telValues.length;
@@ -603,7 +617,95 @@ async function _edmCaricaZone(assetId) {
     const capMax       = occ ? occ.capacita_max : zones.reduce((s, z) => s + (z.capacita_persone || 0), 0);
     const statoColor   = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#F39C12' : pct > 0 ? '#27AE60' : '#95A5A6';
 
-    let html = `
+    // ── Sezione KPI BEMS Occupancy (O-1..O-11) ───────────────────────────
+    let occKpiHtml = '';
+    if (occKpi) {
+      const avgPct    = occKpi.avg_pct_occupancy || 0;
+      const delta     = occKpi.delta_pct;
+      const kpiColor  = avgPct >= 70 ? '#27AE60' : avgPct >= 40 ? '#F39C12' : '#58A6FF';
+      const deltaHtml = delta !== null && delta !== undefined
+        ? `<div class="ee-kpi-card-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">
+             ${delta > 0 ? '<i class="fa fa-arrow-up"></i>' : delta < 0 ? '<i class="fa fa-arrow-down"></i>' : ''}
+             ${fmt(Math.abs(delta))}% vs periodo prec.
+           </div>` : '';
+
+      occKpiHtml = `
+        <div class="ee-section-title" style="margin-bottom:10px;" data-kpi-tip="kpi occupancy — analisi del tasso di utilizzo degli spazi nel periodo selezionato, basata su sensori di presenza configurati nelle zone dell'asset."><i class="fa fa-users"></i>Occupancy e Utilizzo Spazi</div>
+        <div class="ee-kpi-grid" style="margin-bottom:12px;">
+          <div class="ee-kpi-card" data-kpi-tip="o-1 — tasso di occupazione medio nelle ore lavorative configurate (${occKpi.working_hours}). media ponderata su ${occKpi.zone_count} zone monitorate negli ultimi 30 giorni.">
+            <div class="ee-kpi-card-label">Tasso occupazione (O-1)</div>
+            <div class="ee-kpi-card-value" style="color:${kpiColor};">${fmt(avgPct)}%</div>
+            <div class="ee-kpi-card-unit">${occKpi.zone_count} zone · ${occKpi.working_hours}</div>
+            ${deltaHtml}
+          </div>
+          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-2 — co2 media nelle ore occupate. non disponibile: sensori co2 non configurati per questo asset.">
+            <div class="ee-kpi-card-label">CO₂ media (O-2)</div>
+            <div class="ee-kpi-card-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+            <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
+          </div>
+          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-3 — percentuale ore con qualità aria critica. non disponibile: sensori co2 non configurati.">
+            <div class="ee-kpi-card-label">Qualità aria critica (O-3)</div>
+            <div class="ee-kpi-card-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+            <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
+          </div>
+          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-4 — spreco stimato impianti attivi in assenza di occupancy. non disponibile: consumo per piano non configurato.">
+            <div class="ee-kpi-card-label">Spreco stimato (O-4)</div>
+            <div class="ee-kpi-card-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+            <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>consumo per piano non disponibile</div>
+          </div>
+        </div>
+        <div class="ee-section-title" style="margin-bottom:10px;" data-kpi-tip="analisi occupancy — grafici interattivi per l'analisi dettagliata dell'utilizzo degli spazi: heatmap zona×ora, profilo giornaliero, pattern settimanale."><i class="fa fa-chart-bar"></i>Analisi Occupancy</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title" data-kpi-tip="o-5 — distribuzione dell'occupancy per zona e fascia oraria. scala cromatica da blu (bassa) a rosso (alta occupancy). rivela quali zone sono più usate e in quali orari."><i class="fa fa-th"></i>Heatmap zona × ora <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-5</span></div>
+            <div class="ee-chart" id="occ-chart-heatmap-${assetId}"></div>
+          </div>
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title" data-kpi-tip="o-7 — profilo di occupancy medio nelle 24 ore. rivela l'orario reale di arrivo, il picco mattutino, il calo post-pranzo e l'orario reale di uscita. area grigia = orario lavorativo configurato."><i class="fa fa-clock"></i>Profilo giornaliero 24h <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-7</span></div>
+            <div class="ee-chart" id="occ-chart-daily-${assetId}"></div>
+          </div>
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title" data-kpi-tip="o-6 — tasso medio di occupazione per giorno della settimana. rivela la distribuzione reale della presenza, incluso l'effetto dello smart working. barre blu = giorni lavorativi, grigio = weekend."><i class="fa fa-calendar-week"></i>Pattern settimanale <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-6</span>
+              ${weekly && weekly.dati_parziali ? '<span style="font-size:9px;background:rgba(243,156,18,0.15);color:#F39C12;border:1px solid rgba(243,156,18,0.4);border-radius:8px;padding:1px 6px;margin-left:4px;">dati parziali</span>' : ''}
+            </div>
+            <div class="ee-chart" id="occ-chart-weekly-${assetId}"></div>
+          </div>
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title" data-kpi-tip="o-8 — qualità aria per zona (co2, temperatura, umidità). non disponibile: sensori ambientali non configurati per questo asset."><i class="fa fa-wind"></i>Qualità aria per zona <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-8</span></div>
+            <div class="ee-chart" id="occ-chart-air-${assetId}" style="display:flex;align-items:center;justify-content:center;min-height:120px;">
+              <div style="text-align:center;color:var(--text-muted,#4A7A9B);font-size:12px;">
+                <i class="fa fa-lock" style="font-size:20px;margin-bottom:6px;display:block;"></i>
+                Sensori ambientali non configurati
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ee-section-title" style="margin-bottom:10px;" data-kpi-tip="trend occupancy — andamento temporale dell'indice di variabilità dell'occupancy (ovi). un valore basso indica pattern stabile e prevedibile, ottimale per la programmazione automatica degli impianti."><i class="fa fa-chart-line"></i>Trend Occupancy</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title" data-kpi-tip="o-11 — occupancy variance index (ovi): deviazione standard normalizzata del tasso di occupazione giornaliero. fascia verde ovi < 30% (pattern stabile), fascia rossa ovi > 60% (comportamento erratico)."><i class="fa fa-wave-square"></i>OVI — Variabilità occupancy <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-11</span>
+              ${ovi && ovi.dati_parziali ? '<span style="font-size:9px;background:rgba(243,156,18,0.15);color:#F39C12;border:1px solid rgba(243,156,18,0.4);border-radius:8px;padding:1px 6px;margin-left:4px;">dati parziali</span>' : ''}
+            </div>
+            <div class="ee-chart" id="occ-chart-ovi-${assetId}"></div>
+          </div>
+          <div class="es-section" style="margin-bottom:0;">
+            <div class="es-section-title" data-kpi-tip="o-9 — consumo per piano vs occupancy. non disponibile: consumo per piano non configurato per questo asset."><i class="fa fa-layer-group"></i>Consumo piano vs occupancy <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-9</span></div>
+            <div class="ee-chart" id="occ-chart-floor-${assetId}" style="display:flex;align-items:center;justify-content:center;min-height:120px;">
+              <div style="text-align:center;color:var(--text-muted,#4A7A9B);font-size:12px;">
+                <i class="fa fa-lock" style="font-size:20px;margin-bottom:6px;display:block;"></i>
+                Consumo per piano non disponibile
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ee-section-title" style="margin-bottom:10px;"><i class="fa fa-th-large"></i>Zone BEMS — Stato Attuale</div>`;
+    } else {
+      occKpiHtml = `<div style="padding:12px;background:var(--bg-secondary,#132338);border-radius:8px;margin-bottom:16px;font-size:12px;color:var(--text-secondary,#7BAFC4);">
+        <i class="fa fa-info-circle" style="margin-right:6px;"></i>Sensori di presenza non configurati per questo asset. Configurare i sensori nel gateway e l'orario lavorativo in anagrafica per abilitare i KPI Occupancy.
+      </div>`;
+    }
+
+    let html = occKpiHtml + `
       <div class="edm-kpi-grid" style="margin-bottom:12px;">
         <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:${statoColor}">${presenti}</div><div class="edm-kpi-lbl">Presenti</div></div>
         <div class="edm-kpi-card"><div class="edm-kpi-val">${capMax || '–'}</div><div class="edm-kpi-lbl">Capienza max</div></div>
@@ -649,6 +751,145 @@ async function _edmCaricaZone(assetId) {
       html += `</div></div>`;
     }
     el.innerHTML = html;
+
+    // ── Render grafici Plotly Occupancy ──────────────────────────────────
+    if (typeof Plotly === 'undefined' || !occKpi) return;
+    const plotCfg = { responsive: true, displayModeBar: false };
+    const plotLayout = (extra) => {
+      const base = {
+        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        margin: { t: 6, r: 10, b: 42, l: 46 },
+        font: { family: 'Inter,sans-serif', size: 11, color: '#7BAFC4' },
+        legend: { orientation: 'h', y: -0.22, x: 0, font: { size: 10 }, bgcolor: 'transparent' },
+        xaxis: { gridcolor: 'rgba(30,58,95,0.4)', zerolinecolor: 'rgba(30,58,95,0.4)', tickfont: { size: 10 } },
+        yaxis: { gridcolor: 'rgba(30,58,95,0.4)', zerolinecolor: 'rgba(30,58,95,0.4)', tickfont: { size: 10 } },
+      };
+      if (!extra) return base;
+      const merged = Object.assign({}, base, extra);
+      if (extra.xaxis) merged.xaxis = Object.assign({}, base.xaxis, extra.xaxis);
+      if (extra.yaxis) merged.yaxis = Object.assign({}, base.yaxis, extra.yaxis);
+      if (extra.legend) merged.legend = Object.assign({}, base.legend, extra.legend);
+      if (extra.margin) merged.margin = Object.assign({}, base.margin, extra.margin);
+      return merged;
+    };
+
+    // O-5: Heatmap zona × ora
+    if (heatmap && heatmap.zones && heatmap.zones.length) {
+      const hmEl = document.getElementById(`occ-chart-heatmap-${assetId}`);
+      if (hmEl) {
+        Plotly.newPlot(hmEl, [{
+          type: 'heatmap',
+          z: heatmap.matrix,
+          x: heatmap.hours.map(h => `${String(h).padStart(2,'0')}:00`),
+          y: heatmap.zones,
+          colorscale: [[0,'rgba(30,58,95,0.2)'],[0.3,'#1E88E5'],[0.6,'#F39C12'],[1,'#E74C3C']],
+          zmin: 0, zmax: 100,
+          hoverongaps: false,
+          hovertemplate: '<b>%{y}</b><br>Ora: %{x}<br>Occupancy: %{z:.1f}%<extra></extra>',
+          colorbar: { thickness: 12, len: 0.8, title: { text: '%', side: 'right' }, tickfont: { size: 9 } }
+        }], plotLayout({
+          margin: { t: 6, r: 60, b: 42, l: 120 },
+          xaxis: { title: { text: 'Ora del giorno', standoff: 4 } },
+          yaxis: { title: '' }
+        }), plotCfg);
+      }
+    }
+
+    // O-7: Profilo giornaliero 24h
+    if (daily && daily.data && daily.data.length) {
+      const dlEl = document.getElementById(`occ-chart-daily-${assetId}`);
+      if (dlEl) {
+        const whStart = daily.working_hours_start || 8;
+        const whEnd   = daily.working_hours_end   || 19;
+        const shapes  = [{ type:'rect', x0: whStart, x1: whEnd, y0:0, y1:1, yref:'paper',
+          fillcolor:'rgba(30,58,95,0.15)', line:{ width:0 } }];
+        Plotly.newPlot(dlEl, [
+          {
+            x: daily.data.map(r => r.ora),
+            y: daily.data.map(r => r.avg_pct),
+            name: 'Media', type: 'scatter', mode: 'lines',
+            line: { color: '#1E88E5', width: 2 },
+            fill: 'tozeroy', fillcolor: 'rgba(30,136,229,0.15)',
+            hovertemplate: 'Ora %{x}:00<br>Occupancy: %{y:.1f}%<extra></extra>'
+          },
+          {
+            x: daily.data.map(r => r.ora),
+            y: daily.data.map(r => r.max_pct),
+            name: 'Max', type: 'scatter', mode: 'lines',
+            line: { color: '#F39C12', width: 1, dash: 'dot' },
+            hovertemplate: 'Ora %{x}:00<br>Max: %{y:.1f}%<extra></extra>'
+          }
+        ], plotLayout({
+          shapes,
+          xaxis: { title: { text: 'Ora', standoff: 4 }, tickvals: [0,4,8,12,16,20,23] },
+          yaxis: { title: { text: '%', standoff: 4 }, range: [0, 100] }
+        }), plotCfg);
+      }
+    }
+
+    // O-6: Pattern settimanale
+    if (weekly && weekly.data && weekly.data.length) {
+      const wkEl = document.getElementById(`occ-chart-weekly-${assetId}`);
+      if (wkEl) {
+        const avgLav = weekly.data.filter(d => d.lavorativo && d.avg_pct !== null).reduce((s,d,_,a) => s + d.avg_pct/a.length, 0);
+        Plotly.newPlot(wkEl, [
+          {
+            x: weekly.data.map(d => d.label),
+            y: weekly.data.map(d => d.avg_pct),
+            type: 'bar',
+            marker: { color: weekly.data.map(d => d.lavorativo ? '#1E88E5' : '#4A7A9B') },
+            hovertemplate: '<b>%{x}</b><br>Occupancy: %{y:.1f}%<extra></extra>'
+          },
+          {
+            x: weekly.data.map(d => d.label),
+            y: weekly.data.map(() => avgLav),
+            type: 'scatter', mode: 'lines', name: 'Media lavorativi',
+            line: { color: '#F39C12', width: 1.5, dash: 'dash' },
+            hoverinfo: 'skip'
+          }
+        ], plotLayout({
+          bargap: 0.25,
+          xaxis: { title: '' },
+          yaxis: { title: { text: '%', standoff: 4 }, range: [0, 100] }
+        }), plotCfg);
+      }
+    }
+
+    // O-11: OVI trend (coefficiente di variazione: stddev/avg, range 0..∞, >1 = alta variabilità)
+    if (ovi && ovi.data && ovi.data.length) {
+      const oviEl = document.getElementById(`occ-chart-ovi-${assetId}`);
+      if (oviEl) {
+        // OVI è CV (stddev/avg): 0=nessuna varianza, >1=alta. Soglie: verde<0.5, rosso>1.0
+        const oviVals = ovi.data.map(r => r.ovi);
+        const maxOvi  = Math.max(1.5, ...oviVals.filter(v => v !== null));
+        const shapes  = [
+          { type:'rect', x0: ovi.data[0]?.mese, x1: ovi.data[ovi.data.length-1]?.mese,
+            y0: 0, y1: 0.5, yref:'y', fillcolor:'rgba(39,174,96,0.08)', line:{ width:0 } },
+          { type:'rect', x0: ovi.data[0]?.mese, x1: ovi.data[ovi.data.length-1]?.mese,
+            y0: 1.0, y1: maxOvi, yref:'y', fillcolor:'rgba(231,76,60,0.08)', line:{ width:0 } }
+        ];
+        const oviAnnotations = [
+          { x: ovi.data[0]?.mese, y: 0.25, xref:'x', yref:'y', text:'Stabile', showarrow:false,
+            font:{ size:9, color:'#27AE60' }, xanchor:'left' },
+          { x: ovi.data[0]?.mese, y: 1.1, xref:'x', yref:'y', text:'Erratico', showarrow:false,
+            font:{ size:9, color:'#E74C3C' }, xanchor:'left' }
+        ];
+        Plotly.newPlot(oviEl, [{
+          x: ovi.data.map(r => r.mese),
+          y: oviVals,
+          type: 'scatter', mode: 'lines+markers',
+          line: { color: '#1E88E5', width: 2 },
+          marker: { size: 6, color: oviVals.map(v => v === null ? '#4A7A9B' : v < 0.5 ? '#27AE60' : v > 1.0 ? '#E74C3C' : '#F39C12') },
+          hovertemplate: '<b>%{x}</b><br>OVI: %{y:.3f}<br>' +
+            '<extra>0=stabile · >1=erratico</extra>'
+        }], plotLayout({
+          shapes, annotations: oviAnnotations,
+          xaxis: { title: '' },
+          yaxis: { title: { text: 'CV (OVI)', standoff: 4 }, range: [0, maxOvi * 1.1] }
+        }), plotCfg);
+      }
+    }
+
   } catch(e) {
     if (el) el.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Zone & Occupancy non disponibili: ${e.message}</p>`;
   }
