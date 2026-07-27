@@ -305,7 +305,7 @@
     // ── Init ──────────────────────────────────────────────────────────────────
     requireAuth();
     renderSidebar('eff-bollette', 'efficiency');
-    renderTopbar('eff-bollette', { titolo: 'Asset Efficiency', modulo: 'efficiency' });
+    renderTopbar('eff-bollette', { titolo: 'Asset Efficiency', modulo: 'efficiency', filtri: false });
     i18n.apply();
 
     document.getElementById('search-input').addEventListener('input', applicaFiltri);
