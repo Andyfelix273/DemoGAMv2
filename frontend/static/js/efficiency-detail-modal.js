@@ -185,46 +185,7 @@
 .edm-inv-empty {
   text-align:center;padding:24px;color:var(--text-secondary,#7BAFC4);font-size:12px;
 }
-/* ── Tooltip scuro KPI (data-kpi-tip) ────────────────────────────────────── */
-[data-kpi-tip] { position:relative; cursor:help; }
-[data-kpi-tip]::after {
-  content:attr(data-kpi-tip);
-  position:absolute;
-  bottom:calc(100% + 8px);
-  left:0;
-  transform:none;
-  background:#0a1628;
-  color:#c8dff0;
-  border:1px solid rgba(88,166,255,0.25);
-  border-radius:6px;
-  padding:8px 12px;
-  font-size:11px;
-  font-weight:400;
-  line-height:1.5;
-  white-space:normal;
-  width:320px;
-  box-shadow:0 4px 20px rgba(0,0,0,0.65);
-  z-index:9999;
-  pointer-events:none;
-  opacity:0;
-  transition:opacity 0.15s ease;
-}
-[data-kpi-tip]::before {
-  content:'';
-  position:absolute;
-  bottom:calc(100% + 2px);
-  left:16px;
-  transform:none;
-  border:6px solid transparent;
-  border-top-color:rgba(88,166,255,0.25);
-  z-index:9999;
-  pointer-events:none;
-  opacity:0;
-  transition:opacity 0.15s ease;
-}
-[data-kpi-tip]:hover::after,
-[data-kpi-tip]:hover::before { opacity:1; }
-</style>`;
+/* tooltip data-kpi-tip definito in bems-ui.css */
   document.body.appendChild(el.firstElementChild);
   document.body.appendChild(el.lastElementChild); // <style>
 
