@@ -326,6 +326,8 @@
 
   const fmt    = (v, d=1) => v == null ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
   const fmtInt = (v)      => v == null ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
+  // fmtKpi: separatore migliaia sempre presente (anche per numeri a 4 cifre), usato solo nelle card KPI
+  const fmtKpi = (v, d=0) => v == null ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: true });
   const trendCl = (v) => v == null ? 'flat' : v > 0 ? 'up' : 'down';
   const trendIc = (v) => v == null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
 
@@ -343,23 +345,23 @@
       strip.innerHTML = `
         <div class="es-kpi-card">
           <div class="es-kpi-label">Costo energetico mese (P-1)</div>
-          <div class="es-kpi-value">€ ${fmtInt(port.costo_mese_eur)}</div>
+          <div class="es-kpi-value">€ ${fmtKpi(port.costo_mese_eur)}</div>
           <div class="es-kpi-unit">portafoglio</div>
           ${port.trend_vs_mese_prec_pct != null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
         <div class="es-kpi-card">
           <div class="es-kpi-label">EUI medio portafoglio (P-2)</div>
-          <div class="es-kpi-value">${fmt(port.eui_medio)}</div>
+          <div class="es-kpi-value">${fmtKpi(port.eui_medio, 1)}</div>
           <div class="es-kpi-unit">kWh/m²/anno</div>
         </div>
         <div class="es-kpi-card">
           <div class="es-kpi-label">Consumi mese</div>
-          <div class="es-kpi-value">${fmtInt(port.kwh_mese_totale)}</div>
+          <div class="es-kpi-value">${fmtKpi(port.kwh_mese_totale)}</div>
           <div class="es-kpi-unit">kWh</div>
         </div>
         <div class="es-kpi-card">
           <div class="es-kpi-label">CO₂ equivalente mese</div>
-          <div class="es-kpi-value">${fmtInt(port.co2_kg_mese)}</div>
+          <div class="es-kpi-value">${fmtKpi(port.co2_kg_mese)}</div>
           <div class="es-kpi-unit">kg CO₂</div>
         </div>
         <div class="es-kpi-card">
