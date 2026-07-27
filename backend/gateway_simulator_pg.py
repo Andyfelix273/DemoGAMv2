@@ -87,6 +87,9 @@ BASELINE_KW = {
     "altri_carichi":  3.0,   # Altri carichi: prese, stampanti — picco in orario, stand-by di notte
 }
 
+# Giorni lavorativi (0=Lunedì, 6=Domenica) — da working_days dell'asset
+WORKING_DAYS = {0, 1, 2, 3, 4}  # MON-FRI
+
 # ── Funzioni di simulazione ─────────────────────────────────────────────────
 
 def profilo_orario(ora: int, tipo: str) -> float:
@@ -144,7 +147,12 @@ def profilo_orario(ora: int, tipo: str) -> float:
 def simula_zona(zone_id: str, floor_id: str, tipo: str, capacita: int, ts: datetime) -> dict:
     """Genera una lettura di telemetria per una zona."""
     ora = ts.hour
-    occ_factor = profilo_orario(ora, tipo)
+    # Nei giorni non lavorativi (sab/dom) occupancy = 0 per tutte le zone tranne server
+    is_working_day = ts.weekday() in WORKING_DAYS
+    if not is_working_day and tipo not in ("server", "server_room"):
+        occ_factor = 0.0
+    else:
+        occ_factor = profilo_orario(ora, tipo)
     noise = random.gauss(0, 0.05)
     occ_factor = max(0.0, min(1.0, occ_factor + noise))
 

@@ -1348,11 +1348,22 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
         """
         Occupancy % con risoluzione oraria per il grafico Consumi vs Occupancy.
         Per ogni ora: SUM(persone_presenti) / capienza_totale * 100.
-        Ore fuori orario lavorativo → 0%.
+        Giorni non lavorativi (working_days dell'asset) → occ_pct = 0.
         """
         now = datetime.utcnow()
         ts_from = now - timedelta(hours=ore)
+        # Mappa nomi giorno (ISO weekday: 1=Mon..7=Sun) a indice Python (0=Mon..6=Sun)
+        DAY_MAP = {"MON": 0, "TUE": 1, "WED": 2, "THU": 3, "FRI": 4, "SAT": 5, "SUN": 6}
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Orario e giorni lavorativi dell'asset
+            cur.execute("""
+                SELECT working_hours_start, working_hours_end, working_days
+                FROM assets WHERE id = %s
+            """, (asset_id,))
+            asset = cur.fetchone()
+            wd_str = (asset["working_days"] or "MON,TUE,WED,THU,FRI") if asset else "MON,TUE,WED,THU,FRI"
+            working_days_set = {DAY_MAP[d.strip()] for d in wd_str.split(",") if d.strip() in DAY_MAP}
+
             # Capienza totale fissa
             cur.execute("""
                 SELECT COALESCE(SUM(capacita_persone), 1) AS cap_tot
@@ -1382,10 +1393,15 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
                 ORDER BY ora_ts
             """, (cap_tot, asset_id, ts_from, now))
             rows = cur.fetchall()
-        return [
-            {
-                "ts":      r["ora_ts"].isoformat(),
-                "occ_pct": float(r["occ_pct"]) if r["occ_pct"] is not None else 0.0,
-            }
-            for r in rows
-        ]
+        result = []
+        for r in rows:
+            ora_ts = r["ora_ts"]
+            # Converti in ora locale per verificare il giorno della settimana
+            # ora_ts è già in Europe/Rome grazie a AT TIME ZONE nella query
+            weekday = ora_ts.weekday()  # 0=Lun, 6=Dom
+            is_working = weekday in working_days_set
+            result.append({
+                "ts":      ora_ts.isoformat(),
+                "occ_pct": float(r["occ_pct"]) if (r["occ_pct"] is not None and is_working) else 0.0,
+            })
+        return result
