@@ -1896,14 +1896,23 @@ async function _edmCaricaEfficienza(assetId) {
     if (typeof Plotly === 'undefined') return;
 
     const plotCfg = { responsive: true, displayModeBar: false };
-    const plotLayout = (extra) => Object.assign({
-      paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-      margin: { t: 10, r: 10, b: 30, l: 45 },
-      font: { family: 'Inter,sans-serif', size: 11, color: 'var(--text-secondary,#7BAFC4)' },
-      legend: { orientation: 'h', y: -0.25, font: { size: 10 } },
-      xaxis: { gridcolor: 'rgba(30,58,95,0.5)', zerolinecolor: 'rgba(30,58,95,0.5)' },
-      yaxis: { gridcolor: 'rgba(30,58,95,0.5)', zerolinecolor: 'rgba(30,58,95,0.5)' },
-    }, extra || {});
+    const plotLayout = (extra) => {
+      const base = {
+        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        margin: { t: 6, r: 10, b: 42, l: 46 },
+        font: { family: 'Inter,sans-serif', size: 11, color: '#7BAFC4' },
+        legend: { orientation: 'h', y: -0.22, x: 0, font: { size: 10 }, bgcolor: 'transparent' },
+        xaxis: { gridcolor: 'rgba(30,58,95,0.4)', zerolinecolor: 'rgba(30,58,95,0.4)', tickfont: { size: 10 } },
+        yaxis: { gridcolor: 'rgba(30,58,95,0.4)', zerolinecolor: 'rgba(30,58,95,0.4)', tickfont: { size: 10 } },
+      };
+      if (!extra) return base;
+      const merged = Object.assign({}, base, extra);
+      if (extra.xaxis) merged.xaxis = Object.assign({}, base.xaxis, extra.xaxis);
+      if (extra.yaxis) merged.yaxis = Object.assign({}, base.yaxis, extra.yaxis);
+      if (extra.legend) merged.legend = Object.assign({}, base.legend, extra.legend);
+      if (extra.margin) merged.margin = Object.assign({}, base.margin, extra.margin);
+      return merged;
+    };
 
     // Profilo 24h (area stacked)
     if (p24 && p24.length) {
@@ -2136,10 +2145,11 @@ async function _edmCaricaEfficienza(assetId) {
         Plotly.react(`ee-chart-trend-kwh-${assetId}`, traces,
           plotLayout({
             barmode: 'group',
-            margin: { t: 8, r: 12, b: 50, l: 55 },
-            yaxis: { title: { text: yTitle, standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
-            xaxis: { tickangle: -30, gridcolor: 'rgba(30,58,95,0.5)' },
-            legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+            bargap: 0.25,
+            margin: { t: 6, r: 10, b: 50, l: 50 },
+            yaxis: { title: { text: yTitle, font: { size: 9 }, standoff: 4 }, tickformat: ',.0f' },
+            xaxis: { tickangle: -30, tickfont: { size: 8 } },
+            legend: { y: -0.28 }
           }), plotCfg);
       };
 
@@ -2261,10 +2271,11 @@ async function _edmCaricaEfficienza(assetId) {
             Plotly.newPlot(`ee-chart-commodity14-${assetId}`, commTraces,
               plotLayout({
                 barmode: 'stack',
-                margin: { t: 8, r: 12, b: 50, l: 55 },
-                yaxis: { title: { text: '€', standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
-                xaxis: { tickangle: -30, gridcolor: 'rgba(30,58,95,0.5)' },
-                legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+                bargap: 0.25,
+                margin: { t: 6, r: 10, b: 50, l: 50 },
+                yaxis: { title: { text: '€', font: { size: 9 }, standoff: 4 }, tickformat: ',.0f' },
+                xaxis: { tickangle: -30, tickfont: { size: 8 } },
+                legend: { y: -0.28 }
               }), plotCfg);
           } else if (commEl) {
             commEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-layer-group"></i>Solo elettricità disponibile</div>';
