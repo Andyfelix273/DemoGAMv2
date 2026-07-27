@@ -1775,25 +1775,25 @@ async function _edmCaricaEfficienza(assetId) {
     const kpiCards = `
       <div class="ee-kpi-grid">
         <div class="ee-kpi-section-sep" style="grid-column:1/-1;"><i class="fa fa-gauge-high" style="margin-right:5px;"></i>Sintesi</div>
-        <div class="ee-kpi-card" data-kpi-tip="E-1 — Costo energetico totale del mese corrente (dato parziale, aggiornato in tempo reale). Include tutte le commodity attive.">
+        <div class="ee-kpi-card" data-kpi-tip="e-1 — costo energetico totale del mese corrente (dato parziale, aggiornato in tempo reale). include tutte le commodity attive.">
           <div class="ee-kpi-card-label">Costo energetico</div>
           <div class="ee-kpi-card-value">€ ${fmtInt(kpi.costo_mese_eur)}</div>
           <div class="ee-kpi-card-unit">mese · solo elettricità</div>
           ${kpi.trend_vs_mese_prec_pct !== null ? `<div class="ee-kpi-card-delta ${trendClass(kpi.trend_vs_mese_prec_pct)}">${trendIcon(kpi.trend_vs_mese_prec_pct)} ${fmt(Math.abs(kpi.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
-        <div class="ee-kpi-card" data-kpi-tip="E-2 — Costo energetico mensile normalizzato sulla superficie lorda dell’asset. Confrontato con il benchmark di settore per categoria.">
+        <div class="ee-kpi-card" data-kpi-tip="e-2 — costo energetico mensile normalizzato sulla superficie lorda dell’asset. confrontato con il benchmark di settore per categoria.">
           <div class="ee-kpi-card-label">Costo per m²</div>
           <div class="ee-kpi-card-value">€ ${fmt(kpi.costo_mq_eur, 2)}</div>
           <div class="ee-kpi-card-unit">€/m² · mese corrente</div>
           ${bmHtml}
         </div>
 
-        <div class="ee-kpi-card accent-orange" data-kpi-tip="Consumo elettrico totale dell’asset nel mese corrente.">
+        <div class="ee-kpi-card accent-orange" data-kpi-tip="consumo elettrico totale dell’asset nel mese corrente.">
           <div class="ee-kpi-card-label">Consumi mese</div>
           <div class="ee-kpi-card-value">${fmtInt(kpi.kwh_mese)}</div>
           <div class="ee-kpi-card-unit">kWh</div>
         </div>
-        <div class="ee-kpi-card" data-kpi-tip="Emissioni di CO₂ equivalente stimate per il mese corrente (fattore 0,233 kg CO₂/kWh — rete elettrica italiana).">
+        <div class="ee-kpi-card" data-kpi-tip="emissioni di co₂ equivalente stimate per il mese corrente (fattore 0,233 kg co₂/kwh — rete elettrica italiana).">
           <div class="ee-kpi-card-label">CO₂ equivalente</div>
           <div class="ee-kpi-card-value">${fmtInt(kpi.co2_kg_mese)}</div>
           <div class="ee-kpi-card-unit">kg CO₂ · mese</div>
@@ -1814,20 +1814,20 @@ async function _edmCaricaEfficienza(assetId) {
               stroke-dashoffset="${(circ * 0.25).toFixed(1)}" stroke-linecap="round"/>
             <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="9" font-weight="700" fill="${offColor}">${fmt(pctOff)}%</text>
           </svg>`;
-          return `<div class="ee-kpi-card ${offOk ? 'accent-green' : 'accent-red'}" data-kpi-tip="E-5 — Quota percentuale dei consumi avvenuti fuori dall’orario lavorativo configurato in anagrafica (notti, weekend, festivi).">
+          return `<div class="ee-kpi-card ${offOk ? 'accent-green' : 'accent-red'}" data-kpi-tip="e-5 — quota percentuale dei consumi avvenuti fuori dall’orario lavorativo configurato in anagrafica (notti, weekend, festivi).">
             <div class="ee-kpi-card-label">Fuori orario (E-5)</div>
             ${donutSvg}
             <div class="ee-kpi-card-unit" style="color:${offColor};font-weight:600;">${fmt(pctOff)}% dei consumi mensili</div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${offOk ? 'Nella norma (&lt;15%)' : 'Attenzione: sopra soglia'}</div>
           </div>`;
         })() : ''}
-        <div class="ee-kpi-card ${alTot > 0 ? (alCrit > 0 ? 'accent-red' : 'accent-orange') : 'accent-green'}" data-kpi-tip="E-4 — Allarmi energetici attivi (non chiusi) per severità: Critici, Medi, Bassi.">
+        <div class="ee-kpi-card ${alTot > 0 ? (alCrit > 0 ? 'accent-red' : 'accent-orange') : 'accent-green'}" data-kpi-tip="e-4 — allarmi energetici attivi (non chiusi) per severità: critici, medi, bassi.">
           <div class="ee-kpi-card-label">Allarmi energetici</div>
           <div class="ee-kpi-card-value" style="color:${alTot > 0 ? (alCrit > 0 ? '#E74C3C' : '#F39C12') : '#27AE60'};">${alTot}</div>
           <div class="ee-kpi-card-unit">attivi non risolti</div>
           ${alarmiBadge}
         </div>
-        <div class="ee-kpi-card" style="border-color:${kpi.eui_gauge_color === 'green' ? 'rgba(39,174,96,0.4)' : kpi.eui_gauge_color === 'red' ? 'rgba(231,76,60,0.4)' : 'rgba(243,156,18,0.4)'};" data-kpi-tip="E-3 — EUI (Energy Use Intensity): consumo energetico degli ultimi 12 mesi diviso la superficie lorda (kWh/m²/anno). Indica quanto energia consuma ogni metro quadro in un anno. Valore più basso = edificio più efficiente. La classe energetica è calcolata su questo valore secondo la normativa UNI/TS 11300.">
+        <div class="ee-kpi-card" style="border-color:${kpi.eui_gauge_color === 'green' ? 'rgba(39,174,96,0.4)' : kpi.eui_gauge_color === 'red' ? 'rgba(231,76,60,0.4)' : 'rgba(243,156,18,0.4)'};" data-kpi-tip="e-3 — eui (energy use intensity): consumo energetico degli ultimi 12 mesi diviso la superficie lorda (kwh/m²/anno). indica quanto energia consuma ogni metro quadro in un anno. valore più basso = edificio più efficiente. la classe energetica è calcolata su questo valore secondo la normativa uni/ts 11300.">
           <div class="ee-kpi-card-label">EUI · Cl. ${kpi.energy_class_calcolata}${kpi.energy_class_certificata ? ' (cert. ' + kpi.energy_class_certificata + ')' : ''} · ${kpi.building_category || 'OFFICE'}</div>
           ${gaugeEuiSvg(kpi.eui_kwh_mq_anno, kpi.energy_class_calcolata, kpi.eui_gauge_color)}
           <div class="ee-kpi-card-unit">${fmt(kpi.eui_kwh_mq_anno)} kWh/m²/anno</div>
@@ -1838,7 +1838,7 @@ async function _edmCaricaEfficienza(assetId) {
 
     // ── Sezione Analisi ───────────────────────────────────────────────────
     const analisiHtml = `
-      <div class="ee-section-title" data-kpi-tip="Risponde alla domanda: dove e quando consumiamo? Grafici interattivi per l’analisi operativa dei consumi dell’asset."><i class="fa fa-chart-bar" style="margin-right:5px;"></i>Analisi Consumi</div>
+      <div class="ee-section-title" data-kpi-tip="risponde alla domanda: dove e quando consumiamo? grafici interattivi per l’analisi operativa dei consumi dell’asset."><i class="fa fa-chart-bar" style="margin-right:5px;"></i>Analisi Consumi</div>
       <div class="ee-chart-row">
         <div>
           <div class="ee-chart-label">PROFILO 24H PER TIPO IMPIANTO</div>
@@ -1878,7 +1878,7 @@ async function _edmCaricaEfficienza(assetId) {
 
     // ── Sezione Trend ─────────────────────────────────────────────────────
     const trendHtml = `
-      <div class="ee-section-title" data-kpi-tip="Risponde alla domanda: stiamo migliorando? Grafici storici per valutare l’andamento nel tempo dell’asset."><i class="fa fa-chart-line" style="margin-right:5px;"></i>Trend e Confronto</div>
+      <div class="ee-section-title" data-kpi-tip="risponde alla domanda: stiamo migliorando? grafici storici per valutare l’andamento nel tempo dell’asset."><i class="fa fa-chart-line" style="margin-right:5px;"></i>Trend e Confronto</div>
       <div class="ee-chart-row">
         <div>
           <div class="ee-chart-label">CONSUMI MENSILI (kWh)</div>
