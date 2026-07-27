@@ -446,7 +446,8 @@
       // ── P-6: Ranking EUI — Bar Chart orizzontale raggruppato per categoria ────
       const ranking = [...(port.ranking_asset || [])].sort((a, b) => b.eui - a.eui);
       if (ranking.length > 0) {
-        const rankH = Math.max(220, ranking.length * 28 + 60);
+        // Altezza fissa 160px come P-7, barre alte proporzionate al numero di asset
+        const rankH = 160;
         document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
 
         // Raggruppa per categoria con colori per classe energetica
@@ -472,10 +473,14 @@
         Plotly.newPlot('chart-ranking-eui', rankTraces,
           Object.assign({}, baseLayout, {
             barmode: 'overlay',
-            margin: { t: 8, r: 60, b: 35, l: 160 },
-            xaxis: Object.assign({}, baseLayout.xaxis, { title: { text: 'kWh/m²/anno', font: { size: 10 }, standoff: 4 } }),
-            yaxis: Object.assign({}, baseLayout.yaxis, { automargin: true }),
-            legend: { orientation: 'h', y: -0.12, font: { size: 10 }, bgcolor: 'transparent' }
+            bargap: 0.15,
+            margin: { t: 6, r: 50, b: 28, l: 140 },
+            xaxis: Object.assign({}, baseLayout.xaxis, {
+              title: { text: 'kWh/m²/anno', font: { size: 9 }, standoff: 3 },
+              tickfont: { size: 8 }
+            }),
+            yaxis: Object.assign({}, baseLayout.yaxis, { automargin: true, tickfont: { size: 9 } }),
+            legend: { orientation: 'h', y: -0.18, font: { size: 9 }, bgcolor: 'transparent' }
           }), plotCfg);
       }
 
