@@ -186,6 +186,7 @@
   text-align:center;padding:24px;color:var(--text-secondary,#7BAFC4);font-size:12px;
 }
 /* tooltip data-kpi-tip definito in bems-ui.css */
+</style>`;
   document.body.appendChild(el.firstElementChild);
   document.body.appendChild(el.lastElementChild); // <style>
 
