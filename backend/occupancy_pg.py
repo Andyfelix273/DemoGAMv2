@@ -560,6 +560,108 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
     # ── KPI Occupancy — Modulo BEMS ───────────────────────────────────────────
 
+    # ── KPI Occupancy Portafoglio — registrati PRIMA di /{asset_id}/* per evitare conflitti ──
+
+    @app.get("/api/occupancy/portfolio/summary", tags=["occupancy-kpi"])
+    def get_occupancy_portfolio_summary_v2(giorni: int = 30,
+                                            _=Depends(get_utente_corrente),
+                                            db=Depends(get_db)):
+        """P-O1: Tasso Utilizzo Medio Portafoglio (frontend-friendly)."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+        ts_prev = now - timedelta(days=giorni * 2)
+        cur.execute("""
+            SELECT s.asset_id, a.nome, a.tipo, a.superficie_mq,
+                   ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT s.zone_id) AS zone_count
+            FROM occupancy_snapshot s
+            JOIN assets a ON a.id = s.asset_id
+            WHERE s.ts >= %s AND s.ts < %s
+            GROUP BY s.asset_id, a.nome, a.tipo, a.superficie_mq
+            ORDER BY avg_pct DESC
+        """, (ts_from, now))
+        rows = cur.fetchall()
+        if not rows:
+            return {"avg_pct_portfolio": None, "n_asset_con_sensori": 0, "delta_pct": None, "asset": []}
+        assets_list = [{"asset_id": r["asset_id"], "nome": r["nome"], "tipo": r["tipo"],
+                        "superficie_mq": float(r["superficie_mq"] or 0),
+                        "avg_pct": float(r["avg_pct"] or 0), "zone_count": int(r["zone_count"])} for r in rows]
+        avg_cur = round(sum(a["avg_pct"] for a in assets_list) / len(assets_list), 1)
+        cur.execute("""
+            SELECT ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct
+            FROM occupancy_snapshot WHERE ts >= %s AND ts < %s
+        """, (ts_prev, ts_from))
+        prev_row = cur.fetchone()
+        avg_prev = float(prev_row["avg_pct"]) if prev_row and prev_row["avg_pct"] else None
+        delta = round(avg_cur - avg_prev, 1) if avg_prev is not None else None
+        return {"avg_pct_portfolio": avg_cur, "n_asset_con_sensori": len(assets_list),
+                "delta_pct": delta, "giorni": giorni, "asset": assets_list}
+
+    @app.get("/api/occupancy/portfolio/weekly_pattern_v2", tags=["occupancy-kpi"])
+    def get_occupancy_portfolio_weekly_v2(giorni: int = 90,
+                                           _=Depends(get_utente_corrente),
+                                           db=Depends(get_db)):
+        """P-O2: Pattern Settimanale Portafoglio con campo lavorativo."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+        cur.execute("""
+            SELECT EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome')::int AS dow,
+                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT asset_id) AS n_asset
+            FROM occupancy_snapshot WHERE ts >= %s AND ts < %s GROUP BY dow ORDER BY dow
+        """, (ts_from, now))
+        rows = cur.fetchall()
+        dow_labels = {1:"Lun",2:"Mar",3:"Mer",4:"Gio",5:"Ven",6:"Sab",7:"Dom"}
+        dow_map = {r["dow"]: r for r in rows}
+        result = []
+        for dow in range(1, 8):
+            r = dow_map.get(dow)
+            result.append({"dow": dow, "label": dow_labels[dow],
+                           "avg_pct": float(r["avg_pct"]) if r else None,
+                           "n_asset": int(r["n_asset"]) if r else 0,
+                           "lavorativo": dow <= 5, "weekend": dow >= 6})
+        return {"giorni": giorni, "dati_parziali": giorni < 84, "data": result}
+
+    @app.get("/api/occupancy/portfolio/scatter_eui", tags=["occupancy-kpi"])
+    def get_occupancy_portfolio_scatter_eui(giorni: int = 365,
+                                             _=Depends(get_utente_corrente),
+                                             db=Depends(get_db)):
+        """P-O5: Scatter Occupancy vs EUI (frontend-friendly)."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from_occ = now - timedelta(days=30)
+        ts_from_energy = now - timedelta(days=giorni)
+        cur.execute("""
+            SELECT asset_id, ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct
+            FROM occupancy_snapshot WHERE ts >= %s AND ts < %s GROUP BY asset_id
+        """, (ts_from_occ, now))
+        occ_map = {r["asset_id"]: float(r["avg_pct"]) for r in cur.fetchall()}
+        if not occ_map:
+            return {"data": []}
+        cur.execute("""
+            SELECT r.asset_id, SUM(r.valore) AS kwh_totale,
+                   a.superficie_mq, a.nome, a.tipo, a.building_category, a.energy_class
+            FROM energy_readings r
+            JOIN energy_meters m ON m.id = r.meter_id
+            JOIN assets a ON a.id = r.asset_id
+            WHERE r.asset_id = ANY(%s) AND m.tipo = 'elettrico'
+              AND r.ts >= %s AND r.ts < %s
+            GROUP BY r.asset_id, a.superficie_mq, a.nome, a.tipo, a.building_category, a.energy_class
+        """, (list(occ_map.keys()), ts_from_energy, now))
+        result = []
+        for r in cur.fetchall():
+            aid = r["asset_id"]
+            if aid not in occ_map: continue
+            sup = float(r["superficie_mq"] or 1)
+            kwh = float(r["kwh_totale"] or 0)
+            days_ratio = giorni / 365.0
+            eui = round(kwh / sup / days_ratio, 1) if sup > 0 and days_ratio > 0 else None
+            result.append({"asset_id": aid, "nome": r["nome"], "tipo": r["tipo"],
+                           "superficie_mq": sup, "avg_pct": occ_map[aid], "eui": eui})
+        return {"data": result}
+
     @app.get("/api/occupancy/{asset_id}/summary", tags=["occupancy-kpi"])
     def get_occupancy_kpi_summary(asset_id: int,
                                    giorni: int = 30,
