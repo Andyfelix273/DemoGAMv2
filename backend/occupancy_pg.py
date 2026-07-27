@@ -1337,3 +1337,55 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
             }
             for r in rows
         ]
+
+    @app.get("/api/occupancy/{asset_id}/hourly")
+    async def get_occupancy_hourly(
+        asset_id: int,
+        ore: int = 168,
+        current_user=Depends(get_utente_corrente),
+        db=Depends(get_db)
+    ):
+        """
+        Occupancy % con risoluzione oraria per il grafico Consumi vs Occupancy.
+        Per ogni ora: SUM(persone_presenti) / capienza_totale * 100.
+        Ore fuori orario lavorativo → 0%.
+        """
+        now = datetime.utcnow()
+        ts_from = now - timedelta(hours=ore)
+        with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Capienza totale fissa
+            cur.execute("""
+                SELECT COALESCE(SUM(capacita_persone), 1) AS cap_tot
+                FROM zones WHERE asset_id = %s AND capacita_persone > 0
+            """, (asset_id,))
+            cap_tot = float(cur.fetchone()["cap_tot"] or 1)
+
+            # Occupancy per ora: somma persone per ts troncato all'ora, poi media nell'ora
+            cur.execute("""
+                SELECT
+                    date_trunc('hour', ts AT TIME ZONE 'Europe/Rome') AS ora_ts,
+                    LEAST(
+                        ROUND(AVG(somma_pp) / %s * 100.0, 1),
+                        100.0
+                    ) AS occ_pct
+                FROM (
+                    SELECT
+                        ts,
+                        SUM(COALESCE(persone_presenti, 0)) AS somma_pp
+                    FROM telemetry
+                    WHERE asset_id = %s
+                      AND ts >= %s AND ts <= %s
+                      AND zone_id IS NOT NULL
+                    GROUP BY ts
+                ) sub
+                GROUP BY date_trunc('hour', ts AT TIME ZONE 'Europe/Rome')
+                ORDER BY ora_ts
+            """, (cap_tot, asset_id, ts_from, now))
+            rows = cur.fetchall()
+        return [
+            {
+                "ts":      r["ora_ts"].isoformat(),
+                "occ_pct": float(r["occ_pct"]) if r["occ_pct"] is not None else 0.0,
+            }
+            for r in rows
+        ]

@@ -208,9 +208,14 @@
     // Forza resize Plotly quando si cambia tab
     requestAnimationFrame(() => {
       if (typeof Plotly === 'undefined') return;
-      ['edm-consumi-chart','edm-consumi-plant-chart'].forEach(id => {
+      ['edm-consumi-occ-chart','edm-consumi-chart','edm-consumi-plant-chart'].forEach(id => {
         const el = document.getElementById(id);
         if (el && el._fullLayout) Plotly.relayout(el, {});
+        else if (el && el.offsetWidth > 50) {
+          // Grafico non ancora renderizzato ma visibile: forza il re-plot
+          const fn = el._edmReplotFn;
+          if (typeof fn === 'function') fn();
+        }
       });
     });
   });
@@ -486,10 +491,9 @@ async function _edmCaricaConsumiVsOccupancy(assetId, ore) {
   if (!chartEl) return;
   try {
     const H = { 'Authorization': 'Bearer ' + API.getToken() };
-    const giorni = Math.max(1, Math.ceil(ore / 24));
     const [readRes, occRes] = await Promise.all([
       fetch(`/api/energy/readings/${assetId}?ore=${ore}`, { headers: H }),
-      fetch(`/api/occupancy/${assetId}/daily_avg?giorni=${giorni}`, { headers: H }).catch(() => null)
+      fetch(`/api/occupancy/${assetId}/hourly?ore=${ore}`, { headers: H }).catch(() => null)
     ]);
     if (!readRes.ok) { chartEl.innerHTML = ''; return; }
     const readings = await readRes.json();
@@ -541,21 +545,21 @@ async function _edmCaricaConsumiVsOccupancy(assetId, ore) {
       showlegend: true
     };
 
-    // Aggiungi traccia occupancy se disponibile
+    // Aggiungi traccia occupancy come area fill sfumata sovrapposta (asse y2)
     if (occData && occData.length > 0) {
       traces.push({
-        x: occData.map(r => r.giorno || r.ts || r.data),
-        y: occData.map(r => r.occ_pct || r.occupancy_pct || 0),
+        x: occData.map(r => r.ts),
+        y: occData.map(r => r.occ_pct || 0),
         name: 'Occupancy %',
-        type: 'scatter', mode: 'lines+markers',
-        line: { color: '#F39C12', width: 2, dash: 'dot' },
-        marker: { size: 4, color: '#F39C12' },
+        type: 'scatter', mode: 'lines',
+        line: { color: '#27AE60', width: 2, shape: 'spline', smoothing: 0.8 },
+        fill: 'tozeroy', fillcolor: 'rgba(39,174,96,0.15)',
         yaxis: 'y2'
       });
       layout.yaxis2 = {
         overlaying: 'y', side: 'right',
-        tickfont: { size: 9, color: '#F39C12' },
-        title: { text: 'Occ %', font: { size: 9, color: '#F39C12' } },
+        tickfont: { size: 9, color: '#27AE60' },
+        title: { text: 'Occ %', font: { size: 9, color: '#27AE60' } },
         range: [0, 100], showgrid: false
       };
     }
@@ -567,11 +571,13 @@ async function _edmCaricaConsumiVsOccupancy(assetId, ore) {
           setTimeout(() => Plotly.Plots.resize(chartEl), 200);
         });
     };
-    const waitAndPlot = () => {
-      if (chartEl.offsetWidth > 200) { doPlot(); }
-      else { setTimeout(waitAndPlot, 50); }
+    // Salva la funzione di plot sull'elemento per poterla richiamare al cambio tab
+    chartEl._edmReplotFn = doPlot;
+    const waitAndPlot = (attempts) => {
+      if (chartEl.offsetWidth > 50) { doPlot(); }
+      else if ((attempts || 0) < 60) { setTimeout(() => waitAndPlot((attempts || 0) + 1), 100); }
     };
-    setTimeout(waitAndPlot, 50);
+    setTimeout(() => waitAndPlot(0), 50);
   } catch(e) {
     if (chartEl) chartEl.innerHTML = '<p style="color:#E74C3C;font-size:12px;padding:8px;">Dati non disponibili</p>';
   }
