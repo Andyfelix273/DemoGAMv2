@@ -1928,8 +1928,8 @@ async function _edmCaricaEfficienza(assetId) {
         };
       });
       Plotly.newPlot(`ee-chart-profile24h-${assetId}`, traces,
-        plotLayout({ xaxis: { title: 'Ora', tickvals: [0,4,8,12,16,20,23], gridcolor:'rgba(30,58,95,0.5)' },
-                     yaxis: { title: 'kW medio', gridcolor:'rgba(30,58,95,0.5)' } }), plotCfg);
+        plotLayout({ xaxis: { title: 'Ora', tickvals: [0,4,8,12,16,20,23], gridcolor:'rgba(30,58,95,0.4)' },
+                     yaxis: { title: 'kW medio', gridcolor:'rgba(30,58,95,0.4)' } }), plotCfg);
     } else {
       const el2 = document.getElementById(`ee-chart-profile24h-${assetId}`);
       if (el2) el2.innerHTML = '<div class="ee-no-data"><i class="fa fa-chart-area"></i>Dati non disponibili</div>';
@@ -2038,9 +2038,9 @@ async function _edmCaricaEfficienza(assetId) {
         ],
         plotLayout({
           margin: { t: 8, r: 12, b: 40, l: 50 },
-          yaxis: { title: { text: 'kW medio', standoff: 6 }, gridcolor: 'rgba(30,58,95,0.5)' },
-          xaxis: { tickangle: -20, gridcolor: 'rgba(30,58,95,0.5)' },
-          legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+          yaxis: { title: { text: 'kW medio', standoff: 6 } },
+          xaxis: { tickangle: -20 },
+          legend: { orientation: 'h', y: -0.22, font: { size: 10 } }
         }), plotCfg);
     } else {
       const el2 = document.getElementById(`ee-chart-baseline-${assetId}`);
@@ -2089,9 +2089,9 @@ async function _edmCaricaEfficienza(assetId) {
         ],
         plotLayout({
           margin: { t: 8, r: 12, b: 40, l: 55 },
-          xaxis: { title: { text: 'Occupancy media (%)', standoff: 4 }, range: [0, xMax], gridcolor: 'rgba(30,58,95,0.5)' },
-          yaxis: { title: { text: 'Costo (€)', standoff: 6 }, range: [0, yMax], tickformat: ',.2f', gridcolor: 'rgba(30,58,95,0.5)' },
-          legend: { orientation: 'h', y: -0.28, font: { size: 10 } },
+          xaxis: { title: { text: 'Occupancy media (%)', standoff: 4 }, range: [0, xMax] },
+          yaxis: { title: { text: 'Costo (€)', standoff: 6 }, range: [0, yMax], tickformat: ',.2f' },
+          legend: { orientation: 'h', y: -0.22, font: { size: 10 } },
           annotations: [{ x: xMed * 0.5, y: yMax * 0.95, text: '⚠ Spreco potenziale',
             showarrow: false, font: { size: 9, color: '#E74C3C' } }]
         }), plotCfg);
@@ -2149,7 +2149,7 @@ async function _edmCaricaEfficienza(assetId) {
             margin: { t: 6, r: 10, b: 50, l: 50 },
             yaxis: { title: { text: yTitle, font: { size: 9 }, standoff: 4 }, tickformat: ',.0f' },
             xaxis: { tickangle: -30, tickfont: { size: 8 } },
-            legend: { y: -0.28 }
+            legend: { y: -0.22 }
           }), plotCfg);
       };
 
@@ -2217,9 +2217,9 @@ async function _edmCaricaEfficienza(assetId) {
           if (hvacEl) Plotly.newPlot(`ee-chart-hvac-temp-${assetId}`, hvacTraces,
             plotLayout({
               margin: { t: 8, r: 12, b: 40, l: 50 },
-              xaxis: { title: { text: 'Temperatura (°C)', standoff: 4 }, gridcolor: 'rgba(30,58,95,0.5)' },
-              yaxis: { title: { text: 'HVAC kWh', standoff: 6 }, tickformat: ',.0f', gridcolor: 'rgba(30,58,95,0.5)' },
-              legend: { orientation: 'h', y: -0.28, font: { size: 10 } }
+              xaxis: { title: { text: 'Temperatura (°C)', standoff: 4 } },
+              yaxis: { title: { text: 'HVAC kWh', standoff: 6 }, tickformat: ',.0f' },
+              legend: { orientation: 'h', y: -0.22, font: { size: 10 } }
             }), plotCfg);
         } else {
           if (hvacEl) hvacEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-thermometer-half"></i>Dati HVAC non disponibili</div>';
@@ -2275,7 +2275,7 @@ async function _edmCaricaEfficienza(assetId) {
                 margin: { t: 6, r: 10, b: 50, l: 50 },
                 yaxis: { title: { text: '€', font: { size: 9 }, standoff: 4 }, tickformat: ',.0f' },
                 xaxis: { tickangle: -30, tickfont: { size: 8 } },
-                legend: { y: -0.28 }
+                legend: { y: -0.22 }
               }), plotCfg);
           } else if (commEl) {
             commEl.innerHTML = '<div class="ee-no-data"><i class="fa fa-layer-group"></i>Solo elettricità disponibile</div>';

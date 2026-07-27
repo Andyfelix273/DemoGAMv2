@@ -1243,43 +1243,44 @@ a.module-card:hover {
 
 /* KPI card energetica */
 .ee-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 .ee-kpi-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-top: 2px solid var(--accent-blue);
+  flex: 1 1 130px;
+  min-width: 120px;
+  background: var(--card-bg, #0d1b2a);
+  border: 1px solid var(--border-color, rgba(30,58,95,0.6));
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 10px 14px;
 }
-.ee-kpi-card.accent-orange { border-top-color: var(--accent-orange); }
-.ee-kpi-card.accent-green  { border-top-color: var(--accent-green); }
-.ee-kpi-card.accent-red    { border-top-color: var(--accent-red); }
+.ee-kpi-card.accent-orange { border-top: 2px solid var(--accent-orange); }
+.ee-kpi-card.accent-green  { border-top: 2px solid var(--accent-green); }
+.ee-kpi-card.accent-red    { border-top: 2px solid var(--accent-red); }
 .ee-kpi-card-label {
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #7BAFC4);
   font-weight: 600;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ee-kpi-card-value {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--text-primary, #E8F4FD);
   line-height: 1.1;
   white-space: nowrap;
 }
 .ee-kpi-card-unit {
-  font-size: 9px;
-  color: var(--text-muted);
-  margin-top: 1px;
+  font-size: 10px;
+  color: var(--text-muted, #4A6FA5);
+  margin-top: 2px;
 }
 .ee-kpi-card-delta {
   font-size: 10px;
@@ -1290,33 +1291,40 @@ a.module-card:hover {
 .ee-kpi-card-delta.down { color: #27AE60; }
 .ee-kpi-card-delta.flat { color: var(--text-muted); }
 
-/* Separatore categoria KPI nella griglia */
+/* Separatore sezione nella tab Energia (stile es-page-section-sep) */
 .ee-kpi-section-sep {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--accent-blue, #58A6FF);
-  padding: 6px 0 2px;
-  border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.4));
-  margin-bottom: 2px;
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-.ee-kpi-section-sep:first-child { padding-top: 0; }
-
-/* Sezione titolo interna alla tab */
-.ee-section-title {
+  gap: 8px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-muted);
-  padding: 8px 0 5px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 8px;
+  letter-spacing: 0.08em;
+  color: var(--accent-blue, #58A6FF);
+  margin: 14px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.5));
+  flex: 0 0 100%;
+  width: 100%;
 }
+.ee-kpi-section-sep:first-child { margin-top: 0; }
+.ee-kpi-section-sep i { font-size: 11px; }
+
+/* Sezione titolo interna alla tab (stile es-page-section-sep) */
+.ee-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-blue, #58A6FF);
+  margin: 18px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.5));
+}
+.ee-section-title i { font-size: 11px; }
 
 /* Label sopra ogni grafico */
 .ee-chart-label {
