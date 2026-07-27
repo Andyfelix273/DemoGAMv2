@@ -449,10 +449,18 @@ async function _edmCaricaConsumi(assetId, ore) {
         legend:{ orientation:'h', y:-0.22, font:{size:9}, bgcolor:'transparent' },
         showlegend: tipi.length > 1
       };
-      setTimeout(() => {
-        Plotly.newPlot(chartEl, traces, layout, { responsive:true, displayModeBar:false });
-        setTimeout(() => { if (chartEl._fullLayout) Plotly.relayout(chartEl, {}); }, 50);
-      }, 80);
+      const doPlotConsumi = () => {
+        Plotly.newPlot(chartEl, traces, layout, { responsive:true, displayModeBar:false })
+          .then(() => {
+            Plotly.Plots.resize(chartEl);
+            setTimeout(() => Plotly.Plots.resize(chartEl), 200);
+          });
+      };
+      const waitAndPlotConsumi = () => {
+        if (chartEl.offsetWidth > 200) { doPlotConsumi(); }
+        else { setTimeout(waitAndPlotConsumi, 50); }
+      };
+      setTimeout(waitAndPlotConsumi, 50);
     } else {
       chartEl.innerHTML = `<p style="color:var(--text-secondary,#7BAFC4);font-size:12px;padding:8px;">
         Totale: <strong>${totale.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})} ${readings[0]?.unita || 'kWh'}</strong> (${readings.length} letture)</p>`;
@@ -512,10 +520,24 @@ async function _edmCaricaConsumiPerImpianto(assetId, ore) {
       legend: { orientation: 'h', y: -0.30, font: { size: 9 }, bgcolor: 'transparent' },
       showlegend: true
     };
-    setTimeout(() => {
-      Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false });
-      setTimeout(() => { if (chartEl._fullLayout) Plotly.relayout(chartEl, {}); }, 80);
-    }, 150);
+    // Render con resize esplicito per evitare grafico stretto all'apertura tab
+    const doPlot = () => {
+      Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false })
+        .then(() => {
+          Plotly.Plots.resize(chartEl);
+          // Secondo resize dopo 200ms per sicurezza
+          setTimeout(() => Plotly.Plots.resize(chartEl), 200);
+        });
+    };
+    // Attende che il contenitore abbia larghezza > 200px prima di renderizzare
+    const waitAndPlot = () => {
+      if (chartEl.offsetWidth > 200) {
+        doPlot();
+      } else {
+        setTimeout(waitAndPlot, 50);
+      }
+    };
+    setTimeout(waitAndPlot, 50);
   } catch(e) {
     if (chartEl) chartEl.innerHTML = '<p style="color:#E74C3C;font-size:12px;padding:8px;">Dati impianti non disponibili</p>';
   }
