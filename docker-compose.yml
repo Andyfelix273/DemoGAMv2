@@ -37,5 +37,20 @@ services:
     command: >
       sh -c "python3 init_db_pg.py && uvicorn main_pg:app --host 0.0.0.0 --port 8500"
 
+  # ── Frontend React (nuovo) ──────────────────────────────────────────
+  # Accesso: http://localhost:3000
+  # Il frontend vanilla rimane disponibile su http://localhost:8500/static/
+  frontend-react:
+    build:
+      context: ./react-frontend
+      dockerfile: Dockerfile
+    container_name: gam-frontend-react
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    # nginx proxya /api/* → backend:8500 internamente alla rete Docker
+
 volumes:
   pgdata:
