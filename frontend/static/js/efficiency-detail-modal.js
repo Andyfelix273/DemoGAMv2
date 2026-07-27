@@ -1702,8 +1702,8 @@ async function _edmCaricaEfficienza(assetId) {
     // ── Costruisci HTML ──────────────────────────────────────────────────────
     const trendIcon  = (v) => v === null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
     const trendClass = (v) => v === null ? 'flat' : v > 0 ? 'up' : 'down';
-    const fmt        = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
-    const fmtInt     = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
+    const fmt        = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: true });
+    const fmtInt     = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0, useGrouping: true });
 
     // Gauge EUI SVG compatto — colore dinamico per categoria
     function gaugeEuiSvg(eui, classe, gaugeColor) {
