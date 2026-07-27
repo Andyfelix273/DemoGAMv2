@@ -894,6 +894,101 @@ def register_energy_routes(app, get_db, get_utente_corrente):
             "payload_schema": {"temp_c": "float", "co2_ppm": "int", "humidity": "float", "occupancy": "bool", "ts": "ISO8601"},
             "registri_modbus": [],
             "note": "Soluzione all-in-one. Alimentazione USB-C o PoE"
+        },
+        {
+            "id": "MTR-ELEC-MAIN",
+            "nome": "Contatore Principale Elettrico",
+            "tipo": "meter",
+            "categoria": "meters",
+            "marca": "Schneider Electric",
+            "modello": "iEM3355",
+            "misure": ["power_kw", "energy_kwh", "voltage_v", "current_a", "power_factor"],
+            "frequenza_sec": 15,
+            "protocollo": "MQTT + Modbus TCP",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/meters/main-elec",
+            "payload_schema": {"power_kw": "float", "energy_kwh": "float", "voltage_v": "float", "current_a": "float", "power_factor": "float", "ts": "ISO8601"},
+            "registri_modbus": [
+                {"reg": 3000, "desc": "Potenza attiva totale (W)"},
+                {"reg": 3004, "desc": "Energia attiva importata (Wh)"},
+                {"reg": 3028, "desc": "Tensione media L-N (V)"},
+                {"reg": 3010, "desc": "Corrente media (A)"},
+                {"reg": 3024, "desc": "Fattore di potenza totale"}
+            ],
+            "note": "Installare sul quadro generale MT/BT. Richiede CT 5A secondario. Classe 0.5S per misure fiscali"
+        },
+        {
+            "id": "MTR-ELEC-SUB",
+            "nome": "Sub-meter Elettrico di Zona",
+            "tipo": "meter",
+            "categoria": "meters",
+            "marca": "Carlo Gavazzi",
+            "modello": "EM24-DIN AV5",
+            "misure": ["power_kw", "energy_kwh", "power_factor"],
+            "frequenza_sec": 30,
+            "protocollo": "MQTT + Modbus RTU",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/meters/sub-elec/{plant_id}",
+            "payload_schema": {"power_kw": "float", "energy_kwh": "float", "power_factor": "float", "plant_id": "string", "ts": "ISO8601"},
+            "registri_modbus": [
+                {"reg": 40001, "desc": "Potenza attiva (W)"},
+                {"reg": 40003, "desc": "Energia attiva (Wh)"},
+                {"reg": 40005, "desc": "Fattore di potenza"}
+            ],
+            "note": "Per sotto-misura di impianti (HVAC, illuminazione, UPS). Indirizzo Modbus configurabile via DIP switch"
+        },
+        {
+            "id": "MTR-GAS-01",
+            "nome": "Contatore Gas Metano",
+            "tipo": "meter",
+            "categoria": "meters",
+            "marca": "Elster",
+            "modello": "BK-G16",
+            "misure": ["volume_m3", "flow_m3h"],
+            "frequenza_sec": 60,
+            "protocollo": "MQTT + M-Bus",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/meters/gas",
+            "payload_schema": {"volume_m3": "float", "flow_m3h": "float", "ts": "ISO8601"},
+            "registri_modbus": [],
+            "note": "Interfaccia M-Bus. Richiede gateway M-Bus->MQTT (es. Relay WMBUS). Portata max 25 m3/h"
+        },
+        {
+            "id": "MTR-WATER-01",
+            "nome": "Contatore Acqua Fredda",
+            "tipo": "meter",
+            "categoria": "meters",
+            "marca": "Sensus",
+            "modello": "620C",
+            "misure": ["volume_l", "flow_lh"],
+            "frequenza_sec": 60,
+            "protocollo": "MQTT + M-Bus",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/meters/water",
+            "payload_schema": {"volume_l": "float", "flow_lh": "float", "ts": "ISO8601"},
+            "registri_modbus": [],
+            "note": "Compatibile DN15-DN50. Lettura remota via M-Bus o NB-IoT"
+        },
+        {
+            "id": "MTR-HEAT-01",
+            "nome": "Contatore Energia Termica",
+            "tipo": "meter",
+            "categoria": "meters",
+            "marca": "Kamstrup",
+            "modello": "MULTICAL 403",
+            "misure": ["energy_kwh_th", "power_kw_th", "temp_supply_c", "temp_return_c", "flow_m3h"],
+            "frequenza_sec": 60,
+            "protocollo": "MQTT + M-Bus / KMP",
+            "qos": 1,
+            "topic_pattern": "bems/{asset_id}/meters/heat",
+            "payload_schema": {"energy_kwh_th": "float", "power_kw_th": "float", "temp_supply_c": "float", "temp_return_c": "float", "flow_m3h": "float", "ts": "ISO8601"},
+            "registri_modbus": [
+                {"reg": 60, "desc": "Energia termica (GJ)"},
+                {"reg": 68, "desc": "Potenza termica (kW)"},
+                {"reg": 86, "desc": "Temperatura mandata (C)"},
+                {"reg": 87, "desc": "Temperatura ritorno (C)"}
+            ],
+            "note": "Per teleriscaldamento e impianti di cogenerazione. Classe 2 EN 1434"
         }
     ]
 

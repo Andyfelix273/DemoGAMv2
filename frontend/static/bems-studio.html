@@ -428,6 +428,7 @@
               <option value="power_meter">Contatore Energia</option>
               <option value="hvac">Controller HVAC</option>
               <option value="multi">Multifunzione</option>
+              <option value="meter">Meters (Contatori)</option>
             </select>
           </div>
         </div>
@@ -1184,21 +1185,55 @@ function renderCatalog() {
   const filtered = filterType ? sensorCatalog.filter(s => s.tipo === filterType) : sensorCatalog;
   const grid = document.getElementById('catalog-grid');
 
-  grid.innerHTML = filtered.map(s => `
-    <div class="catalog-card" onclick="aggiungiSensoreDaCatalogo('${s.id}')">
-      <div class="cc-name">${s.nome}</div>
+  // Separa sensori da meters
+  const sensors = filtered.filter(s => s.tipo !== 'meter');
+  const meters = filtered.filter(s => s.tipo === 'meter');
+
+  function cardHtml(s, isMeter) {
+    const accentColor = isMeter ? '#F39C12' : '#00B4D8';
+    const iconClass = isMeter ? 'fa-tachometer-alt' : 'fa-microchip';
+    const modbusHtml = (s.registri_modbus && s.registri_modbus.length > 0)
+      ? `<div style="margin-top:4px;font-size:9px;color:var(--muted);"><i class="fa fa-list-ol" style="margin-right:3px;"></i>${s.registri_modbus.length} registri Modbus</div>`
+      : '';
+    return `
+    <div class="catalog-card" style="border-left:3px solid ${accentColor};" onclick="aggiungiSensoreDaCatalogo('${s.id}')">
+      <div class="cc-name"><i class="fa ${iconClass}" style="color:${accentColor};margin-right:5px;"></i>${s.nome}</div>
       <div class="cc-brand">${s.marca} — ${s.modello}</div>
-      <div class="cc-misure">
-        ${s.misure.map(m => `<span class="cc-misura-tag">${m}</span>`).join('')}
-      </div>
+      <div class="cc-misure">${s.misure.map(m => `<span class="cc-misura-tag">${m}</span>`).join('')}</div>
       <div class="cc-proto"><i class="fa fa-wifi"></i> ${s.protocollo} · QoS ${s.qos} · ${s.frequenza_sec}s</div>
+      ${modbusHtml}
       <div class="cc-note">${s.note}</div>
       <div style="margin-top:8px;">
         <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();aggiungiSensoreDaCatalogo('${s.id}')">
           <i class="fa fa-plus"></i> Aggiungi
         </button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }
+
+  let html = '';
+
+  if (sensors.length > 0) {
+    if (!filterType || filterType === 'meter') {
+      // solo meters richiesti, non mostrare header sensori
+    } else {
+      html += `<div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--blue);padding:4px 0 8px;border-bottom:1px solid var(--border);margin-bottom:4px;"><i class="fa fa-microchip" style="margin-right:6px;"></i>Sensori</div>`;
+    }
+    html += sensors.map(s => cardHtml(s, false)).join('');
+  }
+
+  if (meters.length > 0) {
+    const topPad = sensors.length > 0 ? '16px' : '4px';
+    const topMarg = sensors.length > 0 ? '8px' : '0';
+    html += `<div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#F39C12;padding:${topPad} 0 8px;border-bottom:1px solid var(--border);margin-bottom:4px;margin-top:${topMarg};"><i class="fa fa-tachometer-alt" style="margin-right:6px;"></i>Meters — Dispositivi di Misura</div>`;
+    html += meters.map(s => cardHtml(s, true)).join('');
+  }
+
+  if (!html) {
+    html = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--muted);font-size:12px;">Nessun dispositivo trovato</div>';
+  }
+
+  grid.innerHTML = html;
 }
 
 function aggiungiSensoreDaCatalogo(sensorId) {

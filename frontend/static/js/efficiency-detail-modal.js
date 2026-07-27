@@ -205,6 +205,14 @@
     document.querySelectorAll('.edm-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('edm-panel-' + btn.dataset.tab).classList.add('active');
+    // Forza resize Plotly quando si cambia tab
+    requestAnimationFrame(() => {
+      if (typeof Plotly === 'undefined') return;
+      ['edm-consumi-chart','edm-consumi-plant-chart'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el._fullLayout) Plotly.relayout(el, {});
+      });
+    });
   });
 })();
 
@@ -220,10 +228,11 @@ async function apriDettaglioAsset(id) {
   const modalBox = document.getElementById('edm-modal');
   if (modalBox && !modalBox._edmResizeObserver) {
     modalBox._edmResizeObserver = new ResizeObserver(() => {
-      const chartEl = document.getElementById('edm-chart-consumi');
-      if (chartEl && chartEl._fullLayout && typeof Plotly !== 'undefined') {
-        Plotly.relayout(chartEl, {});
-      }
+      if (typeof Plotly === 'undefined') return;
+      ['edm-consumi-chart','edm-consumi-plant-chart'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el._fullLayout) Plotly.relayout(el, {});
+      });
     });
     modalBox._edmResizeObserver.observe(modalBox);
   }
@@ -301,10 +310,17 @@ async function apriDettaglioAsset(id) {
         <span id="edm-consumi-status" class="edm-status-label">Caricamento…</span>
       </div>
       <div id="edm-consumi-chart" class="edm-chart-wrap"></div>
-      <div id="edm-consumi-kpi" class="kpi-strip" style="margin-top:10px;"></div>`;
+      <div id="edm-consumi-kpi" class="kpi-strip" style="margin-top:10px;"></div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#1E3A5F);">
+        <div class="ee-section-title" style="margin-bottom:8px;"><i class="fa fa-plug"></i> Consumi per Impianto</div>
+        <div id="edm-consumi-plant-chart" class="edm-chart-wrap" style="height:220px;"></div>
+      </div>`;
     _edmCaricaConsumi(id, 168);
+    _edmCaricaConsumiPerImpianto(id, 168);
     document.getElementById('edm-consumi-ore').addEventListener('change', (e) => {
-      _edmCaricaConsumi(id, parseInt(e.target.value));
+      const ore = parseInt(e.target.value);
+      _edmCaricaConsumi(id, ore);
+      _edmCaricaConsumiPerImpianto(id, ore);
     });
 
     // ── Allarmi ────────────────────────────────────────────────
@@ -448,6 +464,62 @@ async function _edmCaricaConsumi(assetId, ore) {
 }
 
 
+async function _edmCaricaConsumiPerImpianto(assetId, ore) {
+  const chartEl = document.getElementById('edm-consumi-plant-chart');
+  if (!chartEl) return;
+  try {
+    const H = { 'Authorization': 'Bearer ' + API.getToken() };
+    const [plantsRes, histRes] = await Promise.all([
+      fetch(`/api/bems/buildings/${assetId}/plants`, { headers: H }),
+      fetch(`/api/bems/buildings/${assetId}/telemetry/history?giorni=${Math.max(1, Math.ceil(ore/24))}`, { headers: H })
+    ]);
+    if (!plantsRes.ok || !histRes.ok) { chartEl.innerHTML = ''; return; }
+    const plants = await plantsRes.json();
+    const allData = await histRes.json();
+    const plantData = allData.filter(r => r.plant_id && r.power_kw != null);
+    if (!plants.length || !plantData.length) {
+      chartEl.innerHTML = '<p style="color:var(--text-secondary,#7BAFC4);font-size:12px;padding:8px;">Nessun dato impianti disponibile.</p>';
+      return;
+    }
+    const plantMap = {};
+    plantData.forEach(r => {
+      if (!plantMap[r.plant_id]) plantMap[r.plant_id] = [];
+      plantMap[r.plant_id].push(r);
+    });
+    const plantNames = {};
+    plants.forEach(p => { plantNames[p.plant_id] = p.nome || p.plant_id; });
+    const isDark = (localStorage.getItem('gam_tema') || 'dark') !== 'light';
+    const colori = ['#3498DB','#27AE60','#F39C12','#9B59B6','#E74C3C','#1ABC9C','#E67E22','#2ECC71','#E91E63'];
+    // Escludi contatore principale (somma degli altri)
+    const plantIds = Object.keys(plantMap).filter(pid => pid !== 'IMP-MAIN-MTR').sort();
+    const traces = plantIds.map((pid, idx) => {
+      const dati = plantMap[pid].sort((a, b) => a.ts < b.ts ? -1 : 1);
+      return {
+        x: dati.map(r => r.ts),
+        y: dati.map(r => r.power_kw),
+        name: plantNames[pid] || pid,
+        type: 'scatter', mode: 'lines',
+        line: { color: colori[idx % colori.length], width: 1.5 }
+      };
+    });
+    const layout = {
+      paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+      font: { color: isDark ? '#7BAFC4' : '#57606a', size: 10, family: 'Inter,sans-serif' },
+      xaxis: { gridcolor: isDark ? '#1E3A5F' : '#d0d7de', tickfont: { size: 9 } },
+      yaxis: { gridcolor: isDark ? '#1E3A5F' : '#d0d7de', tickfont: { size: 9 },
+               title: { text: 'kW', font: { size: 9 } } },
+      margin: { t: 6, r: 8, b: 60, l: 44 },
+      legend: { orientation: 'h', y: -0.30, font: { size: 9 }, bgcolor: 'transparent' },
+      showlegend: true
+    };
+    setTimeout(() => {
+      Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false });
+      setTimeout(() => { if (chartEl._fullLayout) Plotly.relayout(chartEl, {}); }, 80);
+    }, 150);
+  } catch(e) {
+    if (chartEl) chartEl.innerHTML = '<p style="color:#E74C3C;font-size:12px;padding:8px;">Dati impianti non disponibili</p>';
+  }
+}
 async function _edmCaricaAllarmi(assetId, nomeAsset) {
   const el = document.getElementById('edm-panel-allarmi');
   if (!el) return;
@@ -668,7 +740,7 @@ async function _edmCaricaZone(assetId) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
           <div class="es-section" style="margin-bottom:0;">
             <div class="es-section-title" data-kpi-tip="o-5 — distribuzione dell'occupancy per zona e fascia oraria. scala cromatica da blu (bassa) a rosso (alta occupancy). rivela quali zone sono più usate e in quali orari."><i class="fa fa-th"></i>Heatmap zona × ora <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-5</span></div>
-            <div class="ee-chart" id="occ-chart-heatmap-${assetId}"></div>
+            <div class="ee-chart" style="height:200px;" id="occ-chart-heatmap-${assetId}"></div>
           </div>
           <div class="es-section" style="margin-bottom:0;">
             <div class="es-section-title" data-kpi-tip="o-7 — profilo di occupancy medio nelle 24 ore. rivela l'orario reale di arrivo, il picco mattutino, il calo post-pranzo e l'orario reale di uscita. area grigia = orario lavorativo configurato."><i class="fa fa-clock"></i>Profilo giornaliero 24h <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-7</span></div>
@@ -750,7 +822,10 @@ async function _edmCaricaZone(assetId) {
               <i class="fa fa-thermometer-half" style="margin-right:3px;color:#3498DB;"></i>${tel.temp_c.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div>` : ''}
             ${tel.co2_ppm  != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
               <i class="fa fa-leaf" style="margin-right:3px;color:#27AE60;"></i>${tel.co2_ppm.toLocaleString('it-IT',{maximumFractionDigits:0})} ppm CO₂</div>` : ''}
-            <div style="font-size:10px;font-weight:600;color:${oc};margin-top:4px;">${isOcc ? 'Occupata' : 'Libera'}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+              ${z.capacita_persone ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-users" style="margin-right:3px;"></i>Cap. ${z.capacita_persone} pers.</div>` : '<div></div>'}
+              <div style="font-size:11px;font-weight:700;color:${oc};">${isOcc ? '● Occupata' : '○ Libera'}</div>
+            </div>
           </div>`;
       });
       html += `</div></div>`;
