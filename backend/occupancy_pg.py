@@ -1305,9 +1305,9 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
             cur.execute("""
                 SELECT
                     DATE(ts AT TIME ZONE 'Europe/Rome') AS giorno,
-                    ROUND(
+                    LEAST(ROUND(
                         AVG(campione_persone) / %s * 100.0
-                    , 1) AS occ_pct,
+                    , 1), 100.0) AS occ_pct,
                     ROUND(AVG(campione_persone)::numeric, 1) AS avg_persone,
                     COUNT(*) AS n_campioni
                 FROM (

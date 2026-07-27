@@ -99,12 +99,46 @@ def profilo_orario(ora: int, tipo: str) -> float:
         if 14 <= ora < 18:  return 0.6 + random.uniform(0, 0.3)
         if 18 <= ora < 20:  return 0.2 + random.uniform(0, 0.1)
         return 0.0
-    elif tipo == "server":
+    elif tipo in ("open_space",):
+        # Open space: alta occupancy in orario lavorativo, calo a pranzo
+        if 8 <= ora < 9:    return 0.4 + random.uniform(0, 0.2)
+        if 9 <= ora < 12:   return 0.75 + random.uniform(0, 0.2)
+        if 12 <= ora < 14:  return 0.35 + random.uniform(0, 0.2)  # pausa pranzo
+        if 14 <= ora < 18:  return 0.65 + random.uniform(0, 0.2)
+        if 18 <= ora < 20:  return 0.15 + random.uniform(0, 0.1)
+        return 0.0
+    elif tipo in ("sala", "sala_riunioni"):
+        # Sale: picchi mattino e pomeriggio, quasi vuote a pranzo e sera
+        if 8 <= ora < 9:    return 0.2 + random.uniform(0, 0.2)
+        if 9 <= ora < 12:   return 0.6 + random.uniform(0, 0.3)
+        if 12 <= ora < 14:  return 0.1 + random.uniform(0, 0.1)
+        if 14 <= ora < 17:  return 0.65 + random.uniform(0, 0.3)
+        if 17 <= ora < 19:  return 0.2 + random.uniform(0, 0.15)
+        return 0.0
+    elif tipo == "laboratorio":
+        # Laboratorio: uso continuo in orario lavorativo, picco pomeridiano
+        if 8 <= ora < 9:    return 0.3 + random.uniform(0, 0.2)
+        if 9 <= ora < 12:   return 0.55 + random.uniform(0, 0.2)
+        if 12 <= ora < 14:  return 0.4 + random.uniform(0, 0.15)
+        if 14 <= ora < 18:  return 0.7 + random.uniform(0, 0.25)
+        if 18 <= ora < 20:  return 0.25 + random.uniform(0, 0.1)
+        return 0.0
+    elif tipo == "break":
+        # Sala break: picco a pranzo e pausa caffè mattino/pomeriggio
+        if 8 <= ora < 9:    return 0.2 + random.uniform(0, 0.2)
+        if 9 <= ora < 10:   return 0.35 + random.uniform(0, 0.2)  # caffè mattino
+        if 10 <= ora < 12:  return 0.15 + random.uniform(0, 0.1)
+        if 12 <= ora < 14:  return 0.7 + random.uniform(0, 0.25)  # pranzo
+        if 14 <= ora < 15:  return 0.35 + random.uniform(0, 0.2)  # caffè pomeriggio
+        if 15 <= ora < 19:  return 0.1 + random.uniform(0, 0.1)
+        return 0.0
+    elif tipo in ("server", "server_room"):
         return 0.85 + random.uniform(0, 0.1)  # sempre acceso
     elif tipo == "corridoio":
         if 8 <= ora < 20:   return 0.1 + random.uniform(0, 0.1)
         return 0.0
     else:
+        # servizi, vano_tecnico, etc: non monitorati per occupancy
         return 0.0
 
 def simula_zona(zone_id: str, floor_id: str, tipo: str, capacita: int, ts: datetime) -> dict:
