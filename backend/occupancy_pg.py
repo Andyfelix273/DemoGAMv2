@@ -1265,3 +1265,75 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
                 for r in rows
             ],
         }
+
+    # ── daily_avg: media giornaliera occupancy % per asset ─────────────────
+    @app.get("/api/occupancy/{asset_id}/daily_avg", tags=["occupancy-kpi"])
+    async def get_occupancy_daily_avg(
+        asset_id: int,
+        giorni: int = 30,
+        current_user=Depends(get_utente_corrente),
+        db=Depends(get_db)
+    ):
+        """
+        Media giornaliera occupancy % in orario lavorativo.
+        Formula: AVG(SUM_persone_per_campione) / capacita_totale_asset × 100
+        Filtra solo i campioni nell'orario lavorativo configurato sull'asset
+        (working_hours_start..working_hours_end, default 08:00-19:00).
+        """
+        now = datetime.utcnow()
+        ts_from = now - timedelta(days=giorni)
+        with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # 1. Orario lavorativo dell'asset
+            cur.execute("""
+                SELECT working_hours_start, working_hours_end
+                FROM assets WHERE id = %s
+            """, (asset_id,))
+            asset = cur.fetchone()
+            wh_start = int(str(asset["working_hours_start"] or "08:00:00").split(":")[0]) if asset else 8
+            wh_end   = int(str(asset["working_hours_end"]   or "19:00:00").split(":")[0]) if asset else 19
+
+            # 2. Capienza totale fissa dell'asset
+            cur.execute("""
+                SELECT COALESCE(SUM(capacita_persone), 1) AS cap_tot
+                FROM zones
+                WHERE asset_id = %s AND capacita_persone > 0
+            """, (asset_id,))
+            cap_tot = float(cur.fetchone()["cap_tot"] or 1)
+
+            # 3. Per ogni campione in orario lavorativo: somma persone su tutte le zone,
+            #    poi media giornaliera divisa per capienza totale
+            cur.execute("""
+                SELECT
+                    DATE(ts AT TIME ZONE 'Europe/Rome') AS giorno,
+                    ROUND(
+                        AVG(campione_persone) / %s * 100.0
+                    , 1) AS occ_pct,
+                    ROUND(AVG(campione_persone)::numeric, 1) AS avg_persone,
+                    COUNT(*) AS n_campioni
+                FROM (
+                    SELECT
+                        ts,
+                        SUM(COALESCE(persone_presenti, 0)) AS campione_persone
+                    FROM telemetry
+                    WHERE asset_id = %s
+                      AND ts >= %s AND ts <= %s
+                      AND zone_id IS NOT NULL
+                      AND EXTRACT(HOUR FROM ts AT TIME ZONE 'Europe/Rome') >= %s
+                      AND EXTRACT(HOUR FROM ts AT TIME ZONE 'Europe/Rome') <  %s
+                    GROUP BY ts
+                ) sub
+                GROUP BY giorno
+                ORDER BY giorno
+            """, (cap_tot, asset_id, ts_from, now, wh_start, wh_end))
+            rows = cur.fetchall()
+        return [
+            {
+                "giorno":        str(r["giorno"]),
+                "occ_pct":       float(r["occ_pct"]) if r["occ_pct"] is not None else None,
+                "avg_persone":   float(r["avg_persone"] or 0),
+                "n_campioni":    int(r["n_campioni"]),
+                "wh_start":      wh_start,
+                "wh_end":        wh_end,
+            }
+            for r in rows
+        ]

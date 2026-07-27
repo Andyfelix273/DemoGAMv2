@@ -629,26 +629,58 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
                               giorni: int = 14,
                               _=Depends(get_utente_corrente),
                               db=Depends(get_db)):
-        """Correlazione giornaliera tra occupancy media e costo energetico.
-        Restituisce lista di {data, occ_pct_media, kwh, costo_eur}."""
+        """
+        Correlazione giornaliera tra occupancy media (in orario lavorativo) e consumo energetico h24.
+        Occupancy = AVG(SUM persone_presenti per campione) / capacita_totale × 100,
+        calcolata solo sui campioni nell'orario lavorativo dell'asset.
+        Energia = kWh h24 (corretto: l'energia si consuma anche fuori orario).
+        Restituisce lista di {data, occ_pct_media, kwh, costo_eur, wh_start, wh_end}.
+        """
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         now = datetime.now(timezone.utc)
         ts_from = now - timedelta(days=giorni)
         unit_cost = _get_unit_cost(cur, asset_id, "ELECTRICITY")
 
-        # Occupancy media giornaliera
+        # 1. Orario lavorativo dell'asset
+        cur.execute("""
+            SELECT working_hours_start, working_hours_end
+            FROM assets WHERE id = %s
+        """, (asset_id,))
+        asset = cur.fetchone()
+        wh_start = int(str(asset["working_hours_start"] or "08:00:00").split(":")[0]) if asset else 8
+        wh_end   = int(str(asset["working_hours_end"]   or "19:00:00").split(":")[0]) if asset else 19
+
+        # 2. Capienza totale fissa dell'asset
+        cur.execute("""
+            SELECT COALESCE(SUM(capacita_persone), 1) AS cap_tot
+            FROM zones
+            WHERE asset_id = %s AND capacita_persone > 0
+        """, (asset_id,))
+        cap_tot = float(cur.fetchone()["cap_tot"] or 1)
+
+        # 3. Occupancy media giornaliera in orario lavorativo da telemetry.persone_presenti
         cur.execute("""
             SELECT
                 DATE(ts AT TIME ZONE 'Europe/Rome') AS giorno,
-                AVG(pct_occupancy) AS occ_pct
-            FROM occupancy_snapshot
-            WHERE asset_id = %s AND ts >= %s
+                ROUND(AVG(campione_persone) / %s * 100.0, 1) AS occ_pct
+            FROM (
+                SELECT
+                    ts,
+                    SUM(COALESCE(persone_presenti, 0)) AS campione_persone
+                FROM telemetry
+                WHERE asset_id = %s
+                  AND ts >= %s
+                  AND zone_id IS NOT NULL
+                  AND EXTRACT(HOUR FROM ts AT TIME ZONE 'Europe/Rome') >= %s
+                  AND EXTRACT(HOUR FROM ts AT TIME ZONE 'Europe/Rome') <  %s
+                GROUP BY ts
+            ) sub
             GROUP BY giorno
             ORDER BY giorno
-        """, (asset_id, ts_from))
+        """, (cap_tot, asset_id, ts_from, wh_start, wh_end))
         occ_rows = {str(r["giorno"]): float(r["occ_pct"] or 0) for r in cur.fetchall()}
 
-        # Consumo giornaliero da telemetria
+        # 4. Consumo giornaliero h24 da telemetria (corretto: energia h24)
         cur.execute("""
             SELECT
                 DATE(t.ts AT TIME ZONE 'Europe/Rome') AS giorno,
@@ -663,17 +695,19 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
         """, (asset_id, ts_from))
         energy_rows = {str(r["giorno"]): float(r["kw_medio"] or 0) for r in cur.fetchall()}
 
-        # Unisci per data
+        # 5. Unisci per data
         all_dates = sorted(set(list(occ_rows.keys()) + list(energy_rows.keys())))
         result = []
         for d in all_dates:
             kw_medio = energy_rows.get(d, 0)
             kwh = round(kw_medio * 24, 1)
             result.append({
-                "data": d,
+                "data":          d,
                 "occ_pct_media": round(occ_rows.get(d, 0), 1),
-                "kwh": kwh,
-                "costo_eur": round(kwh * unit_cost, 2),
+                "kwh":           kwh,
+                "costo_eur":     round(kwh * unit_cost, 2),
+                "wh_start":      wh_start,
+                "wh_end":        wh_end,
             })
         return result
 

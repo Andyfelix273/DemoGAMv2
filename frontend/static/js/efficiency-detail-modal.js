@@ -309,17 +309,26 @@ async function apriDettaglioAsset(id) {
         </select>
         <span id="edm-consumi-status" class="edm-status-label">Caricamento…</span>
       </div>
-      <div id="edm-consumi-chart" class="edm-chart-wrap"></div>
-      <div id="edm-consumi-kpi" class="kpi-strip" style="margin-top:10px;"></div>
-      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#1E3A5F);">
+      <div id="edm-consumi-kpi" class="kpi-strip" style="margin-bottom:12px;"></div>
+      <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border,#1E3A5F);">
+        <div class="ee-section-title" style="margin-bottom:8px;"><i class="fa fa-chart-area"></i> Consumi vs Occupancy</div>
+        <div id="edm-consumi-occ-chart" class="edm-chart-wrap" style="height:220px;"></div>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border,#1E3A5F);">
+        <div class="ee-section-title" style="margin-bottom:8px;"><i class="fa fa-bolt"></i> Andamento Consumi</div>
+        <div id="edm-consumi-chart" class="edm-chart-wrap"></div>
+      </div>
+      <div style="margin-top:4px;">
         <div class="ee-section-title" style="margin-bottom:8px;"><i class="fa fa-plug"></i> Consumi per Impianto</div>
         <div id="edm-consumi-plant-chart" class="edm-chart-wrap" style="height:220px;"></div>
       </div>`;
     _edmCaricaConsumi(id, 168);
+    _edmCaricaConsumiVsOccupancy(id, 168);
     _edmCaricaConsumiPerImpianto(id, 168);
     document.getElementById('edm-consumi-ore').addEventListener('change', (e) => {
       const ore = parseInt(e.target.value);
       _edmCaricaConsumi(id, ore);
+      _edmCaricaConsumiVsOccupancy(id, ore);
       _edmCaricaConsumiPerImpianto(id, ore);
     });
 
@@ -471,6 +480,102 @@ async function _edmCaricaConsumi(assetId, ore) {
   }
 }
 
+
+async function _edmCaricaConsumiVsOccupancy(assetId, ore) {
+  const chartEl = document.getElementById('edm-consumi-occ-chart');
+  if (!chartEl) return;
+  try {
+    const H = { 'Authorization': 'Bearer ' + API.getToken() };
+    const giorni = Math.max(1, Math.ceil(ore / 24));
+    const [readRes, occRes] = await Promise.all([
+      fetch(`/api/energy/readings/${assetId}?ore=${ore}`, { headers: H }),
+      fetch(`/api/occupancy/${assetId}/daily_avg?giorni=${giorni}`, { headers: H }).catch(() => null)
+    ]);
+    if (!readRes.ok) { chartEl.innerHTML = ''; return; }
+    const readings = await readRes.json();
+    const occData  = occRes && occRes.ok ? await occRes.json() : [];
+
+    if (!readings || readings.length === 0) {
+      chartEl.innerHTML = '<p style="color:var(--text-secondary,#7BAFC4);font-size:12px;padding:8px;">Nessun dato disponibile.</p>';
+      return;
+    }
+
+    const isDark = (localStorage.getItem('gam_tema') || 'dark') !== 'light';
+
+    // Aggrega consumi per ora
+    function aggPerOra(dati) {
+      const bucket = {};
+      dati.forEach(r => {
+        const d = new Date(r.ts);
+        const k = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()).toISOString();
+        if (!bucket[k]) bucket[k] = { sum: 0, n: 0 };
+        bucket[k].sum += (r.valore || 0);
+        bucket[k].n++;
+      });
+      return Object.entries(bucket).sort(([a],[b]) => a < b ? -1 : 1)
+        .map(([k, v]) => ({ ts: k, valore: v.sum / v.n }));
+    }
+
+    const consDati = ore <= 48 ? readings : aggPerOra(readings);
+    const traceConsumi = {
+      x: consDati.map(r => r.ts),
+      y: consDati.map(r => r.valore),
+      name: readings[0]?.unita || 'kWh',
+      type: 'scatter', mode: 'lines',
+      line: { color: '#3498DB', width: 2 },
+      fill: 'tozeroy', fillcolor: '#3498DB22',
+      yaxis: 'y1'
+    };
+
+    const traces = [traceConsumi];
+    const layout = {
+      paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+      font: { color: isDark ? '#7BAFC4' : '#57606a', size: 10, family: 'Inter,sans-serif' },
+      xaxis: { gridcolor: isDark ? '#1E3A5F' : '#d0d7de', tickfont: { size: 9 } },
+      yaxis: {
+        gridcolor: isDark ? '#1E3A5F' : '#d0d7de', tickfont: { size: 9 },
+        title: { text: readings[0]?.unita || 'kWh', font: { size: 9 } }
+      },
+      margin: { t: 6, r: 50, b: 50, l: 44 },
+      legend: { orientation: 'h', y: -0.30, font: { size: 9 }, bgcolor: 'transparent' },
+      showlegend: true
+    };
+
+    // Aggiungi traccia occupancy se disponibile
+    if (occData && occData.length > 0) {
+      traces.push({
+        x: occData.map(r => r.giorno || r.ts || r.data),
+        y: occData.map(r => r.occ_pct || r.occupancy_pct || 0),
+        name: 'Occupancy %',
+        type: 'scatter', mode: 'lines+markers',
+        line: { color: '#F39C12', width: 2, dash: 'dot' },
+        marker: { size: 4, color: '#F39C12' },
+        yaxis: 'y2'
+      });
+      layout.yaxis2 = {
+        overlaying: 'y', side: 'right',
+        tickfont: { size: 9, color: '#F39C12' },
+        title: { text: 'Occ %', font: { size: 9, color: '#F39C12' } },
+        range: [0, 100], showgrid: false
+      };
+    }
+
+    const doPlot = () => {
+      Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false })
+        .then(() => {
+          Plotly.Plots.resize(chartEl);
+          setTimeout(() => Plotly.Plots.resize(chartEl), 200);
+        });
+    };
+    const waitAndPlot = () => {
+      if (chartEl.offsetWidth > 200) { doPlot(); }
+      else { setTimeout(waitAndPlot, 50); }
+    };
+    setTimeout(waitAndPlot, 50);
+  } catch(e) {
+    if (chartEl) chartEl.innerHTML = '<p style="color:#E74C3C;font-size:12px;padding:8px;">Dati non disponibili</p>';
+  }
+}
 
 async function _edmCaricaConsumiPerImpianto(assetId, ore) {
   const chartEl = document.getElementById('edm-consumi-plant-chart');
