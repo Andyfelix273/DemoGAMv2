@@ -167,6 +167,47 @@
       align-items: stretch;
     }
     .es-chart-compact { width:100%; height:160px; }
+
+    /* ── Tooltip scuro KPI ──────────────────────────────────────────────── */
+    [data-kpi-tip] { position: relative; cursor: help; }
+    [data-kpi-tip]::after {
+      content: attr(data-kpi-tip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0a1628;
+      color: #c8dff0;
+      border: 1px solid rgba(88,166,255,0.25);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.45;
+      white-space: normal;
+      width: 220px;
+      max-width: 260px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.55);
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    [data-kpi-tip]::before {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 2px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(88,166,255,0.25);
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    [data-kpi-tip]:hover::after,
+    [data-kpi-tip]:hover::before { opacity: 1; }
   </style>
 </head>
 <body class="app-layout">
@@ -204,11 +245,11 @@
       <!-- P-4/P-5: Top efficienti / Da migliorare — liste compatte affiancate -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-star" style="color:#27AE60;"></i>Top efficienti per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-4</span></div>
+          <div class="es-section-title" data-kpi-tip="P-4 — I 3 asset con EUI più basso (migliore efficienza) per categoria. Il confronto è significativo solo tra asset della stessa tipologia."><i class="fa fa-star" style="color:#27AE60;"></i>Top efficienti per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-4</span></div>
           <ul class="es-top-list" id="es-top-efficienti"></ul>
         </div>
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-exclamation-triangle" style="color:#E74C3C;"></i>Da migliorare per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-5</span></div>
+          <div class="es-section-title" data-kpi-tip="P-5 — I 3 asset con EUI più alto (peggiore efficienza) per categoria. Identifica le priorità di intervento nel portafoglio."><i class="fa fa-exclamation-triangle" style="color:#E74C3C;"></i>Da migliorare per categoria <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-5</span></div>
           <ul class="es-top-list" id="es-top-inefficienti"></ul>
         </div>
       </div>
@@ -219,7 +260,7 @@
       <!-- Riga grafici trend: Consumi mensili + YoY + Commodity su una riga -->
       <div class="es-row-3">
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title">
+          <div class="es-section-title" data-kpi-tip="P-7b — Consumo mensile (kWh) degli asset con telemetria attiva nel periodo selezionato. Ogni linea rappresenta un asset.">
             <i class="fa fa-bolt"></i>Trend consumi mensili (kWh)
             <span id="trend-letture" style="font-weight:400;color:var(--text-muted);margin-left:8px;font-size:10px;"></span>
             <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-7b</span>
@@ -227,11 +268,11 @@
           <div class="es-chart-compact" id="chart-trend-kwh"></div>
         </div>
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-calendar-alt"></i>Trend anno su anno (kWh) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-8</span></div>
+          <div class="es-section-title" data-kpi-tip="P-8 — Consumo mensile totale del portafoglio (kWh e €) negli ultimi 24 mesi, con confronto anno su anno."><i class="fa fa-calendar-alt"></i>Trend anno su anno (kWh) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-8</span></div>
           <div class="es-chart-compact" id="chart-trend-yoy"></div>
         </div>
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-layer-group"></i>Commodity (€) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-9</span></div>
+          <div class="es-section-title" data-kpi-tip="P-9 — Costo mensile totale del portafoglio scomposto per commodity (Elettricità, Gas, Acqua, Carburanti, ecc.) negli ultimi 12 mesi."><i class="fa fa-layer-group"></i>Commodity (€) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-9</span></div>
           <div id="chart-commodity-list" style="padding:4px 0;"></div>
         </div>
       </div>
@@ -243,7 +284,7 @@
       <div class="es-row-2" style="margin-bottom:14px;align-items:start;">
         <!-- SINISTRA: P-6 ranking EUI + distribuzione classi come testo -->
         <div class="es-section" style="margin-bottom:0;">
-          <div class="es-section-title"><i class="fa fa-sort-amount-down"></i>Benchmark interno: EUI per asset (P-6)</div>
+          <div class="es-section-title" data-kpi-tip="P-6 — EUI di ogni asset ordinato in modo crescente, raggruppato per categoria. La linea tratteggiata indica la media del gruppo. Verde = sotto media, rosso = sopra media."><i class="fa fa-sort-amount-down"></i>Benchmark interno: EUI per asset (P-6)</div>
           <div class="es-ranking-chart" id="chart-ranking-eui"></div>
           <!-- Distribuzione classi energetiche come badge testo -->
           <div id="classi-text-wrap" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color,rgba(30,58,95,0.4));"></div>
@@ -251,11 +292,11 @@
         <!-- DESTRA: P-7 dimezzato + P-10 sotto -->
         <div style="display:flex;flex-direction:column;gap:14px;">
           <div class="es-section" style="margin-bottom:0;">
-            <div class="es-section-title"><i class="fa fa-calendar-week"></i>Consumi per giorno settimana (kWh/m²) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-7</span></div>
+            <div class="es-section-title" data-kpi-tip="P-7 — Consumo medio giornaliero normalizzato per superficie (kWh/m²) aggregato su tutto il portafoglio, per giorno della settimana."><i class="fa fa-calendar-week"></i>Consumi per giorno settimana (kWh/m²) <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-7</span></div>
             <div class="es-trend-chart" id="chart-weekday" style="height:160px;"></div>
           </div>
           <div class="es-section" style="margin-bottom:0;">
-            <div class="es-section-title"><i class="fa fa-bullseye"></i>Costo cumulato YTD vs Budget <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-10</span></div>
+            <div class="es-section-title" data-kpi-tip="P-10 — Costo energetico cumulato dall’inizio dell’anno confrontato con il budget annuale totale del portafoglio. Area verde = sotto budget, rossa = sopra budget."><i class="fa fa-bullseye"></i>Costo cumulato YTD vs Budget <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;">P-10</span></div>
             <div class="es-trend-chart" id="chart-budget" style="height:160px;"></div>
           </div>
         </div>
@@ -343,33 +384,33 @@
       // ── KPI Strip — Sezione SINTESI (P-1, P-2, P-3) ────────────────────────
       const strip = document.getElementById('kpi-strip');
       strip.innerHTML = `
-        <div class="es-kpi-card">
+        <div class="es-kpi-card" data-kpi-tip="P-1 — Somma dei costi energetici mensili di tutti gli asset attivi del portafoglio. Variazione percentuale vs stesso mese anno precedente.">
           <div class="es-kpi-label">Costo energetico mese (P-1)</div>
           <div class="es-kpi-value">€ ${fmtKpi(port.costo_mese_eur)}</div>
           <div class="es-kpi-unit">portafoglio</div>
           ${port.trend_vs_mese_prec_pct != null ? `<div class="es-kpi-delta ${trendCl(port.trend_vs_mese_prec_pct)}">${trendIc(port.trend_vs_mese_prec_pct)} ${fmt(Math.abs(port.trend_vs_mese_prec_pct))}% vs mese prec.</div>` : ''}
         </div>
-        <div class="es-kpi-card">
+        <div class="es-kpi-card" data-kpi-tip="P-2 — Media ponderata per superficie dell’EUI di tutti gli asset. Calcolata globalmente e per categoria se disponibile.">
           <div class="es-kpi-label">EUI medio portafoglio (P-2)</div>
           <div class="es-kpi-value">${fmtKpi(port.eui_medio, 1)}</div>
           <div class="es-kpi-unit">kWh/m²/anno</div>
         </div>
-        <div class="es-kpi-card">
+        <div class="es-kpi-card" data-kpi-tip="Consumo elettrico totale del portafoglio nel mese corrente, aggregato su tutti gli asset con telemetria attiva.">
           <div class="es-kpi-label">Consumi mese</div>
           <div class="es-kpi-value">${fmtKpi(port.kwh_mese_totale)}</div>
           <div class="es-kpi-unit">kWh</div>
         </div>
-        <div class="es-kpi-card">
+        <div class="es-kpi-card" data-kpi-tip="Emissioni di CO₂ equivalente stimate per il mese corrente, calcolate applicando il fattore di emissione medio alla rete elettrica italiana (0,233 kg CO₂/kWh).">
           <div class="es-kpi-label">CO₂ equivalente mese</div>
           <div class="es-kpi-value">${fmtKpi(port.co2_kg_mese)}</div>
           <div class="es-kpi-unit">kg CO₂</div>
         </div>
-        <div class="es-kpi-card">
+        <div class="es-kpi-card" data-kpi-tip="P-3 — Conteggio totale degli allarmi energetici attivi su tutti gli asset del portafoglio, per severità (Critici, Medi, Bassi).">
           <div class="es-kpi-label">Anomalie attive (P-3)</div>
           <div class="es-kpi-value" style="color:${(port.allarmi_critical||0)>0?'#E74C3C':'var(--text-primary)'}">${port.allarmi_critical || 0}</div>
           <div class="es-kpi-unit">${port.allarmi_medium||0} medi · ${port.allarmi_low||0} bassi</div>
         </div>
-        <div class="es-kpi-card">
+        <div class="es-kpi-card" data-kpi-tip="Numero di asset con stato attivo nel portafoglio. Il sottotitolo indica quanti di essi hanno un gateway IoT configurato e stanno inviando telemetria.">
           <div class="es-kpi-label">Asset attivi</div>
           <div class="es-kpi-value">${port.n_asset_attivi}</div>
           <div class="es-kpi-unit">${port.n_asset_telemetria || 0} con telemetria IoT</div>
