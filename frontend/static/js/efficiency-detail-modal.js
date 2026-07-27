@@ -568,7 +568,7 @@ async function _edmCaricaZone(assetId) {
   if (!el) return;
   try {
     const AUTH = { 'Authorization': 'Bearer ' + API.getToken() };
-    const [zonesRes, telRes, summaryRes, occKpiRes, heatmapRes, dailyRes, weeklyRes, oviRes] = await Promise.all([
+    const [zonesRes, telRes, summaryRes, occKpiRes, heatmapRes, dailyRes, weeklyRes, oviRes, iaqRes, iaqTrendRes] = await Promise.all([
       fetch(`/api/bems/buildings/${assetId}/zones`, { headers: AUTH }),
       fetch(`/api/bems/buildings/${assetId}/telemetry/latest`, { headers: AUTH }).catch(() => null),
       fetch('/api/occupancy/summary', { headers: AUTH }).catch(() => null),
@@ -576,7 +576,9 @@ async function _edmCaricaZone(assetId) {
       fetch(`/api/occupancy/${assetId}/heatmap?giorni=30`, { headers: AUTH }).catch(() => null),
       fetch(`/api/occupancy/${assetId}/daily_profile?giorni=30`, { headers: AUTH }).catch(() => null),
       fetch(`/api/occupancy/${assetId}/weekly_pattern?giorni=90`, { headers: AUTH }).catch(() => null),
-      fetch(`/api/occupancy/${assetId}/ovi?mesi=6`, { headers: AUTH }).catch(() => null)
+      fetch(`/api/occupancy/${assetId}/ovi?mesi=6`, { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/iaq_summary?giorni=30`, { headers: AUTH }).catch(() => null),
+      fetch(`/api/occupancy/${assetId}/iaq_trend?giorni=30`, { headers: AUTH }).catch(() => null)
     ]);
     if (!zonesRes.ok) throw new Error('HTTP ' + zonesRes.status);
     const zones      = await zonesRes.json();
@@ -588,6 +590,8 @@ async function _edmCaricaZone(assetId) {
     const daily      = dailyRes && dailyRes.ok ? await dailyRes.json() : null;
     const weekly     = weeklyRes && weeklyRes.ok ? await weeklyRes.json() : null;
     const ovi        = oviRes && oviRes.ok ? await oviRes.json() : null;
+    const iaq        = iaqRes && iaqRes.ok ? await iaqRes.json() : null;
+    const iaqTrend   = iaqTrendRes && iaqTrendRes.ok ? await iaqTrendRes.json() : null;
 
     const fmt = (v, d=1) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: true });
     const fmtInt = (v) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0, useGrouping: true });
@@ -638,21 +642,27 @@ async function _edmCaricaZone(assetId) {
             <div class="ee-kpi-card-unit">${occKpi.zone_count} zone · ${occKpi.working_hours}</div>
             ${deltaHtml}
           </div>
-          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-2 — co2 media nelle ore occupate. non disponibile: sensori co2 non configurati per questo asset.">
-            <div class="ee-kpi-card-label">CO₂ media (O-2)</div>
+          ${iaq && iaq.iaq_disponibile ? `
+          <div class="ee-kpi-card" data-kpi-tip="o-3 — co2 media nelle zone monitorate negli ultimi 30 giorni. soglie: verde ≤ 800 ppm (buona), arancio 800–1000 ppm (attenzione), rosso > 1000 ppm (critico). valore attuale: ${iaq.avg_co2} ppm su ${iaq.zone.length} zone.">
+            <div class="ee-kpi-card-label">CO₂ media (O-3)</div>
+            <div class="ee-kpi-card-value" style="color:${iaq.avg_co2 > 1000 ? '#E74C3C' : iaq.avg_co2 > 800 ? '#F39C12' : '#27AE60'}">${fmtInt(iaq.avg_co2)} <span style="font-size:12px;font-weight:400;">ppm</span></div>
+            <div class="ee-kpi-card-unit">${iaq.n_zone_critiche > 0 ? `<span style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:3px;"></i>${iaq.n_zone_critiche} zone critiche</span>` : '<span style="color:#27AE60;"><i class="fa fa-check" style="margin-right:3px;"></i>qualità buona</span>'}</div>
+          </div>
+          <div class="ee-kpi-card" data-kpi-tip="o-4 — comfort termico: temperatura media nelle zone monitorate. zona di comfort 19–26°C. temperatura attuale: ${iaq.avg_temp}°C. umidità: ${iaq.avg_hum}%.">
+            <div class="ee-kpi-card-label">Comfort termico (O-4)</div>
+            <div class="ee-kpi-card-value" style="color:${iaq.avg_temp > 26 || iaq.avg_temp < 19 ? '#F39C12' : '#27AE60'}">${fmt(iaq.avg_temp, 1)} <span style="font-size:12px;font-weight:400;">°C</span></div>
+            <div class="ee-kpi-card-unit">${iaq.avg_hum}% umidità · ${iaq.avg_temp > 26 ? 'troppo caldo' : iaq.avg_temp < 19 ? 'troppo freddo' : 'nella norma'}</div>
+          </div>` : `
+          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-3 — co2 media nelle ore occupate. non disponibile: sensori co2 non configurati per questo asset.">
+            <div class="ee-kpi-card-label">CO₂ media (O-3)</div>
             <div class="ee-kpi-card-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
             <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
           </div>
-          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-3 — percentuale ore con qualità aria critica. non disponibile: sensori co2 non configurati.">
-            <div class="ee-kpi-card-label">Qualità aria critica (O-3)</div>
+          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-4 — comfort termico. non disponibile: sensori temperatura non configurati.">
+            <div class="ee-kpi-card-label">Comfort termico (O-4)</div>
             <div class="ee-kpi-card-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
-            <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
-          </div>
-          <div class="ee-kpi-card" style="opacity:0.6;" data-kpi-tip="o-4 — spreco stimato impianti attivi in assenza di occupancy. non disponibile: consumo per piano non configurato.">
-            <div class="ee-kpi-card-label">Spreco stimato (O-4)</div>
-            <div class="ee-kpi-card-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
-            <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>consumo per piano non disponibile</div>
-          </div>
+            <div class="ee-kpi-card-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori non configurati</div>
+          </div>`}
         </div>
         <div class="ee-section-title" style="margin-bottom:10px;" data-kpi-tip="analisi occupancy — grafici interattivi per l'analisi dettagliata dell'utilizzo degli spazi: heatmap zona×ora, profilo giornaliero, pattern settimanale."><i class="fa fa-chart-bar"></i>Analisi Occupancy</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
@@ -671,13 +681,8 @@ async function _edmCaricaZone(assetId) {
             <div class="ee-chart" id="occ-chart-weekly-${assetId}"></div>
           </div>
           <div class="es-section" style="margin-bottom:0;">
-            <div class="es-section-title" data-kpi-tip="o-8 — qualità aria per zona (co2, temperatura, umidità). non disponibile: sensori ambientali non configurati per questo asset."><i class="fa fa-wind"></i>Qualità aria per zona <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-8</span></div>
-            <div class="ee-chart" id="occ-chart-air-${assetId}" style="display:flex;align-items:center;justify-content:center;min-height:120px;">
-              <div style="text-align:center;color:var(--text-muted,#4A7A9B);font-size:12px;">
-                <i class="fa fa-lock" style="font-size:20px;margin-bottom:6px;display:block;"></i>
-                Sensori ambientali non configurati
-              </div>
-            </div>
+            <div class="es-section-title" data-kpi-tip="o-8 — andamento giornaliero co2 media e temperatura nelle zone monitorate. linea blu = co2 (ppm), linea arancio = temperatura (°C). fascia rossa = soglia critica co2 1000 ppm."><i class="fa fa-wind"></i>Qualità aria — trend 30gg <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">O-8</span></div>
+            <div class="ee-chart" id="occ-chart-air-${assetId}"></div>
           </div>
         </div>
         <div class="ee-section-title" style="margin-bottom:10px;" data-kpi-tip="trend occupancy — andamento temporale dell'indice di variabilità dell'occupancy (ovi). un valore basso indica pattern stabile e prevedibile, ottimale per la programmazione automatica degli impianti."><i class="fa fa-chart-line"></i>Trend Occupancy</div>
@@ -887,6 +892,47 @@ async function _edmCaricaZone(assetId) {
           xaxis: { title: '' },
           yaxis: { title: { text: 'CV (OVI)', standoff: 4 }, range: [0, maxOvi * 1.1] }
         }), plotCfg);
+      }
+
+      // ── O-8: Grafico trend CO2 + Temperatura ──────────────────────────────
+      const airEl = document.getElementById(`occ-chart-air-${assetId}`);
+      if (airEl && iaqTrend && iaqTrend.data && iaqTrend.data.length > 0) {
+        const days     = iaqTrend.data.map(r => r.giorno);
+        const co2Vals  = iaqTrend.data.map(r => r.avg_co2);
+        const tempVals = iaqTrend.data.map(r => r.avg_temp);
+        const xFirst   = days[0];
+        const xLast    = days[days.length - 1];
+        Plotly.newPlot(airEl, [
+          {
+            x: days, y: co2Vals,
+            name: 'CO₂ (ppm)', type: 'scatter', mode: 'lines',
+            line: { color: '#1E88E5', width: 2 },
+            yaxis: 'y',
+            hovertemplate: '<b>%{x}</b><br>CO₂: %{y:.0f} ppm<extra></extra>'
+          },
+          {
+            x: days, y: tempVals,
+            name: 'Temp (°C)', type: 'scatter', mode: 'lines',
+            line: { color: '#F39C12', width: 2, dash: 'dot' },
+            yaxis: 'y2',
+            hovertemplate: '<b>%{x}</b><br>Temp: %{y:.1f}°C<extra></extra>'
+          }
+        ], plotLayout({
+          shapes: [
+            { type:'line', x0: xFirst, x1: xLast, y0: 1000, y1: 1000,
+              yref:'y', line:{ color:'rgba(231,76,60,0.5)', width:1, dash:'dot' } }
+          ],
+          annotations: [
+            { x: xLast, y: 1000, xref:'x', yref:'y', text:'soglia critica',
+              showarrow:false, font:{ size:9, color:'#E74C3C' }, xanchor:'right', yanchor:'bottom' }
+          ],
+          xaxis:  { title: '' },
+          yaxis:  { title: { text: 'CO₂ ppm', standoff: 4 }, side: 'left' },
+          yaxis2: { title: { text: '°C', standoff: 4 }, side: 'right', overlaying: 'y', showgrid: false },
+          legend: { x: 0, y: 1.1, orientation: 'h', font: { size: 10 } }
+        }), plotCfg);
+      } else if (airEl) {
+        airEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted,#4A7A9B);font-size:12px;"><i class="fa fa-lock" style="margin-right:6px;"></i>Sensori ambientali non configurati</div>';
       }
     }
 

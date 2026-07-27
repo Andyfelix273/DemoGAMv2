@@ -338,6 +338,39 @@
         el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-info-circle" style="margin-right:6px;"></i>Dati insufficienti (servono ≥ 2 asset con occupancy e EUI)</div>';
       }
     } catch(e) { console.warn('[Occ P-O5]', e); }
+
+    // ── P-O3 / P-O4: IAQ portafoglio ──────────────────────────────────────────
+    try {
+      const res = await fetch(`/api/occupancy/portfolio/iaq_summary?giorni=${giorni}`, { headers: AUTH });
+      const d   = res.ok ? await res.json() : null;
+      if (d && d.n_asset_iaq > 0) {
+        // Aggiorna le card P-O3 e P-O4 nella strip già renderizzata
+        const strip = document.getElementById('occ-kpi-strip');
+        if (strip) {
+          // Rimuovi placeholder P-O3 e P-O4 e sostituisci con dati reali
+          const co2Color  = d.asset_critici > 0 ? '#E74C3C' : d.avg_co2_portfolio > 800 ? '#F39C12' : '#27AE60';
+          const tempColor = d.avg_temp_portfolio > 26 || d.avg_temp_portfolio < 19 ? '#F39C12' : '#27AE60';
+          // Crea o aggiorna le card IAQ
+          const po3Card = strip.querySelector('[data-iaq-po3]');
+          const po4Card = strip.querySelector('[data-iaq-po4]');
+          const iaqHtml = `
+            <div class="es-kpi-card" data-iaq-po3 data-kpi-tip="p-o3 — qualità aria portafoglio: co2 media ${d.avg_co2_portfolio} ppm su ${d.n_asset_iaq} asset monitorati. asset critici (co2 > 1000 ppm per oltre 20% delle ore): ${d.asset_critici}.">
+              <div class="es-kpi-label"><i class="fa fa-wind" style="margin-right:4px;"></i>CO₂ media portafoglio (P-O3)</div>
+              <div class="es-kpi-value" style="color:${co2Color};">${fmtInt(d.avg_co2_portfolio)} <span style="font-size:14px;font-weight:400;">ppm</span></div>
+              <div class="es-kpi-unit">${d.asset_critici > 0 ? `<span style="color:#E74C3C;"><i class="fa fa-exclamation-triangle" style="margin-right:3px;"></i>${d.asset_critici} asset critici</span>` : '<span style="color:#27AE60;"><i class="fa fa-check" style="margin-right:3px;"></i>qualità buona</span>'}</div>
+            </div>
+            <div class="es-kpi-card" data-iaq-po4 data-kpi-tip="p-o4 — comfort termico medio portafoglio: temperatura media ${d.avg_temp_portfolio}°C. zona di comfort 19–26°C.">
+              <div class="es-kpi-label"><i class="fa fa-thermometer-half" style="margin-right:4px;"></i>Comfort termico medio (P-O4)</div>
+              <div class="es-kpi-value" style="color:${tempColor};">${fmt(d.avg_temp_portfolio, 1)} <span style="font-size:14px;font-weight:400;">°C</span></div>
+              <div class="es-kpi-unit">${d.avg_temp_portfolio > 26 ? 'Troppo caldo' : d.avg_temp_portfolio < 19 ? 'Troppo freddo' : 'Nella norma'} · ${d.n_asset_iaq} asset</div>
+            </div>`;
+          // Rimuovi card placeholder P-O3/P-O4 (opacity:0.55) e aggiungi quelle reali
+          const placeholders = strip.querySelectorAll('[style*="opacity:0.55"]');
+          placeholders.forEach(p => p.remove());
+          strip.insertAdjacentHTML('beforeend', iaqHtml);
+        }
+      }
+    } catch(e) { console.warn('[Occ P-O3/P-O4]', e); }
   }
 
   document.addEventListener('DOMContentLoaded', async () => {

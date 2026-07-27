@@ -1070,3 +1070,195 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
             "median_eui": med_eui,
             "giorni_energia": giorni,
         }
+
+    # ── KPI IAQ — Qualità Aria e Comfort (da tabella telemetry) ──────────────
+    # Registrati prima degli endpoint /{asset_id}/* per evitare conflitti.
+
+    @app.get("/api/occupancy/portfolio/iaq_summary", tags=["occupancy-kpi"])
+    def get_iaq_portfolio_summary(giorni: int = 30,
+                                   _=Depends(get_utente_corrente),
+                                   db=Depends(get_db)):
+        """P-O3: Qualità Aria Portafoglio — asset con CO2 critico, medie IAQ."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        # Media CO2, temp, humidity per asset + conteggio ore critiche (CO2 > 1000 ppm)
+        cur.execute("""
+            SELECT
+                t.asset_id,
+                a.nome,
+                a.tipo,
+                COUNT(DISTINCT t.zone_id) AS zone_iaq,
+                ROUND(AVG(t.co2_ppm)::numeric, 0)    AS avg_co2,
+                ROUND(MAX(t.co2_ppm)::numeric, 0)    AS max_co2,
+                ROUND(AVG(t.temp_c)::numeric, 1)     AS avg_temp,
+                ROUND(AVG(t.humidity)::numeric, 1)   AS avg_hum,
+                COUNT(*) AS tot_letture,
+                SUM(CASE WHEN t.co2_ppm > 1000 THEN 1 ELSE 0 END) AS ore_co2_critico,
+                SUM(CASE WHEN t.co2_ppm > 800  THEN 1 ELSE 0 END) AS ore_co2_warning
+            FROM telemetry t
+            JOIN assets a ON a.id = t.asset_id
+            WHERE t.co2_ppm IS NOT NULL
+              AND t.ts >= %s AND t.ts < %s
+            GROUP BY t.asset_id, a.nome, a.tipo
+            ORDER BY avg_co2 DESC
+        """, (ts_from, now))
+        rows = cur.fetchall()
+
+        if not rows:
+            return {"giorni": giorni, "n_asset_iaq": 0, "asset_critici": 0, "data": []}
+
+        result = []
+        for r in rows:
+            tot = int(r["tot_letture"]) or 1
+            pct_critico = round(int(r["ore_co2_critico"]) / tot * 100, 1)
+            pct_warning = round(int(r["ore_co2_warning"]) / tot * 100, 1)
+            stato = "critico" if pct_critico > 20 else ("warning" if pct_warning > 30 else "ok")
+            result.append({
+                "asset_id":       r["asset_id"],
+                "nome":           r["nome"],
+                "tipo":           r["tipo"],
+                "zone_iaq":       int(r["zone_iaq"]),
+                "avg_co2":        float(r["avg_co2"] or 0),
+                "max_co2":        float(r["max_co2"] or 0),
+                "avg_temp":       float(r["avg_temp"] or 0),
+                "avg_hum":        float(r["avg_hum"] or 0),
+                "pct_ore_critico": pct_critico,
+                "pct_ore_warning": pct_warning,
+                "stato_iaq":      stato,
+            })
+
+        n_critici = sum(1 for r in result if r["stato_iaq"] == "critico")
+        avg_co2_portfolio = round(sum(r["avg_co2"] for r in result) / len(result), 0)
+        avg_temp_portfolio = round(sum(r["avg_temp"] for r in result) / len(result), 1)
+
+        return {
+            "giorni":              giorni,
+            "n_asset_iaq":         len(result),
+            "asset_critici":       n_critici,
+            "avg_co2_portfolio":   avg_co2_portfolio,
+            "avg_temp_portfolio":  avg_temp_portfolio,
+            "data":                result,
+        }
+
+    @app.get("/api/occupancy/{asset_id}/iaq_summary", tags=["occupancy-kpi"])
+    def get_iaq_asset_summary(asset_id: int,
+                               giorni: int = 30,
+                               _=Depends(get_utente_corrente),
+                               db=Depends(get_db)):
+        """O-3/O-4: Qualità Aria e Comfort Termico per asset — medie CO2, temp, umidità per zona."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT
+                zone_id,
+                ROUND(AVG(co2_ppm)::numeric, 0)  AS avg_co2,
+                ROUND(MAX(co2_ppm)::numeric, 0)  AS max_co2,
+                ROUND(AVG(temp_c)::numeric, 1)   AS avg_temp,
+                ROUND(MIN(temp_c)::numeric, 1)   AS min_temp,
+                ROUND(MAX(temp_c)::numeric, 1)   AS max_temp,
+                ROUND(AVG(humidity)::numeric, 1) AS avg_hum,
+                COUNT(*) AS tot_letture,
+                SUM(CASE WHEN co2_ppm > 1000 THEN 1 ELSE 0 END) AS ore_co2_critico,
+                SUM(CASE WHEN co2_ppm > 800  THEN 1 ELSE 0 END) AS ore_co2_warning,
+                SUM(CASE WHEN temp_c > 26 OR temp_c < 19 THEN 1 ELSE 0 END) AS ore_temp_fuori
+            FROM telemetry
+            WHERE asset_id = %s
+              AND co2_ppm IS NOT NULL
+              AND ts >= %s AND ts < %s
+            GROUP BY zone_id
+            ORDER BY avg_co2 DESC
+        """, (asset_id, ts_from, now))
+        zone_rows = cur.fetchall()
+
+        if not zone_rows:
+            return {
+                "asset_id": asset_id,
+                "giorni": giorni,
+                "iaq_disponibile": False,
+                "zone": [],
+            }
+
+        zone_list = []
+        for r in zone_rows:
+            tot = int(r["tot_letture"]) or 1
+            pct_critico = round(int(r["ore_co2_critico"]) / tot * 100, 1)
+            pct_warning = round(int(r["ore_co2_warning"]) / tot * 100, 1)
+            pct_temp_fuori = round(int(r["ore_temp_fuori"]) / tot * 100, 1)
+            stato = "critico" if pct_critico > 20 else ("warning" if pct_warning > 30 else "ok")
+            zone_list.append({
+                "zone_id":          r["zone_id"],
+                "avg_co2":          float(r["avg_co2"] or 0),
+                "max_co2":          float(r["max_co2"] or 0),
+                "avg_temp":         float(r["avg_temp"] or 0),
+                "min_temp":         float(r["min_temp"] or 0),
+                "max_temp":         float(r["max_temp"] or 0),
+                "avg_hum":          float(r["avg_hum"] or 0),
+                "pct_ore_critico":  pct_critico,
+                "pct_ore_warning":  pct_warning,
+                "pct_temp_fuori":   pct_temp_fuori,
+                "stato_iaq":        stato,
+            })
+
+        # Medie asset
+        avg_co2  = round(sum(z["avg_co2"]  for z in zone_list) / len(zone_list), 0)
+        avg_temp = round(sum(z["avg_temp"] for z in zone_list) / len(zone_list), 1)
+        avg_hum  = round(sum(z["avg_hum"]  for z in zone_list) / len(zone_list), 1)
+        n_critici = sum(1 for z in zone_list if z["stato_iaq"] == "critico")
+
+        return {
+            "asset_id":        asset_id,
+            "giorni":          giorni,
+            "iaq_disponibile": True,
+            "avg_co2":         avg_co2,
+            "avg_temp":        avg_temp,
+            "avg_hum":         avg_hum,
+            "n_zone_critiche": n_critici,
+            "zone":            zone_list,
+        }
+
+    @app.get("/api/occupancy/{asset_id}/iaq_trend", tags=["occupancy-kpi"])
+    def get_iaq_asset_trend(asset_id: int,
+                             giorni: int = 30,
+                             _=Depends(get_utente_corrente),
+                             db=Depends(get_db)):
+        """O-3 Trend: andamento giornaliero CO2 media, max, temp media per asset."""
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now(timezone.utc)
+        ts_from = now - timedelta(days=giorni)
+
+        cur.execute("""
+            SELECT
+                DATE_TRUNC('day', ts AT TIME ZONE 'Europe/Rome')::date AS giorno,
+                ROUND(AVG(co2_ppm)::numeric, 0)  AS avg_co2,
+                ROUND(MAX(co2_ppm)::numeric, 0)  AS max_co2,
+                ROUND(AVG(temp_c)::numeric, 1)   AS avg_temp,
+                ROUND(AVG(humidity)::numeric, 1) AS avg_hum,
+                COUNT(*) AS n_letture
+            FROM telemetry
+            WHERE asset_id = %s
+              AND co2_ppm IS NOT NULL
+              AND ts >= %s AND ts < %s
+            GROUP BY giorno
+            ORDER BY giorno
+        """, (asset_id, ts_from, now))
+        rows = cur.fetchall()
+
+        return {
+            "asset_id": asset_id,
+            "giorni": giorni,
+            "data": [
+                {
+                    "giorno":    str(r["giorno"]),
+                    "avg_co2":   float(r["avg_co2"] or 0),
+                    "max_co2":   float(r["max_co2"] or 0),
+                    "avg_temp":  float(r["avg_temp"] or 0),
+                    "avg_hum":   float(r["avg_hum"] or 0),
+                    "n_letture": int(r["n_letture"]),
+                }
+                for r in rows
+            ],
+        }
