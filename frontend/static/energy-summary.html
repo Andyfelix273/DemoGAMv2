@@ -446,10 +446,11 @@
       // ── P-6: Ranking EUI — Bar Chart orizzontale raggruppato per categoria ────
       const ranking = [...(port.ranking_asset || [])].sort((a, b) => b.eui - a.eui);
       if (ranking.length > 0) {
-        // Altezza fissa 160px, barre con width esplicito uguale a P-7
-        // P-7: 7 barre in 160px con bargap default (0.2) => barre alte ~18px
-        // Forziamo width=18px su tutte le barre indipendentemente dal numero di asset
-        const rankH = 160;
+        // Altezza proporzionale: P-7 ha 7 barre in 160px => 22px per barra
+        // P-6 usa lo stesso px/barra per avere barre visivamente identiche
+        const PX_PER_BARRA = Math.round(160 / 7); // ~22px
+        const MARGINI_P6 = 54; // t:6 + b:28 + legenda:20
+        const rankH = ranking.length * PX_PER_BARRA + MARGINI_P6;
         document.getElementById('chart-ranking-eui').style.height = rankH + 'px';
 
         // Raggruppa per categoria con colori per classe energetica
@@ -464,7 +465,6 @@
             name: catLabels[cat] || cat,
             y: rows.map(r => r.nome),
             x: rows.map(r => r.eui),
-            width: rows.map(() => 0.6), // larghezza fissa categoria: 0.6 in unità asse Y
             marker: { color: rows.map(r => EUI_CLASS_COLOR[r.eui_class] || catColors[cat] || '#58A6FF'), opacity: 0.85 },
             text: rows.map(r => fmt(r.eui)),
             textposition: 'outside',
@@ -476,7 +476,6 @@
         Plotly.newPlot('chart-ranking-eui', rankTraces,
           Object.assign({}, baseLayout, {
             barmode: 'overlay',
-            bargap: 0.15,
             margin: { t: 6, r: 50, b: 28, l: 140 },
             xaxis: Object.assign({}, baseLayout.xaxis, {
               title: { text: 'kWh/m²/anno', font: { size: 9 }, standoff: 3 },
