@@ -1251,8 +1251,8 @@ a.module-card:hover {
 .ee-kpi-card {
   flex: 1 1 130px;
   min-width: 120px;
-  background: var(--card-bg, #0d1b2a);
-  border: 1px solid var(--border-color, rgba(30,58,95,0.6));
+  background: var(--bg-secondary, #132338);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 10px 14px;
 }
@@ -1406,7 +1406,7 @@ a.module-card:hover {
 
 /* ─── ES-SECTION: card generica condivisa tra summary e modale ───────────────*/
 .es-section {
-  background: var(--card-bg, #0d1b2a);
+  background: var(--bg-card, #1A2E45);
   border: 1px solid var(--border-color, rgba(30,58,95,0.6));
   border-radius: 8px;
   padding: 14px 16px 10px;
