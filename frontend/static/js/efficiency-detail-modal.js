@@ -309,7 +309,7 @@ async function apriDettaglioAsset(id) {
         </select>
         <span id="edm-consumi-status" class="edm-status-label">Caricamento…</span>
       </div>
-      <div id="edm-consumi-kpi" class="kpi-strip" style="margin-bottom:12px;"></div>
+      <div id="edm-consumi-kpi" class="ee-kpi-grid"></div>
       <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border,#1E3A5F);">
         <div class="ee-section-title" style="margin-bottom:8px;"><i class="fa fa-chart-area"></i> Consumi vs Occupancy</div>
         <div id="edm-consumi-occ-chart" class="edm-chart-wrap" style="height:220px;"></div>
@@ -401,9 +401,9 @@ async function _edmCaricaConsumi(assetId, ore) {
 
     if (!readings || readings.length === 0) {
       if (kpiEl && kwIstantaneo > 0) kpiEl.innerHTML = `
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:#F39C12">${kwIstantaneo.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="edm-kpi-lbl">kW istantaneo</div></div>
-        ${tempMedia > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${tempMedia.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div><div class="edm-kpi-lbl">Temp. media</div></div>` : ''}
-        ${co2Media  > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${co2Media.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="edm-kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+        <div class="ee-kpi-card"><div class="ee-kpi-card-label">KW ISTANTANEO</div><div class="ee-kpi-card-value" style="color:#F39C12">${kwIstantaneo.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="ee-kpi-card-unit">kW ora</div></div>
+        ${tempMedia > 0 ? `<div class="ee-kpi-card"><div class="ee-kpi-card-label">TEMP. MEDIA</div><div class="ee-kpi-card-value">${tempMedia.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div></div>` : ''}
+        ${co2Media  > 0 ? `<div class="ee-kpi-card"><div class="ee-kpi-card-label">CO₂ MEDIA</div><div class="ee-kpi-card-value">${co2Media.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="ee-kpi-card-unit">ppm</div></div>` : ''}`;
       chartEl.innerHTML = '<p style="color:var(--text-secondary,#7BAFC4);font-size:13px;padding:20px;text-align:center;">Nessuna lettura storica disponibile.</p>';
       if (statusEl) statusEl.textContent = '';
       return;
@@ -414,12 +414,12 @@ async function _edmCaricaConsumi(assetId, ore) {
     const max    = Math.max(...readings.map(r => r.valore || 0));
 
     if (kpiEl) kpiEl.innerHTML = `
-      ${kwIstantaneo > 0 ? `<div class="kpi-card warning"><div class="kpi-val">${kwIstantaneo.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="kpi-lbl"><i class="fa fa-bolt"></i> kW ora</div></div>` : ''}
-      <div class="kpi-card"><div class="kpi-val">${totale.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="kpi-lbl">Totale ${readings[0]?.unita || 'kWh'}</div></div>
-      <div class="kpi-card"><div class="kpi-val">${media.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="kpi-lbl">Media lettura</div></div>
-      <div class="kpi-card"><div class="kpi-val">${max.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="kpi-lbl">Picco max</div></div>
-      ${tempMedia > 0 ? `<div class="kpi-card info"><div class="kpi-val">${tempMedia.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div><div class="kpi-lbl">Temp. media</div></div>` : ''}
-      ${co2Media  > 0 ? `<div class="kpi-card"><div class="kpi-val">${co2Media.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+      ${kwIstantaneo > 0 ? `<div class="ee-kpi-card"><div class="ee-kpi-card-label">KW ORA</div><div class="ee-kpi-card-value" style="color:#F39C12">${kwIstantaneo.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="ee-kpi-card-unit">istantaneo</div></div>` : ''}
+      <div class="ee-kpi-card"><div class="ee-kpi-card-label">TOTALE ${(readings[0]?.unita || 'kWh').toUpperCase()}</div><div class="ee-kpi-card-value">${totale.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="ee-kpi-card-unit">${readings[0]?.unita || 'kWh'}</div></div>
+      <div class="ee-kpi-card"><div class="ee-kpi-card-label">MEDIA LETTURA</div><div class="ee-kpi-card-value">${media.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="ee-kpi-card-unit">${readings[0]?.unita || 'kWh'}/lettura</div></div>
+      <div class="ee-kpi-card"><div class="ee-kpi-card-label">PICCO MAX</div><div class="ee-kpi-card-value">${max.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="ee-kpi-card-unit">${readings[0]?.unita || 'kWh'}</div></div>
+      ${tempMedia > 0 ? `<div class="ee-kpi-card"><div class="ee-kpi-card-label">TEMP. MEDIA</div><div class="ee-kpi-card-value">${tempMedia.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div></div>` : ''}
+      ${co2Media  > 0 ? `<div class="ee-kpi-card"><div class="ee-kpi-card-label">CO₂ MEDIA</div><div class="ee-kpi-card-value">${co2Media.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="ee-kpi-card-unit">ppm</div></div>` : ''}`;
 
     if (statusEl) statusEl.textContent = `${readings.length} letture`;
 
