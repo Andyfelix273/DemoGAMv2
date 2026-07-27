@@ -165,6 +165,7 @@
   };
 
   const fmt    = (v, d=1) => v == null ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtInt  = (v) => v == null ? '–' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: 0 });
   const trendCl = (v) => v == null ? 'flat' : v > 0 ? 'up' : 'down';
   const trendIc = (v) => v == null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
 
