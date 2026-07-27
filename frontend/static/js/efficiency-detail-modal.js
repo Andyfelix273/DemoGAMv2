@@ -274,6 +274,22 @@ async function apriDettaglioAsset(id) {
     // ── Anagrafica ───────────────────────────────────────────────────────────
     const statoLabel = { attivo:'Attivo', manutenzione:'In manutenzione', inattivo:'Inattivo' }[a.stato] || a.stato;
     const statoColor = { attivo:'#27AE60', manutenzione:'#F39C12', inattivo:'#E74C3C' }[a.stato] || '';
+    // Orario lavorativo
+    const whStart = a.working_hours_start ? a.working_hours_start.slice(0,5) : '–';
+    const whEnd   = a.working_hours_end   ? a.working_hours_end.slice(0,5)   : '–';
+    const wdMap   = { MON:'Lun', TUE:'Mar', WED:'Mer', THU:'Gio', FRI:'Ven', SAT:'Sab', SUN:'Dom' };
+    const wdLabel = a.working_days ? a.working_days.split(',').map(d => wdMap[d]||d).join(', ') : '–';
+    const whLabel = (whStart !== '–') ? `${whStart} – ${whEnd} &nbsp;·&nbsp; ${wdLabel}` : '–';
+    // Classe energetica
+    const _eClassColors = { A4:'#1a7a2e',A3:'#27AE60',A2:'#52be80',A1:'#a9dfbf',B:'#F39C12',C:'#E67E22',D:'#E74C3C',E:'#c0392b',F:'#922b21',G:'#7b241c' };
+    const eClass = a.energy_class || null;
+    const eClassHtml = eClass
+      ? `<span style="background:${_eClassColors[eClass]||'#555'};color:#fff;padding:1px 9px;border-radius:4px;font-weight:700;font-size:12px;">${eClass}</span>`
+      : '–';
+    const catLabel = { OFFICE:'Ufficio', INDUSTRIAL:'Industriale', WAREHOUSE:'Magazzino', RETAIL:'Retail', MIXED:'Misto' }[a.building_category] || a.building_category || '–';
+    const budgetLabel = a.annual_energy_budget_eur
+      ? '€ ' + a.annual_energy_budget_eur.toLocaleString('it-IT', {minimumFractionDigits:0, maximumFractionDigits:0}) + ' / anno'
+      : '–';
     const campi = [
       ['Codice', a.codice], ['Tipo', a.tipo],
       ['Stato', `<span style="color:${statoColor};font-weight:600">${statoLabel}</span>`],
@@ -282,6 +298,10 @@ async function apriDettaglioAsset(id) {
       ['CAP', a.cap],
       ['Superficie', a.superficie_mq ? a.superficie_mq.toLocaleString('it-IT') + ' m²' : '–'],
       ['Anno costruzione', a.anno_costruzione || '–'],
+      ['Orario lavorativo', whLabel],
+      ['Categoria edificio', catLabel],
+      ['Classe energetica', eClassHtml],
+      ['Budget energia annuo', budgetLabel],
       ['Coordinate', (a.lat||0).toFixed(5) + ', ' + (a.lon||0).toFixed(5)],
       ['Note', a.note || '–', true]
     ];

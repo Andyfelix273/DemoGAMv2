@@ -683,13 +683,28 @@ def register_energy_routes(app, get_db, get_utente_corrente):
         Restituisce un dict zone_id -> {power_kw, temp_c, humidity, co2_ppm, occupancy_pct, ts}."""
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         # Ultima telemetria per zona (DISTINCT ON richiede ORDER BY)
+        # Ultimo campione per zona (preferisce il più recente con persone_presenti valorizzato)
         cur.execute("""
-            SELECT DISTINCT ON (zone_id)
-                zone_id, power_kw, temp_c, humidity, co2_ppm, occupancy, persone_presenti, ts
-            FROM telemetry
-            WHERE asset_id = %s AND zone_id IS NOT NULL
-            ORDER BY zone_id, ts DESC
-        """, (asset_id,))
+            WITH latest AS (
+                SELECT DISTINCT ON (zone_id)
+                    zone_id, power_kw, temp_c, humidity, co2_ppm, occupancy, persone_presenti, ts
+                FROM telemetry
+                WHERE asset_id = %s AND zone_id IS NOT NULL
+                ORDER BY zone_id, ts DESC
+            ),
+            latest_pp AS (
+                SELECT DISTINCT ON (zone_id)
+                    zone_id, persone_presenti AS pp_val
+                FROM telemetry
+                WHERE asset_id = %s AND zone_id IS NOT NULL
+                  AND persone_presenti IS NOT NULL
+                ORDER BY zone_id, ts DESC
+            )
+            SELECT l.zone_id, l.power_kw, l.temp_c, l.humidity, l.co2_ppm,
+                   l.occupancy, COALESCE(lp.pp_val, l.persone_presenti) AS persone_presenti, l.ts
+            FROM latest l
+            LEFT JOIN latest_pp lp ON l.zone_id = lp.zone_id
+        """, (asset_id, asset_id))
         rows = cur.fetchall()
         # Calcola occupancy_pct_30d per ogni zona (% ore occupate negli ultimi 30 giorni)
         cur.execute("""
