@@ -976,11 +976,9 @@ async function _edmCaricaZone(assetId) {
             ${tel.co2_ppm  != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
               <i class="fa fa-leaf" style="margin-right:3px;color:#27AE60;"></i>${tel.co2_ppm.toLocaleString('it-IT',{maximumFractionDigits:0})} ppm CO₂</div>` : ''}
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
-              ${tel.persone_presenti != null
-                ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-users" style="margin-right:3px;color:#00B4D8;"></i>${tel.persone_presenti} / ${z.capacita_persone || '?'} pers.</div>`
-                : (tel.occupancy_pct != null
-                    ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-chart-bar" style="margin-right:3px;color:#00B4D8;"></i>Occ. ${tel.occupancy_pct.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}%</div>`
-                    : '<div></div>')}
+              ${(tel.persone_presenti != null && z.capacita_persone > 0)
+                ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-users" style="margin-right:3px;color:#00B4D8;"></i>${tel.persone_presenti} / ${z.capacita_persone} pers.</div>`
+                : '<div></div>'}
               <div style="font-size:11px;font-weight:700;color:${oc};">${isOcc ? '● Occupata' : '○ Libera'}</div>
             </div>
           </div>`;
