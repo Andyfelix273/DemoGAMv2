@@ -188,7 +188,7 @@ def simula_zona(zone_id: str, floor_id: str, tipo: str, capacita: int, ts: datet
     #   - Badge system: conteggio accessi per zona
     # Nel simulatore lo calcoliamo come stima: occ_factor × capacità massima
     # ────────────────────────────────────────────────────────────────────────
-    persone_presenti = round(occ_factor * capacita) if capacita and capacita > 0 else None
+    persone_presenti = min(round(occ_factor * capacita), capacita) if capacita and capacita > 0 else None
 
     return {
         "asset_id": ASSET_ID,
