@@ -375,9 +375,9 @@ async function _edmCaricaConsumi(assetId, ore) {
 
     if (!readings || readings.length === 0) {
       if (kpiEl && kwIstantaneo > 0) kpiEl.innerHTML = `
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:#F39C12">${kwIstantaneo.toFixed(1)}</div><div class="edm-kpi-lbl">kW istantaneo</div></div>
-        ${tempMedia > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${tempMedia.toFixed(1)}°C</div><div class="edm-kpi-lbl">Temp. media</div></div>` : ''}
-        ${co2Media  > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${co2Media.toFixed(0)}</div><div class="edm-kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="color:#F39C12">${kwIstantaneo.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="edm-kpi-lbl">kW istantaneo</div></div>
+        ${tempMedia > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${tempMedia.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div><div class="edm-kpi-lbl">Temp. media</div></div>` : ''}
+        ${co2Media  > 0 ? `<div class="edm-kpi-card"><div class="edm-kpi-val">${co2Media.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="edm-kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
       chartEl.innerHTML = '<p style="color:var(--text-secondary,#7BAFC4);font-size:13px;padding:20px;text-align:center;">Nessuna lettura storica disponibile.</p>';
       if (statusEl) statusEl.textContent = '';
       return;
@@ -388,12 +388,12 @@ async function _edmCaricaConsumi(assetId, ore) {
     const max    = Math.max(...readings.map(r => r.valore || 0));
 
     if (kpiEl) kpiEl.innerHTML = `
-      ${kwIstantaneo > 0 ? `<div class="kpi-card warning"><div class="kpi-val">${kwIstantaneo.toFixed(1)}</div><div class="kpi-lbl"><i class="fa fa-bolt"></i> kW ora</div></div>` : ''}
-      <div class="kpi-card"><div class="kpi-val">${totale.toFixed(0)}</div><div class="kpi-lbl">Totale ${readings[0]?.unita || 'kWh'}</div></div>
-      <div class="kpi-card"><div class="kpi-val">${media.toFixed(1)}</div><div class="kpi-lbl">Media lettura</div></div>
-      <div class="kpi-card"><div class="kpi-val">${max.toFixed(1)}</div><div class="kpi-lbl">Picco max</div></div>
-      ${tempMedia > 0 ? `<div class="kpi-card info"><div class="kpi-val">${tempMedia.toFixed(1)}°C</div><div class="kpi-lbl">Temp. media</div></div>` : ''}
-      ${co2Media  > 0 ? `<div class="kpi-card"><div class="kpi-val">${co2Media.toFixed(0)}</div><div class="kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
+      ${kwIstantaneo > 0 ? `<div class="kpi-card warning"><div class="kpi-val">${kwIstantaneo.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="kpi-lbl"><i class="fa fa-bolt"></i> kW ora</div></div>` : ''}
+      <div class="kpi-card"><div class="kpi-val">${totale.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="kpi-lbl">Totale ${readings[0]?.unita || 'kWh'}</div></div>
+      <div class="kpi-card"><div class="kpi-val">${media.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="kpi-lbl">Media lettura</div></div>
+      <div class="kpi-card"><div class="kpi-val">${max.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="kpi-lbl">Picco max</div></div>
+      ${tempMedia > 0 ? `<div class="kpi-card info"><div class="kpi-val">${tempMedia.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div><div class="kpi-lbl">Temp. media</div></div>` : ''}
+      ${co2Media  > 0 ? `<div class="kpi-card"><div class="kpi-val">${co2Media.toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="kpi-lbl">CO₂ media (ppm)</div></div>` : ''}`;
 
     if (statusEl) statusEl.textContent = `${readings.length} letture`;
 
@@ -438,7 +438,7 @@ async function _edmCaricaConsumi(assetId, ore) {
       }, 80);
     } else {
       chartEl.innerHTML = `<p style="color:var(--text-secondary,#7BAFC4);font-size:12px;padding:8px;">
-        Totale: <strong>${totale.toFixed(1)} ${readings[0]?.unita || 'kWh'}</strong> (${readings.length} letture)</p>`;
+        Totale: <strong>${totale.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})} ${readings[0]?.unita || 'kWh'}</strong> (${readings.length} letture)</p>`;
     }
   } catch(e) {
     if (chartEl) chartEl.innerHTML = `<p style="color:#E74C3C;font-size:13px;padding:20px;text-align:center;">Dati consumi non disponibili</p>`;
@@ -498,15 +498,15 @@ async function _edmCaricaEsg(assetId) {
           display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;">${item.rating_esg||'–'}</div>
         <div>
           <div style="font-size:11px;color:var(--text-secondary,#7BAFC4);">Rating efficienza energetica</div>
-          <div style="font-size:22px;font-weight:700;">${(item.kwh_giorno||0).toFixed(0)} kWh/giorno</div>
-          <div style="font-size:11px;color:var(--text-secondary,#7BAFC4);">${(item.kwh_mq||0).toFixed(2)} kWh/m²</div>
+          <div style="font-size:22px;font-weight:700;">${(item.kwh_giorno||0).toLocaleString('it-IT',{maximumFractionDigits:0})} kWh/giorno</div>
+          <div style="font-size:11px;color:var(--text-secondary,#7BAFC4);">${(item.kwh_mq||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})} kWh/m²</div>
         </div>
       </div>
       <div class="edm-kpi-grid">
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">${(item.co2_kg_giorno||0).toFixed(1)}</div><div class="edm-kpi-lbl">kg CO₂/giorno</div></div>
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">€ ${(item.costo_euro_giorno||0).toFixed(2)}</div><div class="edm-kpi-lbl">Costo/giorno</div></div>
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">${(item.kwh_mese||0).toFixed(0)}</div><div class="edm-kpi-lbl">kWh/mese</div></div>
-        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">${(item.efficienza_score||0).toFixed(0)}%</div><div class="edm-kpi-lbl">Score efficienza</div></div>
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">${(item.co2_kg_giorno||0).toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}</div><div class="edm-kpi-lbl">kg CO₂/giorno</div></div>
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">€ ${(item.costo_euro_giorno||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="edm-kpi-lbl">Costo/giorno</div></div>
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">${(item.kwh_mese||0).toLocaleString('it-IT',{maximumFractionDigits:0})}</div><div class="edm-kpi-lbl">kWh/mese</div></div>
+        <div class="edm-kpi-card"><div class="edm-kpi-val" style="font-size:16px;">${(item.efficienza_score||0).toLocaleString('it-IT',{maximumFractionDigits:0})}%</div><div class="edm-kpi-lbl">Score efficienza</div></div>
       </div>
       ${item.anomalia_rilevata
         ? `<div style="margin-top:12px;padding:8px 12px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#E74C3C;">
@@ -637,11 +637,11 @@ async function _edmCaricaZone(assetId) {
             ${z.superficie_mq ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);margin-bottom:4px;">
               <i class="fa fa-expand" style="margin-right:3px;"></i>${z.superficie_mq} m²${capStr}</div>` : ''}
             ${tel.power_kw != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
-              <i class="fa fa-bolt" style="margin-right:3px;color:#F39C12;"></i>${tel.power_kw.toFixed(2)} kW</div>` : ''}
+              <i class="fa fa-bolt" style="margin-right:3px;color:#F39C12;"></i>${tel.power_kw.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})} kW</div>` : ''}
             ${tel.temp_c   != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
-              <i class="fa fa-thermometer-half" style="margin-right:3px;color:#3498DB;"></i>${tel.temp_c.toFixed(1)}°C</div>` : ''}
+              <i class="fa fa-thermometer-half" style="margin-right:3px;color:#3498DB;"></i>${tel.temp_c.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}°C</div>` : ''}
             ${tel.co2_ppm  != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
-              <i class="fa fa-leaf" style="margin-right:3px;color:#27AE60;"></i>${tel.co2_ppm.toFixed(0)} ppm CO₂</div>` : ''}
+              <i class="fa fa-leaf" style="margin-right:3px;color:#27AE60;"></i>${tel.co2_ppm.toLocaleString('it-IT',{maximumFractionDigits:0})} ppm CO₂</div>` : ''}
             <div style="font-size:10px;font-weight:600;color:${oc};margin-top:4px;">${isOcc ? 'Occupata' : 'Libera'}</div>
           </div>`;
       });
@@ -978,9 +978,9 @@ async function _edmCaricaBollette(assetId) {
   };
 
   // ── Utility ─────────────────────────────────────────────────────────
-  function fmtEur(v) {
+  function fmtEur(v, dec = 2) {
     if (v == null) return '–';
-    return '€ ' + parseFloat(v).toFixed(4).replace('.', ',');
+    return '€\u00a0' + parseFloat(v).toLocaleString('it-IT', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   }
   function fmtData(s) {
     if (!s) return '–';
@@ -1728,8 +1728,8 @@ async function _edmCaricaEfficienza(assetId) {
       const pct = bm.benchmark_medio > 0 ? ((actual - bm.benchmark_medio) / bm.benchmark_medio * 100) : null;
       const pctColor = pct === null ? 'var(--text-secondary)' : pct > 15 ? '#E74C3C' : pct < -15 ? '#27AE60' : '#F39C12';
       return `
-        <div style="margin-top:4px;font-size:10px;color:var(--text-secondary,#7BAFC4);">Benchmark ${bm.categoria}: <strong style="color:var(--text-primary);">€ ${(bm.benchmark_min||0).toFixed(2)}–${(bm.benchmark_max||0).toFixed(2)}/m²/mese</strong>
-          ${pct !== null ? `<span style="color:${pctColor};margin-left:4px;">(${pct > 0 ? '+' : ''}${pct.toFixed(0)}% vs media)</span>` : ''}
+        <div style="margin-top:4px;font-size:10px;color:var(--text-secondary,#7BAFC4);">Benchmark ${bm.categoria}: <strong style="color:var(--text-primary);">€ ${(bm.benchmark_min||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}–${(bm.benchmark_max||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}/m²/mese</strong>
+          ${pct !== null ? `<span style="color:${pctColor};margin-left:4px;">(${pct > 0 ? '+' : ''}${pct.toLocaleString('it-IT',{maximumFractionDigits:0})}% vs media)</span>` : ''}
         </div>`;
     })() : '';
 
