@@ -804,7 +804,7 @@ async function _edmCaricaZone(assetId) {
         const isOcc  = tel.occupancy === true;
         const oc     = isOcc ? '#27AE60' : '#95A5A6';
         const ic     = tipoIcon[z.tipo] || 'fa-th-large';
-        const capStr = z.capacita_persone ? ` · ${z.capacita_persone} pers.` : '';
+        // capStr rimosso — capienza non mostrata nella riga superficie (evita ridondanza)
         html += `
           <div style="background:var(--bg-secondary,#0A1628);border:1px solid var(--border,#1E3A5F);
             border-left:3px solid ${oc};border-radius:8px;padding:10px 12px;">
@@ -815,7 +815,7 @@ async function _edmCaricaZone(assetId) {
                 padding:1px 5px;border-radius:8px;">${z.tipo}</span>
             </div>
             ${z.superficie_mq ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);margin-bottom:4px;">
-              <i class="fa fa-expand" style="margin-right:3px;"></i>${z.superficie_mq} m²${capStr}</div>` : ''}
+              <i class="fa fa-expand" style="margin-right:3px;"></i>${z.superficie_mq} m²</div>` : ''}
             ${tel.power_kw != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
               <i class="fa fa-bolt" style="margin-right:3px;color:#F39C12;"></i>${tel.power_kw.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})} kW</div>` : ''}
             ${tel.temp_c   != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
@@ -823,7 +823,11 @@ async function _edmCaricaZone(assetId) {
             ${tel.co2_ppm  != null ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);">
               <i class="fa fa-leaf" style="margin-right:3px;color:#27AE60;"></i>${tel.co2_ppm.toLocaleString('it-IT',{maximumFractionDigits:0})} ppm CO₂</div>` : ''}
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
-              ${z.capacita_persone ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-users" style="margin-right:3px;"></i>Cap. ${z.capacita_persone} pers.</div>` : '<div></div>'}
+              ${tel.persone_presenti != null
+                ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-users" style="margin-right:3px;color:#00B4D8;"></i>${tel.persone_presenti} / ${z.capacita_persone || '?'} pers.</div>`
+                : (tel.occupancy_pct != null
+                    ? `<div style="font-size:10px;color:var(--text-secondary,#7BAFC4);"><i class="fa fa-chart-bar" style="margin-right:3px;color:#00B4D8;"></i>Occ. ${tel.occupancy_pct.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}%</div>`
+                    : '<div></div>')}
               <div style="font-size:11px;font-weight:700;color:${oc};">${isOcc ? '● Occupata' : '○ Libera'}</div>
             </div>
           </div>`;

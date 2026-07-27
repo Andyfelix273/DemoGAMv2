@@ -139,6 +139,15 @@ def simula_zona(zone_id: str, floor_id: str, tipo: str, capacita: int, ts: datet
     # Occupancy booleana (True se > 10% capacità)
     occupancy = occ_factor > 0.1
 
+    # ── PUNTO DI INTEGRAZIONE SENSORE REALE ─────────────────────────────────
+    # In produzione questo valore viene letto direttamente dal sensore:
+    #   - People counter (telecamera AI): dato diretto in numero persone
+    #   - Sensore PIR/microonde: dato binario → persone_presenti = None
+    #   - Badge system: conteggio accessi per zona
+    # Nel simulatore lo calcoliamo come stima: occ_factor × capacità massima
+    # ────────────────────────────────────────────────────────────────────────
+    persone_presenti = round(occ_factor * capacita) if capacita and capacita > 0 else None
+
     return {
         "asset_id": ASSET_ID,
         "floor_id": floor_id,
@@ -148,7 +157,8 @@ def simula_zona(zone_id: str, floor_id: str, tipo: str, capacita: int, ts: datet
         "temp_c": round(temp, 2),
         "humidity": round(max(20, min(80, humidity)), 2),
         "co2_ppm": round(max(380, co2), 2),
-        "occupancy": occupancy
+        "occupancy": occupancy,
+        "persone_presenti": persone_presenti
     }
 
 def simula_impianto(plant_id: str, floor_id: str, tipo: str, ts: datetime) -> dict:

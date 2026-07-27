@@ -2311,6 +2311,16 @@ async def avvia_simulatore():
     """Avvia il task di simulazione dati live all'avvio del server."""
     asyncio.create_task(_simulatore_loop())
     print("[simulatore] task live avviato (intervallo: 60s)")
+    # Avvia il gateway simulator esterno per scrivere telemetria BEMS (zone + impianti) in background
+    import subprocess
+    gw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gateway_simulator_pg.py')
+    if os.path.exists(gw_path):
+        subprocess.Popen(
+            ['python3', gw_path, '--interval', '60'],
+            stdout=open('/tmp/gateway_live.log', 'w'),
+            stderr=subprocess.STDOUT
+        )
+        print("[simulatore] gateway BEMS live avviato (intervallo: 60s)")
 
 
 # ── Endpoint ricalcolo manuale allarmi ───────────────────────────────────────

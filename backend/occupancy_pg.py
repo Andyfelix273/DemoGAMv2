@@ -572,13 +572,13 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
         ts_from = now - timedelta(days=giorni)
         ts_prev = now - timedelta(days=giorni * 2)
         cur.execute("""
-            SELECT s.asset_id, a.nome, a.tipo, a.superficie_mq,
-                   ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct,
-                   COUNT(DISTINCT s.zone_id) AS zone_count
-            FROM occupancy_snapshot s
-            JOIN assets a ON a.id = s.asset_id
-            WHERE s.ts >= %s AND s.ts < %s
-            GROUP BY s.asset_id, a.nome, a.tipo, a.superficie_mq
+            SELECT t.asset_id, a.nome, a.tipo, a.superficie_mq,
+                   ROUND(AVG(CASE WHEN t.occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT t.zone_id) AS zone_count
+            FROM telemetry t
+            JOIN assets a ON a.id = t.asset_id
+            WHERE t.zone_id IS NOT NULL AND t.ts >= %s AND t.ts < %s
+            GROUP BY t.asset_id, a.nome, a.tipo, a.superficie_mq
             ORDER BY avg_pct DESC
         """, (ts_from, now))
         rows = cur.fetchall()
@@ -589,8 +589,8 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
                         "avg_pct": float(r["avg_pct"] or 0), "zone_count": int(r["zone_count"])} for r in rows]
         avg_cur = round(sum(a["avg_pct"] for a in assets_list) / len(assets_list), 1)
         cur.execute("""
-            SELECT ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct
-            FROM occupancy_snapshot WHERE ts >= %s AND ts < %s
+            SELECT ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct
+            FROM telemetry WHERE zone_id IS NOT NULL AND ts >= %s AND ts < %s
         """, (ts_prev, ts_from))
         prev_row = cur.fetchone()
         avg_prev = float(prev_row["avg_pct"]) if prev_row and prev_row["avg_pct"] else None
@@ -608,9 +608,9 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
         ts_from = now - timedelta(days=giorni)
         cur.execute("""
             SELECT EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome')::int AS dow,
-                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
                    COUNT(DISTINCT asset_id) AS n_asset
-            FROM occupancy_snapshot WHERE ts >= %s AND ts < %s GROUP BY dow ORDER BY dow
+            FROM telemetry WHERE zone_id IS NOT NULL AND ts >= %s AND ts < %s GROUP BY dow ORDER BY dow
         """, (ts_from, now))
         rows = cur.fetchall()
         dow_labels = {1:"Lun",2:"Mar",3:"Mer",4:"Gio",5:"Ven",6:"Sab",7:"Dom"}
@@ -634,8 +634,8 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
         ts_from_occ = now - timedelta(days=30)
         ts_from_energy = now - timedelta(days=giorni)
         cur.execute("""
-            SELECT asset_id, ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct
-            FROM occupancy_snapshot WHERE ts >= %s AND ts < %s GROUP BY asset_id
+            SELECT asset_id, ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct
+            FROM telemetry WHERE zone_id IS NOT NULL AND ts >= %s AND ts < %s GROUP BY asset_id
         """, (ts_from_occ, now))
         occ_map = {r["asset_id"]: float(r["avg_pct"]) for r in cur.fetchall()}
         if not occ_map:
@@ -689,14 +689,14 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
         def _avg_occ(ts_a, ts_b):
             cur.execute("""
-                SELECT ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct,
-                       COUNT(DISTINCT s.zone_id) AS zone_count
-                FROM occupancy_snapshot s
-                WHERE s.asset_id = %s
-                  AND s.ts >= %s AND s.ts < %s
-                  AND EXTRACT(hour FROM s.ts AT TIME ZONE 'Europe/Rome') >= %s
-                  AND EXTRACT(hour FROM s.ts AT TIME ZONE 'Europe/Rome') < %s
-                  AND EXTRACT(isodow FROM s.ts AT TIME ZONE 'Europe/Rome') = ANY(%s)
+                SELECT ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
+                       COUNT(DISTINCT zone_id) AS zone_count
+                FROM telemetry
+                WHERE asset_id = %s AND zone_id IS NOT NULL
+                  AND ts >= %s AND ts < %s
+                  AND EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome') >= %s
+                  AND EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome') < %s
+                  AND EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome') = ANY(%s)
             """, (asset_id, ts_a, ts_b, wh_start, wh_end, wd_list))
             r = cur.fetchone()
             return float(r["avg_pct"] or 0), int(r["zone_count"] or 0)
@@ -710,8 +710,8 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
         cur.execute("""
             SELECT COUNT(DISTINCT ts) AS n_snap
-            FROM occupancy_snapshot
-            WHERE asset_id = %s AND ts >= %s AND ts < %s
+            FROM telemetry
+            WHERE asset_id = %s AND zone_id IS NOT NULL AND ts >= %s AND ts < %s
               AND EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome') >= %s
               AND EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome') < %s
               AND EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome') = ANY(%s)
@@ -741,21 +741,23 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
         ts_from = now - timedelta(days=giorni)
 
         cur.execute("""
-            SELECT oz.nome AS zona_nome,
-                   EXTRACT(hour FROM s.ts AT TIME ZONE 'Europe/Rome')::int AS ora,
-                   ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct
-            FROM occupancy_snapshot s
-            JOIN occupancy_zones oz ON oz.id = s.zone_id
-            WHERE s.asset_id = %s AND s.ts >= %s AND s.ts < %s
-            GROUP BY oz.nome, ora
-            ORDER BY oz.nome, ora
+            SELECT COALESCE(z.nome, t.zone_id) AS zona_nome,
+                   t.zone_id,
+                   EXTRACT(hour FROM t.ts AT TIME ZONE 'Europe/Rome')::int AS ora,
+                   ROUND(AVG(CASE WHEN t.occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct
+            FROM telemetry t
+            LEFT JOIN zones z ON z.zone_id = t.zone_id AND z.asset_id = t.asset_id
+            WHERE t.asset_id = %s AND t.zone_id IS NOT NULL
+              AND t.ts >= %s AND t.ts < %s
+            GROUP BY zona_nome, t.zone_id, ora
+            ORDER BY t.zone_id, ora
         """, (asset_id, ts_from, now))
         rows = cur.fetchall()
 
         if not rows:
             raise HTTPException(status_code=404, detail="Nessun dato occupancy disponibile")
 
-        zones_set = sorted(set(r["zona_nome"] for r in rows))
+        zones_set = list(dict.fromkeys(r["zona_nome"] for r in rows))  # preserva ordine
         matrix = {z: [None]*24 for z in zones_set}
         for r in rows:
             matrix[r["zona_nome"]][r["ora"]] = float(r["avg_pct"])
@@ -764,6 +766,7 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
             "asset_id": asset_id,
             "giorni": giorni,
             "zones": zones_set,
+            "zone_ids": list(dict.fromkeys(r["zone_id"] for r in rows)),
             "hours": list(range(24)),
             "matrix": [matrix[z] for z in zones_set],
         }
@@ -780,11 +783,11 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
         cur.execute("""
             SELECT EXTRACT(hour FROM ts AT TIME ZONE 'Europe/Rome')::int AS ora,
-                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
-                   ROUND(MAX(pct_occupancy)::numeric, 1) AS max_pct,
-                   ROUND(MIN(pct_occupancy)::numeric, 1) AS min_pct
-            FROM occupancy_snapshot
-            WHERE asset_id = %s AND ts >= %s AND ts < %s
+                   ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
+                   ROUND(MAX(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS max_pct,
+                   ROUND(MIN(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS min_pct
+            FROM telemetry
+            WHERE asset_id = %s AND zone_id IS NOT NULL AND ts >= %s AND ts < %s
             GROUP BY ora
             ORDER BY ora
         """, (asset_id, ts_from, now))
@@ -832,10 +835,10 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
         cur.execute("""
             SELECT EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome')::int AS dow,
-                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
                    COUNT(DISTINCT DATE(ts AT TIME ZONE 'Europe/Rome')) AS n_giorni
-            FROM occupancy_snapshot
-            WHERE asset_id = %s AND ts >= %s AND ts < %s
+            FROM telemetry
+            WHERE asset_id = %s AND zone_id IS NOT NULL AND ts >= %s AND ts < %s
             GROUP BY dow
             ORDER BY dow
         """, (asset_id, ts_from, now))
@@ -880,11 +883,11 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
         cur.execute("""
             SELECT DATE_TRUNC('month', ts AT TIME ZONE 'Europe/Rome') AS mese,
-                   ROUND(AVG(pct_occupancy)::numeric, 2) AS avg_pct,
-                   ROUND(STDDEV(pct_occupancy)::numeric, 2) AS stddev_pct,
+                   ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 2) AS avg_pct,
+                   ROUND(STDDEV(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 2) AS stddev_pct,
                    COUNT(*) AS n
-            FROM occupancy_snapshot
-            WHERE asset_id = %s AND ts >= %s AND ts < %s
+            FROM telemetry
+            WHERE asset_id = %s AND zone_id IS NOT NULL AND ts >= %s AND ts < %s
             GROUP BY mese
             ORDER BY mese
         """, (asset_id, ts_from, now))
@@ -922,16 +925,16 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
         ts_from = now - timedelta(days=giorni)
 
         cur.execute("""
-            SELECT s.asset_id,
+            SELECT t.asset_id,
                    a.nome,
                    a.tipo,
                    a.superficie_mq,
-                   ROUND(AVG(s.pct_occupancy)::numeric, 1) AS avg_pct,
-                   COUNT(DISTINCT s.zone_id) AS zone_count
-            FROM occupancy_snapshot s
-            JOIN assets a ON a.id = s.asset_id
-            WHERE s.ts >= %s AND s.ts < %s
-            GROUP BY s.asset_id, a.nome, a.tipo, a.superficie_mq
+                   ROUND(AVG(CASE WHEN t.occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
+                   COUNT(DISTINCT t.zone_id) AS zone_count
+            FROM telemetry t
+            JOIN assets a ON a.id = t.asset_id
+            WHERE t.zone_id IS NOT NULL AND t.ts >= %s AND t.ts < %s
+            GROUP BY t.asset_id, a.nome, a.tipo, a.superficie_mq
             ORDER BY avg_pct DESC
         """, (ts_from, now))
         rows = cur.fetchall()
@@ -970,10 +973,10 @@ def register_occupancy_routes(app, get_db, get_utente_corrente):
 
         cur.execute("""
             SELECT EXTRACT(isodow FROM ts AT TIME ZONE 'Europe/Rome')::int AS dow,
-                   ROUND(AVG(pct_occupancy)::numeric, 1) AS avg_pct,
+                   ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS avg_pct,
                    COUNT(DISTINCT asset_id) AS n_asset
-            FROM occupancy_snapshot
-            WHERE ts >= %s AND ts < %s
+            FROM telemetry
+            WHERE zone_id IS NOT NULL AND ts >= %s AND ts < %s
             GROUP BY dow
             ORDER BY dow
         """, (ts_from, now))

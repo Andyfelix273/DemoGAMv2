@@ -685,12 +685,24 @@ def register_energy_routes(app, get_db, get_utente_corrente):
         # Ultima telemetria per zona (DISTINCT ON richiede ORDER BY)
         cur.execute("""
             SELECT DISTINCT ON (zone_id)
-                zone_id, power_kw, temp_c, humidity, co2_ppm, occupancy, ts
+                zone_id, power_kw, temp_c, humidity, co2_ppm, occupancy, persone_presenti, ts
             FROM telemetry
             WHERE asset_id = %s AND zone_id IS NOT NULL
             ORDER BY zone_id, ts DESC
         """, (asset_id,))
         rows = cur.fetchall()
+        # Calcola occupancy_pct_30d per ogni zona (% ore occupate negli ultimi 30 giorni)
+        cur.execute("""
+            SELECT zone_id,
+                   ROUND(AVG(CASE WHEN occupancy THEN 100.0 ELSE 0.0 END)::numeric, 1) AS occ_pct
+            FROM telemetry
+            WHERE asset_id = %s
+              AND zone_id IS NOT NULL
+              AND occupancy IS NOT NULL
+              AND ts >= NOW() - INTERVAL '30 days'
+            GROUP BY zone_id
+        """, (asset_id,))
+        occ_pct_map = {r2["zone_id"]: float(r2["occ_pct"]) for r2 in cur.fetchall()}
         result = {}
         for r in rows:
             zid = r["zone_id"]
@@ -700,7 +712,8 @@ def register_energy_routes(app, get_db, get_utente_corrente):
                 "humidity": float(r["humidity"]) if r["humidity"] is not None else None,
                 "co2_ppm": float(r["co2_ppm"]) if r["co2_ppm"] is not None else None,
                 "occupancy": r["occupancy"],
-                "occupancy_pct": None,  # Calcolato dal simulatore
+                "occupancy_pct": occ_pct_map.get(zid),
+                "persone_presenti": int(r["persone_presenti"]) if r["persone_presenti"] is not None else None,
                 "ts": r["ts"].isoformat() if r.get("ts") else None
             }
         return result
@@ -752,8 +765,8 @@ def register_energy_routes(app, get_db, get_utente_corrente):
         Non richiede autenticazione (chiamato dal gateway interno)."""
         cur = db.cursor()
         cur.execute("""
-            INSERT INTO telemetry (asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO telemetry (asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy, persone_presenti)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             payload.get("asset_id"),
             payload.get("floor_id"),
@@ -763,7 +776,8 @@ def register_energy_routes(app, get_db, get_utente_corrente):
             payload.get("temp_c"),
             payload.get("humidity"),
             payload.get("co2_ppm"),
-            payload.get("occupancy")
+            payload.get("occupancy"),
+            payload.get("persone_presenti")
         ))
         db.commit()
         return {"status": "ok"}
@@ -778,8 +792,8 @@ def register_energy_routes(app, get_db, get_utente_corrente):
             ts_val = item.get("ts")
             if ts_val:
                 cur.execute("""
-                    INSERT INTO telemetry (ts, asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO telemetry (ts, asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy, persone_presenti)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     ts_val,
                     item.get("asset_id"),
@@ -790,12 +804,13 @@ def register_energy_routes(app, get_db, get_utente_corrente):
                     item.get("temp_c"),
                     item.get("humidity"),
                     item.get("co2_ppm"),
-                    item.get("occupancy")
+                    item.get("occupancy"),
+                    item.get("persone_presenti")
                 ))
             else:
                 cur.execute("""
-                    INSERT INTO telemetry (asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO telemetry (asset_id, floor_id, zone_id, plant_id, power_kw, temp_c, humidity, co2_ppm, occupancy, persone_presenti)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     item.get("asset_id"),
                     item.get("floor_id"),
@@ -805,7 +820,8 @@ def register_energy_routes(app, get_db, get_utente_corrente):
                     item.get("temp_c"),
                     item.get("humidity"),
                     item.get("co2_ppm"),
-                    item.get("occupancy")
+                    item.get("occupancy"),
+                    item.get("persone_presenti")
                 ))
         db.commit()
         return {"status": "ok", "inserted": len(payload)}
