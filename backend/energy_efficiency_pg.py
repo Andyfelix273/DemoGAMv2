@@ -1491,3 +1491,303 @@ def register_efficiency_routes(app, get_db, get_utente_corrente):
             "commodity_def": COMMODITY_DEF,
             "commodity_presenti": commodity_presenti
         }
+
+    # ── E-8: Baseline Energetica Oraria per Impianto ────────────────────────
+    @app.get("/api/efficiency/{asset_id}/baseline_hourly", tags=["efficiency"])
+    def get_baseline_hourly(
+        asset_id: int,
+        ore: int = 168,
+        plant_id: str = None,
+        _=Depends(get_utente_corrente),
+        db=Depends(get_db)
+    ):
+        """
+        E-8 — Baseline energetica per impianto.
+        Confronta il consumo orario attuale con la baseline rolling (media stessa
+        fascia oraria nelle ultime 4 settimane precedenti al periodo analizzato).
+        """
+        cur = db.cursor()
+        plant_filter = "AND t.plant_id = %(plant_id)s" if plant_id else ""
+
+        cur.execute(f"""
+            WITH periodo AS (
+                SELECT
+                    DATE_TRUNC('hour', ts) AS ora,
+                    t.plant_id,
+                    AVG(power_kw) AS avg_kw
+                FROM telemetry t
+                WHERE t.asset_id = %(asset_id)s
+                  AND t.plant_id IS NOT NULL AND t.plant_id != ''
+                  AND t.power_kw IS NOT NULL
+                  AND ts >= NOW() - INTERVAL '1 hour' * %(ore)s
+                  {plant_filter}
+                GROUP BY 1, 2
+            ),
+            storico AS (
+                SELECT
+                    EXTRACT(DOW  FROM ts)::int AS dow,
+                    EXTRACT(HOUR FROM ts)::int AS ora_h,
+                    t.plant_id,
+                    AVG(power_kw)    AS media,
+                    STDDEV(power_kw) AS stddev
+                FROM telemetry t
+                WHERE t.asset_id = %(asset_id)s
+                  AND t.plant_id IS NOT NULL AND t.plant_id != ''
+                  AND t.power_kw IS NOT NULL
+                  AND ts >= NOW() - INTERVAL '1 hour' * %(ore)s - INTERVAL '4 weeks'
+                  AND ts <  NOW() - INTERVAL '1 hour' * %(ore)s + INTERVAL '1 hour'
+                  {plant_filter}
+                GROUP BY 1, 2, 3
+            )
+            SELECT
+                p.ora,
+                p.plant_id,
+                ROUND(p.avg_kw::numeric, 3)                                        AS kwh_attuale,
+                ROUND(s.media::numeric, 3)                                          AS kwh_baseline,
+                ROUND(s.stddev::numeric, 3)                                         AS stddev,
+                ROUND(((p.avg_kw - s.media) / NULLIF(s.media, 0) * 100)::numeric, 1) AS delta_pct
+            FROM periodo p
+            LEFT JOIN storico s
+                ON s.dow   = EXTRACT(DOW  FROM p.ora)::int
+               AND s.ora_h = EXTRACT(HOUR FROM p.ora)::int
+               AND s.plant_id = p.plant_id
+            ORDER BY p.plant_id, p.ora
+        """, {"asset_id": asset_id, "ore": ore, "plant_id": plant_id})
+
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "ts":           r["ora"].isoformat() if r["ora"] else None,
+                "plant_id":     r["plant_id"],
+                "kwh_attuale":  float(r["kwh_attuale"]) if r["kwh_attuale"] is not None else None,
+                "kwh_baseline": float(r["kwh_baseline"]) if r["kwh_baseline"] is not None else None,
+                "stddev":       float(r["stddev"]) if r["stddev"] is not None else None,
+                "delta_pct":    float(r["delta_pct"]) if r["delta_pct"] is not None else None,
+            })
+        cur.close()
+        return {"data": result, "ore": ore, "plant_id": plant_id}
+
+    # ── E-10: Anomaly Detection per Impianto ─────────────────────────────────
+    @app.get("/api/efficiency/{asset_id}/anomalies", tags=["efficiency"])
+    def get_anomalies(
+        asset_id: int,
+        ore: int = 168,
+        plant_id: str = None,
+        z_threshold: float = 2.0,
+        _=Depends(get_utente_corrente),
+        db=Depends(get_db)
+    ):
+        """
+        E-10 — Anomaly Detection per impianto.
+        Rileva anomalie energetiche usando z-score rolling rispetto alla baseline
+        delle ultime 4 settimane (stessa ora, stesso giorno settimana).
+        """
+        cur = db.cursor()
+        plant_filter = "AND t.plant_id = %(plant_id)s" if plant_id else ""
+
+        cur.execute(f"""
+            WITH periodo AS (
+                SELECT
+                    DATE_TRUNC('hour', ts) AS ora,
+                    t.plant_id,
+                    AVG(power_kw) AS avg_kw
+                FROM telemetry t
+                WHERE t.asset_id = %(asset_id)s
+                  AND t.plant_id IS NOT NULL AND t.plant_id != ''
+                  AND t.power_kw IS NOT NULL
+                  AND ts >= NOW() - INTERVAL '1 hour' * %(ore)s
+                  {plant_filter}
+                GROUP BY 1, 2
+            ),
+            storico AS (
+                SELECT
+                    EXTRACT(DOW  FROM ts)::int AS dow,
+                    EXTRACT(HOUR FROM ts)::int AS ora_h,
+                    t.plant_id,
+                    AVG(power_kw)    AS media,
+                    STDDEV(power_kw) AS stddev
+                FROM telemetry t
+                WHERE t.asset_id = %(asset_id)s
+                  AND t.plant_id IS NOT NULL AND t.plant_id != ''
+                  AND t.power_kw IS NOT NULL
+                  AND ts >= NOW() - INTERVAL '1 hour' * %(ore)s - INTERVAL '4 weeks'
+                  AND ts <  NOW() - INTERVAL '1 hour' * %(ore)s + INTERVAL '1 hour'
+                  {plant_filter}
+                GROUP BY 1, 2, 3
+            ),
+            scored AS (
+                SELECT
+                    p.ora,
+                    p.plant_id,
+                    p.avg_kw,
+                    s.media,
+                    s.stddev,
+                    CASE WHEN s.stddev > 0
+                         THEN ROUND(((p.avg_kw - s.media) / s.stddev)::numeric, 2)
+                         ELSE 0
+                    END AS z_score
+                FROM periodo p
+                LEFT JOIN storico s
+                    ON s.dow   = EXTRACT(DOW  FROM p.ora)::int
+                   AND s.ora_h = EXTRACT(HOUR FROM p.ora)::int
+                   AND s.plant_id = p.plant_id
+            )
+            SELECT
+                ora,
+                plant_id,
+                ROUND(avg_kw::numeric, 3)  AS kwh,
+                ROUND(media::numeric, 3)   AS baseline,
+                z_score,
+                CASE
+                    WHEN ABS(z_score) >= 3.0 THEN 'alta'
+                    WHEN ABS(z_score) >= 2.5 THEN 'media'
+                    WHEN ABS(z_score) >= %(z_thr)s THEN 'bassa'
+                    ELSE NULL
+                END AS severita,
+                CASE WHEN z_score > 0 THEN 'consumo_elevato' ELSE 'consumo_basso' END AS tipo
+            FROM scored
+            WHERE ABS(z_score) >= %(z_thr)s
+            ORDER BY plant_id, ora
+        """, {"asset_id": asset_id, "ore": ore, "plant_id": plant_id, "z_thr": z_threshold})
+
+        rows = cur.fetchall()
+        anomalies = []
+        for r in rows:
+            anomalies.append({
+                "ts":       r["ora"].isoformat() if r["ora"] else None,
+                "plant_id": r["plant_id"],
+                "kwh":      float(r["kwh"]) if r["kwh"] is not None else None,
+                "baseline": float(r["baseline"]) if r["baseline"] is not None else None,
+                "z_score":  float(r["z_score"]) if r["z_score"] is not None else None,
+                "severita": r["severita"],
+                "tipo":     r["tipo"],
+            })
+
+        summary = {}
+        for a in anomalies:
+            pid = a["plant_id"]
+            if pid not in summary:
+                summary[pid] = {"totale": 0, "alta": 0, "media": 0, "bassa": 0,
+                                "consumo_elevato": 0, "consumo_basso": 0}
+            summary[pid]["totale"] += 1
+            if a["severita"]: summary[pid][a["severita"]] += 1
+            if a["tipo"]:     summary[pid][a["tipo"]] += 1
+
+        cur.close()
+        return {
+            "anomalies": anomalies,
+            "summary":   summary,
+            "totale":    len(anomalies),
+            "ore":       ore,
+            "z_threshold": z_threshold
+        }
+
+    # ── E-10b: Riepilogo anomalie per asset (tutti gli impianti) ─────────────
+    @app.get("/api/efficiency/{asset_id}/anomalies/summary", tags=["efficiency"])
+    def get_anomalies_summary(
+        asset_id: int,
+        giorni: int = 30,
+        _=Depends(get_utente_corrente),
+        db=Depends(get_db)
+    ):
+        """
+        Riepilogo anomalie degli ultimi N giorni per tutti gli impianti dell'asset.
+        Usato dalla pagina Anomaly Detection per la vista aggregata.
+        """
+        cur = db.cursor()
+        ore = giorni * 24
+
+        cur.execute("""
+            WITH periodo AS (
+                SELECT DATE_TRUNC('hour', ts) AS ora, t.plant_id, AVG(power_kw) AS avg_kw
+                FROM telemetry t
+                WHERE t.asset_id = %(asset_id)s
+                  AND t.plant_id IS NOT NULL AND t.plant_id != ''
+                  AND t.power_kw IS NOT NULL
+                  AND ts >= NOW() - INTERVAL '1 hour' * %(ore)s
+                GROUP BY 1, 2
+            ),
+            storico AS (
+                SELECT
+                    EXTRACT(DOW  FROM ts)::int AS dow,
+                    EXTRACT(HOUR FROM ts)::int AS ora_h,
+                    t.plant_id,
+                    AVG(power_kw) AS media, STDDEV(power_kw) AS stddev
+                FROM telemetry t
+                WHERE t.asset_id = %(asset_id)s
+                  AND t.plant_id IS NOT NULL AND t.plant_id != ''
+                  AND t.power_kw IS NOT NULL
+                  AND ts >= NOW() - INTERVAL '1 hour' * %(ore)s - INTERVAL '4 weeks'
+                  AND ts <  NOW() - INTERVAL '1 hour' * %(ore)s + INTERVAL '1 hour'
+                GROUP BY 1, 2, 3
+            ),
+            scored AS (
+                SELECT p.ora, p.plant_id, p.avg_kw, s.media, s.stddev,
+                    CASE WHEN s.stddev > 0
+                         THEN (p.avg_kw - s.media) / s.stddev ELSE 0
+                    END AS z_score
+                FROM periodo p
+                LEFT JOIN storico s
+                    ON s.dow   = EXTRACT(DOW  FROM p.ora)::int
+                   AND s.ora_h = EXTRACT(HOUR FROM p.ora)::int
+                   AND s.plant_id = p.plant_id
+            ),
+            anomalie AS (
+                SELECT plant_id, ora, avg_kw, media AS baseline,
+                    ROUND(z_score::numeric, 2) AS z_score,
+                    CASE WHEN ABS(z_score) >= 3.0 THEN 'alta'
+                         WHEN ABS(z_score) >= 2.5 THEN 'media'
+                         WHEN ABS(z_score) >= 2.0 THEN 'bassa' ELSE NULL END AS severita,
+                    CASE WHEN z_score > 0 THEN 'consumo_elevato' ELSE 'consumo_basso' END AS tipo_anomalia
+                FROM scored WHERE ABS(z_score) >= 2.0
+            )
+            SELECT
+                a.plant_id,
+                p.nome          AS plant_nome,
+                p.tipo          AS plant_tipo,
+                COUNT(*)        AS totale,
+                COUNT(*) FILTER (WHERE severita = 'alta')  AS n_alta,
+                COUNT(*) FILTER (WHERE severita = 'media') AS n_media,
+                COUNT(*) FILTER (WHERE severita = 'bassa') AS n_bassa,
+                COUNT(*) FILTER (WHERE tipo_anomalia = 'consumo_elevato') AS n_elevato,
+                COUNT(*) FILTER (WHERE tipo_anomalia = 'consumo_basso')   AS n_basso,
+                ROUND(MAX(ABS(z_score))::numeric, 2) AS z_max,
+                MAX(ora)                             AS ultima_anomalia,
+                ROUND(AVG(avg_kw)::numeric, 3)       AS avg_kwh_anomalia,
+                ROUND(AVG(baseline)::numeric, 3)     AS avg_baseline
+            FROM anomalie a
+            LEFT JOIN plants p ON p.plant_id = a.plant_id AND p.asset_id = %(asset_id)s
+            GROUP BY a.plant_id, p.nome, p.tipo
+            ORDER BY n_alta DESC, totale DESC
+        """, {"asset_id": asset_id, "ore": ore})
+
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "plant_id":         r["plant_id"],
+                "plant_nome":       r["plant_nome"],
+                "plant_tipo":       r["plant_tipo"],
+                "totale":           int(r["totale"]),
+                "n_alta":           int(r["n_alta"]),
+                "n_media":          int(r["n_media"]),
+                "n_bassa":          int(r["n_bassa"]),
+                "n_elevato":        int(r["n_elevato"]),
+                "n_basso":          int(r["n_basso"]),
+                "z_max":            float(r["z_max"]) if r["z_max"] else None,
+                "ultima_anomalia":  r["ultima_anomalia"].isoformat() if r["ultima_anomalia"] else None,
+                "avg_kwh_anomalia": float(r["avg_kwh_anomalia"]) if r["avg_kwh_anomalia"] else None,
+                "avg_baseline":     float(r["avg_baseline"]) if r["avg_baseline"] else None,
+            })
+
+        cur.close()
+        return {
+            "impianti":        result,
+            "totale_anomalie": sum(r["totale"] for r in result),
+            "totale_alta":     sum(r["n_alta"]  for r in result),
+            "totale_media":    sum(r["n_media"] for r in result),
+            "totale_bassa":    sum(r["n_bassa"] for r in result),
+            "giorni":          giorni,
+            "asset_id":        asset_id
+        }

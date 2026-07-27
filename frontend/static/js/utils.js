@@ -130,6 +130,7 @@ function renderSidebar(paginaAttiva, modulo, elementId) {
         <i class="fa fa-bell"></i>
         <span class="${dotCls}" id="${dotId}"></span>
       </a>
+      ${a('/static/anomaly-detection.html',   'eff-anomaly',        'fa-triangle-exclamation', 'Anomaly Detection')}
       ${a('/static/energy-summary.html',      'eff-energy-summary', 'fa-chart-line',       'Energy Summary')}
       ${a('/static/occupancy.html',             'eff-occupancy',   'fa-users',               'Occupancy')}
       ${a('/static/efficiency-invoices.html', 'eff-bollette',    'fa-file-invoice-dollar', 'Tariffe & Bollette')}

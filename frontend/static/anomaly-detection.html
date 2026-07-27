@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Anomaly Detection</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
+  <link rel="stylesheet" href="/static/css/icons.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css?v=2">
+  <style>
+    /* ── Layout pagina ────────────────────────────────────────────── */
+    .ad-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .ad-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ad-select {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    /* ── KPI strip ────────────────────────────────────────────────── */
+    .ad-kpi-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .ad-kpi-card {
+      flex: 1 1 140px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      min-width: 120px;
+    }
+    .ad-kpi-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .ad-kpi-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .ad-kpi-value.alta  { color: var(--accent-red,   #e74c3c); }
+    .ad-kpi-value.media { color: var(--accent-orange, #e67e22); }
+    .ad-kpi-value.bassa { color: var(--accent-yellow, #f1c40f); }
+    .ad-kpi-unit {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    /* ── Tabella impianti ─────────────────────────────────────────── */
+    .ad-table-wrap {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .ad-table-title {
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ad-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .ad-table th {
+      padding: 8px 14px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .ad-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+    .ad-table tr:last-child td { border-bottom: none; }
+    .ad-table tr:hover td { background: var(--bg-hover, rgba(255,255,255,0.03)); }
+    .ad-table tr.clickable { cursor: pointer; }
+    .badge-alta  { background: rgba(231,76,60,0.15);  color: #e74c3c; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-media { background: rgba(230,126,34,0.15); color: #e67e22; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-bassa { background: rgba(241,196,15,0.15); color: #f1c40f; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-ok    { background: rgba(46,204,113,0.15); color: #2ecc71; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    /* ── Pannello dettaglio impianto ──────────────────────────────── */
+    .ad-detail-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .ad-detail-panel.visible { display: block; }
+    .ad-detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .ad-detail-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .ad-chart-wrap {
+      height: 260px;
+      width: 100%;
+    }
+    /* ── Lista anomalie ───────────────────────────────────────────── */
+    .ad-anomaly-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .ad-anomaly-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--bg-primary, #0d1f33);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .ad-anomaly-item .ts { color: var(--text-muted); min-width: 120px; }
+    .ad-anomaly-item .plant { color: var(--text-secondary); min-width: 140px; font-weight: 500; }
+    .ad-anomaly-item .val  { color: var(--text-primary); min-width: 80px; }
+    .ad-anomaly-item .delta { min-width: 70px; font-weight: 600; }
+    .ad-anomaly-item .delta.pos { color: var(--accent-red, #e74c3c); }
+    .ad-anomaly-item .delta.neg { color: #3498db; }
+    .ad-empty {
+      text-align: center;
+      padding: 32px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title">
+        <i class="fa fa-triangle-exclamation" style="margin-right:8px;color:var(--accent-orange);"></i>
+        Anomaly Detection
+      </h1>
+      <div id="ad-badge-wrap" style="display:flex;gap:8px;align-items:center"></div>
+    </div>
+    <div class="page-body">
+
+      <!-- Controlli -->
+      <div class="ad-header">
+        <div class="ad-controls">
+          <label style="font-size:12px;color:var(--text-muted)">Asset:</label>
+          <select class="ad-select" id="ad-asset-select">
+            <option value="">Caricamento...</option>
+          </select>
+          <label style="font-size:12px;color:var(--text-muted)">Periodo:</label>
+          <select class="ad-select" id="ad-giorni-select">
+            <option value="7">Ultimi 7 giorni</option>
+            <option value="14">Ultimi 14 giorni</option>
+            <option value="30" selected>Ultimi 30 giorni</option>
+            <option value="60">Ultimi 60 giorni</option>
+            <option value="90">Ultimi 90 giorni</option>
+          </select>
+          <label style="font-size:12px;color:var(--text-muted)">Soglia z-score:</label>
+          <select class="ad-select" id="ad-zscore-select">
+            <option value="1.5">1.5 (sensibile)</option>
+            <option value="2.0" selected>2.0 (standard)</option>
+            <option value="2.5">2.5 (severo)</option>
+            <option value="3.0">3.0 (critico)</option>
+          </select>
+        </div>
+        <div id="ad-last-update" style="font-size:11px;color:var(--text-muted)"></div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="ad-kpi-strip" id="ad-kpi-strip">
+        <div class="ad-kpi-card"><div class="ad-kpi-label">Totale anomalie</div><div class="ad-kpi-value" id="kpi-totale">–</div><div class="ad-kpi-unit">nel periodo</div></div>
+        <div class="ad-kpi-card"><div class="ad-kpi-label">Severità alta</div><div class="ad-kpi-value alta" id="kpi-alta">–</div><div class="ad-kpi-unit">z &gt; 3.0</div></div>
+        <div class="ad-kpi-card"><div class="ad-kpi-label">Severità media</div><div class="ad-kpi-value media" id="kpi-media">–</div><div class="ad-kpi-unit">z 2.5 – 3.0</div></div>
+        <div class="ad-kpi-card"><div class="ad-kpi-label">Severità bassa</div><div class="ad-kpi-value bassa" id="kpi-bassa">–</div><div class="ad-kpi-unit">z 2.0 – 2.5</div></div>
+        <div class="ad-kpi-card"><div class="ad-kpi-label">Impianti coinvolti</div><div class="ad-kpi-value" id="kpi-impianti">–</div><div class="ad-kpi-unit">su totale</div></div>
+        <div class="ad-kpi-card"><div class="ad-kpi-label">Z-score massimo</div><div class="ad-kpi-value alta" id="kpi-zmax">–</div><div class="ad-kpi-unit">picco rilevato</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" style="margin-bottom:16px">
+        <button class="tab-btn active" data-tab="impianti">Per impianto</button>
+        <button class="tab-btn" data-tab="timeline">Timeline anomalie</button>
+        <button class="tab-btn" data-tab="baseline">Baseline vs Attuale</button>
+      </div>
+
+      <!-- Tab: Per impianto -->
+      <div class="tab-content active" id="tab-impianti">
+        <div class="ad-table-wrap">
+          <div class="ad-table-title">
+            <i class="fa fa-bolt" style="color:var(--accent-orange)"></i>
+            Riepilogo anomalie per impianto
+          </div>
+          <table class="ad-table" id="ad-impianti-table">
+            <thead>
+              <tr>
+                <th>Impianto</th>
+                <th>Tipo</th>
+                <th>Totale</th>
+                <th>Alta</th>
+                <th>Media</th>
+                <th>Bassa</th>
+                <th>Z-score max</th>
+                <th>Ultima anomalia</th>
+                <th>kWh medio anomalia</th>
+                <th>Baseline kWh</th>
+              </tr>
+            </thead>
+            <tbody id="ad-impianti-tbody">
+              <tr><td colspan="10" class="ad-empty"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pannello dettaglio impianto (grafico baseline + anomalie) -->
+        <div class="ad-detail-panel" id="ad-detail-panel">
+          <div class="ad-detail-header">
+            <div class="ad-detail-title" id="ad-detail-title">–</div>
+            <button class="btn btn-sm" onclick="chiudiDettaglio()" style="font-size:11px;padding:4px 10px">
+              <i class="fa fa-times"></i> Chiudi
+            </button>
+          </div>
+          <div class="ad-chart-wrap" id="ad-baseline-chart"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Timeline anomalie -->
+      <div class="tab-content" id="tab-timeline">
+        <div class="ad-table-wrap">
+          <div class="ad-table-title">
+            <i class="fa fa-clock" style="color:var(--accent-blue,#3498db)"></i>
+            Tutte le anomalie — ordine cronologico inverso
+          </div>
+          <div id="ad-timeline-list" style="padding:8px 0">
+            <div class="ad-empty"><div class="spinner" style="margin:0 auto"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Baseline vs Attuale -->
+      <div class="tab-content" id="tab-baseline">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <label style="font-size:12px;color:var(--text-muted)">Impianto:</label>
+          <select class="ad-select" id="ad-plant-select">
+            <option value="">Seleziona impianto...</option>
+          </select>
+        </div>
+        <div class="ad-table-wrap">
+          <div class="ad-table-title">
+            <i class="fa fa-chart-area" style="color:var(--accent-green,#2ecc71)"></i>
+            Consumo attuale vs Baseline rolling (4 settimane)
+          </div>
+          <div class="ad-chart-wrap" id="ad-baseline-full-chart" style="height:320px"></div>
+        </div>
+      </div>
+
+    </div><!-- /page-body -->
+  </div><!-- /page -->
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/i18n.js?v=6"></script>
+  <script src="/static/js/api.js?v=6"></script>
+  <script src="/static/js/utils.js?v=8"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script>
+  if (!requireAuth()) throw new Error('not authenticated');
+  Tema.apply();
+  renderTopbar('eff-anomaly', { filtri: false, titolo: 'Asset Efficiency' });
+  renderSidebar('eff-anomaly', 'efficiency');
+
+  // ── Stato ──────────────────────────────────────────────────────────────────
+  let _assetId   = null;
+  let _giorni    = 30;
+  let _zThreshold = 2.0;
+  let _summaryData = null;
+  let _anomaliesData = null;
+
+  const PLANT_LABEL = {
+    'hvac':         'HVAC',
+    'illuminazione':'Illuminazione',
+    'altri_carichi':'Prese / Utenze',
+    'ced':          'CED / Server',
+    'emergenza':    'Emergenza / UPS',
+    'contatore':    'Contatore principale',
+  };
+
+  // ── Inizializzazione ───────────────────────────────────────────────────────
+  async function init() {
+    await caricaAsset();
+    bindControls();
+  }
+
+  async function caricaAsset() {
+    try {
+      const raw = await API.get('/api/assets');
+      // L'endpoint restituisce GeoJSON FeatureCollection
+      let assets = [];
+      if (raw && raw.features) {
+        assets = raw.features.map(f => f.properties);
+      } else if (Array.isArray(raw)) {
+        assets = raw;
+      }
+      // Filtra solo asset con telemetria (per ora solo asset 6)
+      // In futuro: filtrare con has_telemetry flag
+      const sel = document.getElementById('ad-asset-select');
+      if (!assets || assets.length === 0) {
+        sel.innerHTML = '<option value="">Nessun asset disponibile</option>';
+        return;
+      }
+      sel.innerHTML = assets.map(a =>
+        `<option value="${a.id}">${a.codice} — ${a.nome}</option>`
+      ).join('');
+      // Preseleziona ASS-0006 (unico con telemetria nel dimostratore)
+      const ass6 = assets.find(a => a.codice === 'ASS-0006');
+      _assetId = ass6 ? ass6.id : assets[0].id;
+      sel.value = _assetId;
+      await caricaDati();
+    } catch(e) {
+      console.error('Errore caricamento asset:', e);
+    }
+  }
+
+  function bindControls() {
+    document.getElementById('ad-asset-select').addEventListener('change', async (e) => {
+      _assetId = parseInt(e.target.value);
+      await caricaDati();
+    });
+    document.getElementById('ad-giorni-select').addEventListener('change', async (e) => {
+      _giorni = parseInt(e.target.value);
+      await caricaDati();
+    });
+    document.getElementById('ad-zscore-select').addEventListener('change', async (e) => {
+      _zThreshold = parseFloat(e.target.value);
+      await caricaDati();
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const tabId = 'tab-' + btn.dataset.tab;
+        document.getElementById(tabId).classList.add('active');
+        if (btn.dataset.tab === 'baseline') {
+          const sel = document.getElementById('ad-plant-select');
+          if (sel.value) caricaBaselineChart(sel.value);
+        }
+        // Resize grafici Plotly al cambio tab
+        setTimeout(() => {
+          ['ad-baseline-chart','ad-baseline-full-chart'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el._fullLayout) Plotly.Plots.resize(el);
+          });
+        }, 50);
+      });
+    });
+    document.getElementById('ad-plant-select').addEventListener('change', (e) => {
+      if (e.target.value) caricaBaselineChart(e.target.value);
+    });
+  }
+
+  // ── Caricamento dati ───────────────────────────────────────────────────────
+  async function caricaDati() {
+    if (!_assetId) return;
+    mostraSpinner();
+    try {
+      const [summary, anomalies] = await Promise.all([
+        API.get(`/api/efficiency/${_assetId}/anomalies/summary?giorni=${_giorni}`),
+        API.get(`/api/efficiency/${_assetId}/anomalies?ore=${_giorni * 24}&z_threshold=${_zThreshold}`)
+      ]);
+      _summaryData   = summary;
+      _anomaliesData = anomalies;
+      aggiornaKPI(summary);
+      aggiornaTabella(summary);
+      aggiornaTimeline(anomalies);
+      popolaPlantSelect(summary);
+      document.getElementById('ad-last-update').textContent =
+        'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
+    } catch(e) {
+      console.error('Errore caricamento dati:', e);
+    }
+  }
+
+  function mostraSpinner() {
+    document.getElementById('ad-impianti-tbody').innerHTML =
+      '<tr><td colspan="10" class="ad-empty"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+    document.getElementById('ad-timeline-list').innerHTML =
+      '<div class="ad-empty"><div class="spinner" style="margin:0 auto"></div></div>';
+  }
+
+  // ── KPI strip ──────────────────────────────────────────────────────────────
+  function aggiornaKPI(d) {
+    document.getElementById('kpi-totale').textContent   = d.totale_anomalie ?? '–';
+    document.getElementById('kpi-alta').textContent     = d.totale_alta    ?? '–';
+    document.getElementById('kpi-media').textContent    = d.totale_media   ?? '–';
+    document.getElementById('kpi-bassa').textContent    = d.totale_bassa   ?? '–';
+    document.getElementById('kpi-impianti').textContent = d.impianti ? d.impianti.length : '–';
+    const zmax = d.impianti && d.impianti.length > 0
+      ? Math.max(...d.impianti.map(i => i.z_max || 0)).toFixed(1)
+      : '–';
+    document.getElementById('kpi-zmax').textContent = zmax;
+
+    // Badge header
+    const wrap = document.getElementById('ad-badge-wrap');
+    wrap.innerHTML = '';
+    if (d.totale_alta > 0) {
+      wrap.innerHTML += `<span class="badge badge-alarm">${d.totale_alta} alta</span>`;
+    }
+    if (d.totale_media > 0) {
+      wrap.innerHTML += `<span class="badge badge-warning">${d.totale_media} media</span>`;
+    }
+  }
+
+  // ── Tabella impianti ───────────────────────────────────────────────────────
+  function aggiornaTabella(d) {
+    const tbody = document.getElementById('ad-impianti-tbody');
+    if (!d.impianti || d.impianti.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="ad-empty">Nessuna anomalia rilevata nel periodo</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.impianti.map(r => {
+      const sev = r.n_alta > 0 ? 'alta' : r.n_media > 0 ? 'media' : 'bassa';
+      const badgeSev = `<span class="badge-${sev}">${sev.toUpperCase()}</span>`;
+      const ultimaTs = r.ultima_anomalia
+        ? new Date(r.ultima_anomalia).toLocaleString('it-IT', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+        : '–';
+      const tipoLabel = PLANT_LABEL[r.plant_tipo] || r.plant_tipo || '–';
+      return `<tr class="clickable" onclick="apriDettaglioImpianto('${r.plant_id}', '${r.plant_nome || r.plant_id}')">
+        <td><strong>${r.plant_nome || r.plant_id}</strong></td>
+        <td style="color:var(--text-muted)">${tipoLabel}</td>
+        <td>${badgeSev} <span style="margin-left:6px">${r.totale}</span></td>
+        <td style="color:var(--accent-red,#e74c3c);font-weight:600">${r.n_alta}</td>
+        <td style="color:var(--accent-orange,#e67e22)">${r.n_media}</td>
+        <td style="color:var(--accent-yellow,#f1c40f)">${r.n_bassa}</td>
+        <td style="font-weight:600">${r.z_max ?? '–'}</td>
+        <td style="color:var(--text-muted)">${ultimaTs}</td>
+        <td>${r.avg_kwh_anomalia != null ? r.avg_kwh_anomalia.toFixed(2) + ' kW' : '–'}</td>
+        <td style="color:var(--text-muted)">${r.avg_baseline != null ? r.avg_baseline.toFixed(2) + ' kW' : '–'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Timeline anomalie ──────────────────────────────────────────────────────
+  function aggiornaTimeline(d) {
+    const wrap = document.getElementById('ad-timeline-list');
+    if (!d.anomalies || d.anomalies.length === 0) {
+      wrap.innerHTML = '<div class="ad-empty">Nessuna anomalia nel periodo con la soglia selezionata</div>';
+      return;
+    }
+    // Ordine cronologico inverso
+    const sorted = [...d.anomalies].sort((a,b) => new Date(b.ts) - new Date(a.ts));
+    wrap.innerHTML = '<div class="ad-anomaly-list">' + sorted.map(a => {
+      const ts = new Date(a.ts).toLocaleString('it-IT', {
+        day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
+      });
+      const delta = a.baseline > 0
+        ? ((a.kwh - a.baseline) / a.baseline * 100).toFixed(1)
+        : null;
+      const deltaClass = delta > 0 ? 'pos' : 'neg';
+      const deltaStr   = delta != null ? (delta > 0 ? '+' : '') + delta + '%' : '–';
+      const sevBadge   = a.severita ? `<span class="badge-${a.severita}">${a.severita.toUpperCase()}</span>` : '';
+      return `<div class="ad-anomaly-item">
+        <span class="ts">${ts}</span>
+        <span class="plant">${a.plant_id}</span>
+        ${sevBadge}
+        <span class="val">${a.kwh != null ? a.kwh.toFixed(2) + ' kW' : '–'}</span>
+        <span style="color:var(--text-muted);font-size:11px">base: ${a.baseline != null ? a.baseline.toFixed(2) : '–'} kW</span>
+        <span class="delta ${deltaClass}">${deltaStr}</span>
+        <span style="color:var(--text-muted);font-size:11px">z=${a.z_score != null ? a.z_score.toFixed(2) : '–'}</span>
+        <span style="color:var(--text-muted);font-size:11px">${a.tipo === 'consumo_elevato' ? '↑ elevato' : '↓ basso'}</span>
+      </div>`;
+    }).join('') + '</div>';
+  }
+
+  // ── Plant select per tab Baseline ──────────────────────────────────────────
+  function popolaPlantSelect(d) {
+    const sel = document.getElementById('ad-plant-select');
+    if (!d.impianti || d.impianti.length === 0) {
+      sel.innerHTML = '<option value="">Nessun impianto disponibile</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">Seleziona impianto...</option>' +
+      d.impianti.map(r =>
+        `<option value="${r.plant_id}">${r.plant_nome || r.plant_id}</option>`
+      ).join('');
+  }
+
+  // ── Dettaglio impianto (grafico baseline + punti anomalia) ─────────────────
+  async function apriDettaglioImpianto(plantId, plantNome) {
+    const panel = document.getElementById('ad-detail-panel');
+    document.getElementById('ad-detail-title').textContent = plantNome + ' — Baseline vs Attuale (7 giorni)';
+    panel.classList.add('visible');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    await caricaBaselineChartInEl('ad-baseline-chart', plantId, 168);
+  }
+
+  function chiudiDettaglio() {
+    document.getElementById('ad-detail-panel').classList.remove('visible');
+  }
+
+  async function caricaBaselineChart(plantId) {
+    await caricaBaselineChartInEl('ad-baseline-full-chart', plantId, _giorni * 24);
+  }
+
+  async function caricaBaselineChartInEl(elId, plantId, ore) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%"><div class="spinner"></div></div>';
+    try {
+      const data = await API.get(`/api/efficiency/${_assetId}/baseline_hourly?ore=${ore}&plant_id=${encodeURIComponent(plantId)}`);
+      if (!data || !data.data || data.data.length === 0) {
+        el.innerHTML = '<div class="ad-empty">Nessun dato disponibile per questo impianto</div>';
+        return;
+      }
+      const rows = data.data;
+      const ts        = rows.map(r => r.ts);
+      const attuale   = rows.map(r => r.kwh_attuale);
+      const baseline  = rows.map(r => r.kwh_baseline);
+
+      // Anomalie (z-score > soglia) per evidenziarle sul grafico
+      const anomalie = (_anomaliesData && _anomaliesData.anomalies)
+        ? _anomaliesData.anomalies.filter(a => a.plant_id === plantId)
+        : [];
+      const anomTs  = anomalie.map(a => a.ts);
+      const anomKwh = anomalie.map(a => a.kwh);
+
+      const isDark = Tema.get() === 'dark';
+      const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+      const textColor = isDark ? '#a0b4c8' : '#555';
+
+      const traces = [
+        {
+          x: ts, y: attuale,
+          name: 'Consumo attuale',
+          type: 'scatter', mode: 'lines',
+          line: { color: '#3498db', width: 2 },
+          fill: 'tozeroy',
+          fillcolor: 'rgba(52,152,219,0.12)',
+        },
+        {
+          x: ts, y: baseline,
+          name: 'Baseline rolling',
+          type: 'scatter', mode: 'lines',
+          line: { color: '#2ecc71', width: 1.5, dash: 'dot' },
+        },
+      ];
+
+      if (anomTs.length > 0) {
+        traces.push({
+          x: anomTs, y: anomKwh,
+          name: 'Anomalia',
+          type: 'scatter', mode: 'markers',
+          marker: { color: '#e74c3c', size: 8, symbol: 'circle' },
+        });
+      }
+
+      const layout = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor:  'transparent',
+        margin: { t: 10, r: 50, b: 40, l: 50 },
+        xaxis: {
+          color: textColor, gridcolor: gridColor,
+          tickfont: { size: 10 }, showgrid: true,
+        },
+        yaxis: {
+          color: textColor, gridcolor: gridColor,
+          tickfont: { size: 10 }, title: { text: 'kW', font: { size: 11, color: textColor } },
+        },
+        legend: { font: { size: 11, color: textColor }, orientation: 'h', y: -0.15 },
+        hovermode: 'x unified',
+      };
+
+      el.innerHTML = '';
+      Plotly.newPlot(el, traces, layout, { responsive: true, displayModeBar: false });
+    } catch(e) {
+      console.error('Errore caricamento baseline chart:', e);
+      el.innerHTML = '<div class="ad-empty">Errore nel caricamento del grafico</div>';
+    }
+  }
+
+  // ── Avvio ──────────────────────────────────────────────────────────────────
+  init();
+  </script>
+</body>
+</html>

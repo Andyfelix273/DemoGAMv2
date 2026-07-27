@@ -237,7 +237,10 @@ const API = (() => {
     getWorkOrders, getWorkOrder, getWorkOrderStats, createWorkOrder, updateWorkOrder, deleteWorkOrder, getAssetWorkOrders,
     getAssetDocuments, getDocuments, getDocumentStats, uploadDocument, deleteDocument, getDocumentDownloadUrl,
     getDeadlines, getDeadlineStats, getDeadline, createDeadline, updateDeadline, deleteDeadline, getAssetDeadlines,
-    startAlarmPolling, stopAlarmPolling, onAlarmUpdate
+    startAlarmPolling, stopAlarmPolling, onAlarmUpdate,
+    // Shortcut generici per endpoint non mappati
+    get:  (path)       => request('GET',  path),
+    post: (path, body) => request('POST', path, body)
   };
 
 })();
