@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Asset Efficiency – Occupancy</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/v4-shims.min.css">
+  <link rel="stylesheet" href="/static/css/icons.css">
+  <link rel="stylesheet" href="/static/css/bems-ui.css?v=3">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    /* Riga 2 colonne */
+    .es-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+      align-items: start;
+    }
+    /* Riga 3 colonne */
+    .es-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+      align-items: start;
+    }
+    .es-chart-compact  { width: 100%; height: 200px; }
+    .es-chart-tall     { width: 100%; height: 280px; }
+    /* KPI strip */
+    .es-kpi-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    /* Separatore sezione */
+    .es-page-section-sep {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-blue, #58A6FF);
+      margin: 18px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color, rgba(30,58,95,0.5));
+    }
+    .es-page-section-sep i { font-size: 11px; }
+    /* KPI card valori */
+    .es-kpi-label { font-size: 10px; color: var(--text-secondary,#7BAFC4); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+    .es-kpi-value { font-size: 22px; font-weight: 700; color: var(--text-primary,#E8F4FD); line-height: 1.1; }
+    .es-kpi-unit  { font-size: 10px; color: var(--text-muted,#4A6FA5); margin-top: 2px; }
+    .es-kpi-delta { font-size: 10px; margin-top: 4px; }
+    .es-kpi-delta.up   { color: #E74C3C; }
+    .es-kpi-delta.down { color: #27AE60; }
+    .es-kpi-delta.flat { color: var(--text-muted,#4A6FA5); }
+    /* Tabella asset */
+    .occ-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .occ-table th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted,#4A6FA5); padding: 6px 8px; border-bottom: 1px solid var(--border-color,rgba(30,58,95,0.4)); text-align: left; }
+    .occ-table td { padding: 7px 8px; border-bottom: 1px solid rgba(30,58,95,0.2); color: var(--text-primary,#E8F4FD); vertical-align: middle; }
+    .occ-table tr:last-child td { border-bottom: none; }
+    .occ-table tr:hover td { background: rgba(30,58,95,0.15); }
+    /* Barra occupancy inline */
+    .occ-bar-wrap { display: flex; align-items: center; gap: 6px; }
+    .occ-bar-bg { flex: 1; height: 6px; border-radius: 3px; background: rgba(30,58,95,0.4); overflow: hidden; }
+    .occ-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  </style>
+</head>
+<body class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="sidebar-content">
+  <header class="topbar" id="topbar"></header>
+  <div class="page">
+
+    <div class="page-header">
+      <h1 class="page-title">
+        <i class="fa fa-users" style="margin-right:8px;color:var(--accent-blue);"></i>Occupancy &amp; Qualità Ambiente
+      </h1>
+      <div class="page-actions">
+        <select id="filter-giorni" class="btn btn-secondary btn-sm" style="padding:5px 10px;">
+          <option value="30" selected>Ultimi 30 giorni</option>
+          <option value="60">Ultimi 60 giorni</option>
+          <option value="90">Ultimi 90 giorni</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh" title="Aggiorna">
+          <i class="fa fa-sync-alt"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- SEZIONE SINTESI (P-O1, P-O3) -->
+      <div class="es-page-section-sep"><i class="fa fa-tachometer-alt"></i>Sintesi portafoglio</div>
+      <div class="es-kpi-strip" id="occ-kpi-strip">
+        <div class="es-kpi-card"><div class="es-kpi-label"><i class="fa fa-spinner fa-spin" style="margin-right:4px;"></i>Caricamento…</div></div>
+      </div>
+
+      <!-- SEZIONE ANALISI (P-O2, P-O5) -->
+      <div class="es-page-section-sep"><i class="fa fa-chart-bar"></i>Analisi</div>
+      <div class="es-row-2">
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title" data-kpi-tip="p-o2 — distribuzione dell'occupancy per giorno della settimana aggregata su tutto il portafoglio. rivela il fenomeno smart working a livello organizzativo: lo squilibrio tra giorni centrali (mar–gio) e marginali (lun, ven). barre blu = giorni lavorativi, grigio = weekend.">
+            <i class="fa fa-calendar-week"></i>Pattern settimanale portafoglio
+            <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-O2</span>
+          </div>
+          <div class="es-chart-compact" id="occ-chart-weekly"></div>
+        </div>
+        <div class="es-section" style="margin-bottom:0;">
+          <div class="es-section-title" data-kpi-tip="p-o5 — scatter plot strategico: ogni punto è un asset. asse x = tasso di occupazione medio (%), asse y = eui (kwh/m²/anno), dimensione = superficie. quadranti: alto-destra = molto usato, inefficiente → priorità intervento; basso-destra = molto usato, efficiente → benchmark; basso-sinistra = poco usato, efficiente → valutare consolidamento; alto-sinistra = poco usato, inefficiente → candidato a dismissione.">
+            <i class="fa fa-chart-scatter"></i>Mappa portafoglio: Occupancy vs EUI
+            <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;">P-O5</span>
+          </div>
+          <div class="es-chart-compact" id="occ-chart-scatter"></div>
+        </div>
+      </div>
+
+      <!-- SEZIONE DETTAGLIO ASSET (P-O1 per asset) -->
+      <div class="es-page-section-sep"><i class="fa fa-table"></i>Dettaglio per asset</div>
+      <div class="es-section" style="margin-bottom:0;">
+        <div class="table-wrap" style="margin-top:6px;">
+          <table class="occ-table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Tipo</th>
+                <th>Zone</th>
+                <th>Occupancy media</th>
+                <th style="min-width:120px;"></th>
+              </tr>
+            </thead>
+            <tbody id="occ-tbody">
+              <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Caricamento…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /page-body -->
+  </div><!-- /page -->
+  </div><!-- /sidebar-content -->
+
+  <script src="/static/js/api.js?v=3"></script>
+  <script src="/static/js/i18n.js?v=2"></script>
+  <script src="/static/js/utils.js?v=2"></script>
+  <script>
+  /* global API, renderSidebar, renderTopbar, Plotly */
+
+  const plotCfg = { responsive: true, displayModeBar: false };
+
+  const baseLayout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font: { family: 'Inter,sans-serif', size: 11, color: '#7BAFC4' },
+    xaxis: { gridcolor: 'rgba(30,58,95,0.4)', zerolinecolor: 'rgba(30,58,95,0.4)', tickfont: { size: 10 } },
+    yaxis: { gridcolor: 'rgba(30,58,95,0.4)', zerolinecolor: 'rgba(30,58,95,0.4)', tickfont: { size: 10 } },
+    legend: { orientation: 'h', y: -0.25, x: 0, font: { size: 10 }, bgcolor: 'transparent' },
+    margin: { t: 8, r: 16, b: 42, l: 46 }
+  };
+
+  const fmt    = (v, d=1) => v == null ? '–' : Number(v).toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const trendCl = (v) => v == null ? 'flat' : v > 0 ? 'up' : 'down';
+  const trendIc = (v) => v == null ? '' : v > 0 ? '<i class="fa fa-arrow-up"></i>' : '<i class="fa fa-arrow-down"></i>';
+
+  function occColor(pct) {
+    if (pct == null) return '#4A7A9B';
+    if (pct >= 70) return '#27AE60';
+    if (pct >= 40) return '#F39C12';
+    return '#1E88E5';
+  }
+
+  async function caricaOccupancy() {
+    const AUTH    = { 'Authorization': 'Bearer ' + API.getToken() };
+    const giorni  = parseInt(document.getElementById('filter-giorni').value);
+
+    // ── P-O1 / P-O3: KPI strip ───────────────────────────────────────────────
+    try {
+      const res = await fetch(`/api/occupancy/portfolio/summary?giorni=${giorni}`, { headers: AUTH });
+      const d   = res.ok ? await res.json() : null;
+      const strip = document.getElementById('occ-kpi-strip');
+
+      if (d && d.avg_pct_portfolio !== null) {
+        const avgPct = d.avg_pct_portfolio;
+        const delta  = d.delta_pct;
+        const deltaHtml = delta !== null && delta !== undefined
+          ? `<div class="es-kpi-delta ${trendCl(delta)}">${trendIc(delta)} ${fmt(Math.abs(delta))}% vs periodo prec.</div>` : '';
+
+        strip.innerHTML = `
+          <div class="es-kpi-card" data-kpi-tip="p-o1 — tasso di utilizzo medio del portafoglio: media dei tassi di occupazione di tutti gli asset con sensori di presenza configurati nel periodo selezionato.">
+            <div class="es-kpi-label"><i class="fa fa-users" style="margin-right:4px;"></i>Utilizzo medio portafoglio (P-O1)</div>
+            <div class="es-kpi-value" style="color:${occColor(avgPct)};">${fmt(avgPct)}%</div>
+            <div class="es-kpi-unit">${d.n_asset_con_sensori} asset monitorati · ${giorni} giorni</div>
+            ${deltaHtml}
+          </div>
+          <div class="es-kpi-card" data-kpi-tip="p-o3 — numero di asset in cui la qualità dell'aria è risultata critica (co2 > soglia per più del 20% delle ore occupate). non disponibile: sensori co2 non configurati." style="opacity:0.55;">
+            <div class="es-kpi-label"><i class="fa fa-wind" style="margin-right:4px;"></i>Asset qualità aria critica (P-O3)</div>
+            <div class="es-kpi-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+            <div class="es-kpi-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori CO₂ non configurati</div>
+          </div>
+          <div class="es-kpi-card" data-kpi-tip="p-o4 — indice di comfort termico medio (pmv) del portafoglio. non disponibile: sensori temperatura/umidità non configurati." style="opacity:0.55;">
+            <div class="es-kpi-label"><i class="fa fa-thermometer-half" style="margin-right:4px;"></i>Comfort termico medio (P-O4)</div>
+            <div class="es-kpi-value" style="color:var(--text-muted,#4A7A9B);">n/d</div>
+            <div class="es-kpi-unit"><i class="fa fa-lock" style="margin-right:3px;"></i>sensori T/RH non configurati</div>
+          </div>`;
+
+        // Tabella dettaglio asset
+        const tbody = document.getElementById('occ-tbody');
+        if (d.asset && d.asset.length) {
+          tbody.innerHTML = d.asset.map(a => {
+            const pct   = a.avg_pct;
+            const color = occColor(pct);
+            const barW  = Math.min(100, pct || 0);
+            return `<tr>
+              <td><strong>${a.nome}</strong></td>
+              <td style="color:var(--text-muted);font-size:11px;">${a.tipo}</td>
+              <td style="color:var(--text-muted);font-size:11px;text-align:center;">${a.zone_count}</td>
+              <td style="font-weight:700;color:${color};">${fmt(pct)}%</td>
+              <td>
+                <div class="occ-bar-wrap">
+                  <div class="occ-bar-bg">
+                    <div class="occ-bar-fill" style="width:${barW}%;background:${color};"></div>
+                  </div>
+                </div>
+              </td>
+            </tr>`;
+          }).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun asset con sensori di presenza configurati</td></tr>';
+        }
+
+      } else {
+        strip.innerHTML = `
+          <div class="es-kpi-card" style="opacity:0.6;">
+            <div class="es-kpi-label"><i class="fa fa-info-circle" style="margin-right:4px;"></i>Occupancy portafoglio</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Nessun asset con sensori di presenza configurati</div>
+          </div>`;
+        document.getElementById('occ-tbody').innerHTML =
+          '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun dato disponibile</td></tr>';
+      }
+    } catch(e) { console.warn('[Occ P-O1]', e); }
+
+    // ── P-O2: Pattern settimanale ─────────────────────────────────────────────
+    try {
+      const res = await fetch(`/api/occupancy/portfolio/weekly_pattern_v2?giorni=${Math.max(giorni, 30)}`, { headers: AUTH });
+      const d   = res.ok ? await res.json() : null;
+      const el  = document.getElementById('occ-chart-weekly');
+
+      if (d && d.data && d.data.length) {
+        const avgLav = d.data
+          .filter(r => r.lavorativo && r.avg_pct !== null)
+          .reduce((s, r, _, a) => s + r.avg_pct / a.length, 0);
+
+        Plotly.newPlot(el, [
+          {
+            x: d.data.map(r => r.label),
+            y: d.data.map(r => r.avg_pct),
+            type: 'bar',
+            name: 'Occupancy %',
+            marker: { color: d.data.map(r => r.lavorativo ? '#1E88E5' : '#4A7A9B') },
+            hovertemplate: '<b>%{x}</b><br>Occupancy: %{y:.1f}%<extra></extra>'
+          },
+          {
+            x: d.data.map(r => r.label),
+            y: d.data.map(() => avgLav),
+            type: 'scatter', mode: 'lines', name: 'Media lavorativi',
+            line: { color: '#F39C12', width: 1.5, dash: 'dash' },
+            hoverinfo: 'skip'
+          }
+        ], Object.assign({}, baseLayout, {
+          bargap: 0.25,
+          yaxis: Object.assign({}, baseLayout.yaxis, {
+            range: [0, 100],
+            title: { text: '%', font: { size: 10 }, standoff: 4 }
+          })
+        }), plotCfg);
+      } else {
+        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-info-circle" style="margin-right:6px;"></i>Dati non disponibili</div>';
+      }
+    } catch(e) { console.warn('[Occ P-O2]', e); }
+
+    // ── P-O5: Scatter Occupancy vs EUI ───────────────────────────────────────
+    try {
+      const res = await fetch('/api/occupancy/portfolio/scatter_eui', { headers: AUTH });
+      const d   = res.ok ? await res.json() : null;
+      const el  = document.getElementById('occ-chart-scatter');
+
+      if (d && d.data && d.data.length >= 2) {
+        const pts    = d.data;
+        const avgOcc = pts.reduce((s, p) => s + p.avg_pct, 0) / pts.length;
+        const avgEui = pts.filter(p => p.eui).reduce((s, p) => s + p.eui, 0) / pts.filter(p => p.eui).length;
+
+        Plotly.newPlot(el, [{
+          x: pts.map(p => p.avg_pct),
+          y: pts.map(p => p.eui),
+          mode: 'markers+text',
+          type: 'scatter',
+          text: pts.map(p => p.nome),
+          textposition: 'top center',
+          textfont: { size: 9 },
+          marker: {
+            size: pts.map(p => Math.max(10, Math.min(32, Math.sqrt(p.superficie_mq || 1000) / 3))),
+            color: pts.map(p => p.avg_pct >= 60
+              ? (p.eui > avgEui ? '#E74C3C' : '#27AE60')
+              : (p.eui > avgEui ? '#F39C12' : '#1E88E5')),
+            opacity: 0.85,
+            line: { width: 1, color: 'rgba(255,255,255,0.2)' }
+          },
+          hovertemplate: '<b>%{text}</b><br>Occupancy: %{x:.1f}%<br>EUI: %{y:.1f} kWh/m²/anno<extra></extra>'
+        }], Object.assign({}, baseLayout, {
+          margin: { t: 8, r: 16, b: 50, l: 62 },
+          xaxis: Object.assign({}, baseLayout.xaxis, {
+            title: { text: 'Tasso occupazione (%)', font: { size: 10 }, standoff: 4 },
+            range: [0, 100]
+          }),
+          yaxis: Object.assign({}, baseLayout.yaxis, {
+            title: { text: 'EUI (kWh/m²/anno)', font: { size: 10 }, standoff: 4 }
+          }),
+          shapes: [
+            { type:'line', x0:avgOcc, x1:avgOcc, y0:0, y1:1, yref:'paper',
+              line:{ color:'rgba(255,255,255,0.15)', dash:'dot', width:1 } },
+            { type:'line', x0:0, x1:1, xref:'paper', y0:avgEui, y1:avgEui,
+              line:{ color:'rgba(255,255,255,0.15)', dash:'dot', width:1 } }
+          ],
+          annotations: [
+            { x:97, y:0, xref:'x', yref:'paper', text:'Molto usato', showarrow:false,
+              font:{ size:8, color:'#4A7A9B' }, xanchor:'right' },
+            { x:3,  y:0, xref:'x', yref:'paper', text:'Poco usato', showarrow:false,
+              font:{ size:8, color:'#4A7A9B' }, xanchor:'left' }
+          ]
+        }), plotCfg);
+      } else {
+        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;"><i class="fa fa-info-circle" style="margin-right:6px;"></i>Dati insufficienti (servono ≥ 2 asset con occupancy e EUI)</div>';
+      }
+    } catch(e) { console.warn('[Occ P-O5]', e); }
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    renderSidebar('eff-occupancy', 'efficiency');
+    renderTopbar('eff-occupancy', { titolo: 'Asset Efficiency', filtri: false });
+    caricaOccupancy();
+    document.getElementById('filter-giorni').addEventListener('change', caricaOccupancy);
+    document.getElementById('btn-refresh').addEventListener('click', caricaOccupancy);
+  });
+  </script>
+</body>
+</html>
