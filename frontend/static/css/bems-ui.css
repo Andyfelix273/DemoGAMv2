@@ -1256,9 +1256,7 @@ a.module-card:hover {
   border-radius: 8px;
   padding: 10px 14px;
 }
-.ee-kpi-card.accent-orange { border-top: 2px solid var(--accent-orange); }
-.ee-kpi-card.accent-green  { border-top: 2px solid var(--accent-green); }
-.ee-kpi-card.accent-red    { border-top: 2px solid var(--accent-red); }
+/* accent-* border-top rimosso: il colore va solo sul valore, non sul bordo (allineato a es-kpi-card) */
 .ee-kpi-card-label {
   font-size: 10px;
   text-transform: uppercase;
